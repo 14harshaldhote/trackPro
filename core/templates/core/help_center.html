@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}Help & Guide{% endblock %}
+
+{% block content %}
+<div class="main-content fade-in">
+    <h1>Help & Getting Started Guide</h1>
+    <p class="text-secondary" style="margin-bottom: 2rem;">Everything you need to know about Tracker Pro</p>
+
+    <!-- Quick Start Guide -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="margin-bottom: 1rem;">
+            <svg class="icon" width="24" height="24">
+                <use href="/static/icons/sprite.svg#check"></use>
+            </svg>
+            Quick Start Guide
+        </h2>
+
+        <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
+            <div
+                style="padding: 1.5rem; background: var(--color-bg); border-radius: 8px; border-left: 4px solid var(--color-primary);">
+                <h3 style="margin-bottom: 0.5rem;">1. Create a Tracker</h3>
+                <p class="text-secondary">Click "New Tracker", give it a name, and choose a template category
+                    (Productivity, Fitness, etc.)</p>
+            </div>
+
+            <div
+                style="padding: 1.5rem; background: var(--color-bg); border-radius: 8px; border-left: 4px solid var(--color-primary);">
+                <h3 style="margin-bottom: 0.5rem;">2. Add or Edit Tasks</h3>
+                <p class="text-secondary">Go to "Manage Tasks" to add, edit, or remove activities you want to track</p>
+            </div>
+
+            <div
+                style="padding: 1.5rem; background: var(--color-bg); border-radius: 8px; border-left: 4px solid var(--color-primary);">
+                <h3 style="margin-bottom: 0.5rem;">3. Track Daily</h3>
+                <p class="text-secondary">Use "Today" view to mark tasks as done. Click status buttons to cycle: TODO →
+                    IN PROGRESS → DONE</p>
+            </div>
+
+            <div
+                style="padding: 1.5rem; background: var(--color-bg); border-radius: 8px; border-left: 4px solid var(--color-primary);">
+                <h3 style="margin-bottom: 0.5rem;">4. Review Insights</h3>
+                <p class="text-secondary">Check Week/Month views for patterns, and Insights for personalized
+                    recommendations</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Time-Based Views -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="margin-bottom: 1rem;">Time-Based Views</h2>
+
+        <div style="margin-top: 1rem;">
+            <h4>
+                <svg class="icon" width="20" height="20">
+                    <use href="/static/icons/sprite.svg#home"></use>
+                </svg>
+                Today View
+            </h4>
+            <p class="text-secondary">Focus on what you need to do TODAY. Shows all tasks with current status, progress
+                bar, and completion stats.</p>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                <li>Click status circles to toggle: TODO → IN PROGRESS → DONE</li>
+                <li>Tasks strike through when completed</li>
+                <li>Real-time progress updates</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+            <h4>
+                <svg class="icon" width="20" height="20">
+                    <use href="/static/icons/sprite.svg#chart"></use>
+                </svg>
+                Week View
+            </h4>
+            <p class="text-secondary">7-day grid (Mon-Sun) showing all tasks across the week. Perfect for seeing
+                patterns and consistency.</p>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem;">
+                <li>Each cell = one task on one day</li>
+                <li>Click any cell to toggle status</li>
+                <li>Today's column is highlighted</li>
+                <li>Navigate previous/next weeks</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+            <h4>
+                <svg class="icon" width="20" height="20">
+                    <use href="/static/icons/sprite.svg#chart"></use>
+                </svg>
+                Month View
+            </h4>
+            <p class="text-secondary">Full calendar grid with all tasks. Best for long-term habit tracking.</p>
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+            <h4>
+                <svg class="icon" width="20" height="20">
+                    <use href="/static/icons/sprite.svg#chart"></use>
+                </svg>
+                Custom Range
+            </h4>
+            <p class="text-secondary">Select any date range for flexible reporting. Includes bulk actions.</p>
+        </div>
+    </div>
+
+    <!-- Status System -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="margin-bottom: 1rem;">Understanding Task Status</h2>
+
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid var(--color-border);">
+                <td style="padding: 1rem; font-weight: 500;">TODO</td>
+                <td style="padding: 1rem;">Grey circle ○</td>
+                <td style="padding: 1rem;" class="text-secondary">Not started</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--color-border);">
+                <td style="padding: 1rem; font-weight: 500;">IN PROGRESS</td>
+                <td style="padding: 1rem;">Blue half-circle ◐</td>
+                <td style="padding: 1rem;" class="text-secondary">Currently working on it</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--color-border);">
+                <td style="padding: 1rem; font-weight: 500;">DONE</td>
+                <td style="padding: 1rem;">Green checkmark ✓</td>
+                <td style="padding: 1rem;" class="text-secondary">Completed</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--color-border);">
+                <td style="padding: 1rem; font-weight: 500;">MISSED</td>
+                <td style="padding: 1rem;">Red X ✗</td>
+                <td style="padding: 1rem;" class="text-secondary">Overdue/skipped</td>
+            </tr>
+            <tr>
+                <td style="padding: 1rem; font-weight: 500;">BLOCKED</td>
+                <td style="padding: 1rem;">Orange warning ⚠</td>
+                <td style="padding: 1rem;" class="text-secondary">Can't proceed (optional)</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- FAQs -->
+    <div class="card">
+        <h2 style="margin-bottom: 1rem;">Frequently Asked Questions</h2>
+
+        <details style="padding: 1rem 0; border-bottom: 1px solid var(--color-border);">
+            <summary style="font-weight: 500; cursor: pointer;">How do I add tasks to a tracker?</summary>
+            <p class="text-secondary" style="margin-top: 0.5rem;">Go to your tracker page → Click "Manage Tasks" → Click
+                "+ Add New Task". Fill in the task description and category.</p>
+        </details>
+
+        <details style="padding: 1rem 0; border-bottom: 1px solid var(--color-border);">
+            <summary style="font-weight: 500; cursor: pointer;">Can I use templates?</summary>
+            <p class="text-secondary" style="margin-top: 0.5rem;">Yes! When creating a tracker, select a category
+                (Productivity, Fitness, Study, Wellbeing) and tasks will be auto-added. You can also browse all
+                templates from the sidebar.</p>
+        </details>
+
+        <details style="padding: 1rem 0; border-bottom: 1px solid var(--color-border);">
+            <summary style="font-weight: 500; cursor: pointer;">What's the difference between deleting a template vs.
+                instances?</summary>
+            <p class="text-secondary" style="margin-top: 0.5rem;">Deleting a template removes it from future days.
+                Deleting instances removes all past data for that task. By default, only the template is deleted to
+                preserve your history.</p>
+        </details>
+
+        <details style="padding: 1rem 0; border-bottom: 1px solid var(--color-border);">
+            <summary style="font-weight: 500; cursor: pointer;">How do bulk actions work?</summary>
+            <p class="text-secondary" style="margin-top: 0.5rem;">In Custom Range view, you can select multiple tasks
+                and mark them all as done, or use "Mark Overdue as Missed" to automatically update past TODO tasks.</p>
+        </details>
+
+        <details style="padding: 1rem 0;">
+            <summary style="font-weight: 500; cursor: pointer;">Where can I see my progress?</summary>
+            <p class="text-secondary" style="margin-top: 0.5rem;">Check the "Insights" page for plain-English analysis,
+                recommendations, and per-task performance. Analytics page has advanced charts and correlations.</p>
+        </details>
+    </div>
+
+    <!-- Tips -->
+    <div class="card" style="margin-top: 2rem; background: rgba(var(--color-primary-rgb, 2, 119, 189), 0.1);">
+        <h3 style="margin-bottom: 1rem;">Pro Tips</h3>
+        <ul style="padding-left: 1.5rem;">
+            <li>Start with 3-5 core tasks, not 20 - you'll have better follow-through</li>
+            <li>Use the Week view to spot patterns in when you complete tasks</li>
+            <li>Weight important tasks higher (1-10 scale) - it affects your completion percentage</li>
+            <li>Check Insights weekly for personalized recommendations</li>
+            <li>Duplicate tasks to quickly create similar ones</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics - {{ tracker.name }}{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div style="margin-bottom: 2rem;">
+        <a href="{% url 'tracker_detail' tracker.tracker_id %}" class="btn btn-ghost">← Back to Tracker</a>
+        <h1 style="margin: 1rem 0;">📊 Analytics Dashboard</h1>
+        <p class="text-secondary">{{ tracker.name }}</p>
+    </div>
+
+    <!-- Key Metrics Grid -->
+    <div class="grid-4" style="margin-bottom: 2rem;">
+        <div class="card">
+            <div class="stat-item">
+                <div class="stat-value">{{ completion.value|floatformat:1 }}%</div>
+                <div class="stat-label">Completion Rate</div>
+                <p class="text-secondary" style="font-size: 0.75rem; margin-top: 0.5rem;">
+                    {{ completion.raw_inputs.completed_tasks }} / {{ completion.raw_inputs.total_tasks }} tasks
+                </p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="stat-item">
+                <div class="stat-value">{{ streaks.value.current_streak }}</div>
+                <div class="stat-label">Current Streak</div>
+                <p class="text-secondary" style="font-size: 0.75rem; margin-top: 0.5rem;">
+                    Longest: {{ streaks.value.longest_streak }} days
+                </p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="stat-item">
+                <div class="stat-value">{{ consistency.value|floatformat:0 }}</div>
+                <div class="stat-label">Consistency Score</div>
+                <p class="text-secondary" style="font-size: 0.75rem; margin-top: 0.5rem;">
+                    Out of 100
+                </p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="stat-item">
+                <div class="stat-value">{{ effort.value|floatformat:0 }}</div>
+                <div class="stat-label">Effort Index</div>
+                <p class="text-secondary" style="font-size: 0.75rem; margin-top: 0.5rem;">
+                    Weighted tasks
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    {% if completion_chart %}
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h3>Completion Trend</h3>
+        </div>
+        <img src="data:image/png;base64,{{ completion_chart }}" alt="Completion" style="width: 100%; height: auto;">
+    </div>
+    {% endif %}
+
+    <div class="grid-2" style="margin-bottom: 2rem;">
+        {% if heatmap %}
+        <div class="card">
+            <div class="card-header">
+                <h3>30-Day Heatmap</h3>
+            </div>
+            <img src="data:image/png;base64,{{ heatmap }}" alt="Heatmap" style="width: 100%; height: auto;">
+        </div>
+        {% endif %}
+
+        {% if streak_timeline %}
+        <div class="card">
+            <div class="card-header">
+                <h3>Streak Timeline</h3>
+            </div>
+            <img src="data:image/png;base64,{{ streak_timeline }}" alt="Streaks" style="width: 100%; height: auto;">
+        </div>
+        {% endif %}
+    </div>
+
+    {% if progress_trend %}
+    <div class="card">
+        <div class="card-header">
+            <h3>Progress with Trend Line</h3>
+        </div>
+        <img src="data:image/png;base64,{{ progress_trend }}" alt="Progress" style="width: 100%; height: auto;">
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

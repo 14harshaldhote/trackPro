@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% load tracker_filters %}
+
+{% block title %}Today - {{ tracker.name }}{% endblock %}
+
+{% block content %}
+<div class="main-content fade-in">
+    <!-- Header -->
+    <div style="margin-bottom: 2rem;">
+        <a href="{% url 'tracker_detail' tracker.tracker_id %}" class="btn btn-ghost">← Back</a>
+        <h1 style="margin: 1rem 0;">📅 Today's Tasks</h1>
+        <p class="text-secondary">{{ tracker.name }} - {{ today|date:"l, F j, Y" }}</p>
+    </div>
+
+    <!-- Progress Summary -->
+    <div class="grid-3" style="margin-bottom: 2rem;">
+        <div class="card">
+            <div class="stat-item">
+                <div class="stat-value">{{ done_tasks }}/{{ total_tasks }}</div>
+                <div class="stat-label">Completed</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="stat-item">
+                <div class="stat-value">{{ completion_rate|floatformat:0 }}%</div>
+                <div class="stat-label">Progress</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="stat-item">
+                <div class="stat-value">{{ in_progress_tasks }}</div>
+                <div class="stat-label">In Progress</div>
+            </div>
+        </div>
+    </div>
+
+    <!--progress Bar -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="progress-bar" style="height: 12px;">
+            <div class="progress-fill" style="width: {{ completion_rate }}%;"></div>
+        </div>
+        <p class="text-secondary" style="text-align: center; margin-top: 0.5rem; font-size: 0.875rem;">
+            {{ done_tasks }} of {{ total_tasks }} tasks completed
+        </p>
+    </div>
+
+    <!--Tasks List -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Your Tasks</h3>
+            <span class="badge badge-primary">{{ total_tasks }} total</span>
+        </div>
+
+        {% if tasks %}
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+            {% for item in tasks %}
+            <div class="task-row" style="display: flex; align-items: center; padding: 1rem; background: var(--color-bg); border-radius: 8px; border-left: 3px solid 
+                {% if item.status == 'DONE' %}#10B981
+                {% elif item.status == 'IN_PROGRESS' %}#3B82F6
+                {% elif item.status == 'MISSED' %}#EF4444
+                {% elif item.status == 'BLOCKED' %}#F59E0B
+                {% else %}var(--color-border){% endif %}; transition: all 0.2s;">
+
+                <!-- Status Button -->
+                {% if item.task %}
+                <button onclick="toggleStatus('{{ item.task.task_instance_id }}')" class="status-btn"
+                    id="status-{{ item.task.task_instance_id }}" data-status="{{ item.status }}"
+                    style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--color-border); 
+                        background: {% if item.status == 'DONE' %}#10B981{% elif item.status == 'IN_PROGRESS' %}#3B82F6{% else %}transparent{% endif %}; 
+                        cursor: pointer; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s;">
+                    {% if item.status == 'DONE' %}
+                    <span style="color: white;">✓</span>
+                    {% elif item.status == 'IN_PROGRESS' %}
+                    <span style="color: white;">◐</span>
+                    {% elif item.status == 'MISSED' %}
+                    <span style="color: #EF4444;">✗</span>
+                    {% elif item.status == 'BLOCKED' %}
+                    <span style="color: #F59E0B;">⚠</span>
+                    {% else %}
+                    <span style="color: var(--color-text-secondary);">○</span>
+                    {% endif %}
+                </button>
+                {% else %}
+                <button disabled
+                    style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--color-border); 
+                        background: transparent; cursor: not-allowed; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: 0.3;">
+                    <span style="color: var(--color-text-secondary);">○</span>
+                </button>
+                {% endif %}
+
+                <!-- Task Info -->
+                <div style="flex: 1; margin-left: 1rem;">
+                    <div
+                        style="font-weight: 500; font-size: 1rem; {% if item.status == 'DONE' %}text-decoration: line-through; opacity: 0.7;{% endif %}">
+                        {{ item.template.description }}
+                    </div>
+                    {% if item.template.category %}
+                    <span class="badge badge-primary" style="margin-top: 0.25rem;">{{ item.template.category }}</span>
+                    {% endif %}
+                    {% if item.notes %}
+                    <p class="text-secondary" style="font-size: 0.875rem; margin-top: 0.5rem;">{{ item.notes }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Status Badge -->
+                <span class="badge"
+                    style="flex-shrink: 0;
+                    {% if item.status == 'DONE' %}background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid #10B981;
+                    {% elif item.status == 'IN_PROGRESS' %}background: rgba(59, 130, 246, 0.15); color: #3B82F6; border: 1px solid #3B82F6;
+                    {% elif item.status == 'MISSED' %}background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid #EF4444;
+                    {% elif item.status == 'BLOCKED' %}background: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid #F59E0B;
+                    {% else %}background: rgba(128, 128, 128, 0.15); color: #808080; border: 1px solid #808080;{% endif %}">
+                    {{ status_info|get_item:item.status|get_item:'label'|default:item.status }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 3rem;">
+            <p class="text-secondary">No tasks configured for this tracker.</p>
+            <a href="{% url 'tracker_detail' tracker.tracker_id %}" class="btn btn-primary" style="margin-top: 1rem;">
+                Add Tasks
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    function toggleStatus(taskId) {
+        if (!taskId) return;
+
+        const btn = document.getElementById('status-' + taskId);
+        const currentStatus = btn.dataset.status;
+
+        // Define status cycle
+        const statusCycle = {
+            'TODO': 'IN_PROGRESS',
+            'IN_PROGRESS': 'DONE',
+            'DONE': 'TODO'
+        };
+
+        fetch(`/api/task/${taskId}/toggle/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Reload to show updated UI
+                    location.reload();
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

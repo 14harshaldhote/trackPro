@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}Export - {{ tracker.name }}{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div style="margin-bottom: 2rem;">
+        <a href="{% url 'tracker_detail' tracker.tracker_id %}" class="btn btn-ghost">← Back</a>
+        <h1 style="margin: 1rem 0;">💾 Export Center</h1>
+        <p class="text-secondary">{{ tracker.name }}</p>
+    </div>
+
+    <div class="grid-2">
+        <!-- Excel Summary Report -->
+        <div class="card">
+            <h3 style="margin-bottom: 1rem;">📊 Excel Summary Report</h3>
+            <p class="text-secondary" style="margin-bottom: 1.5rem;">
+                Comprehensive report with metrics, charts, and daily data in a professional Excel workbook.
+            </p>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="export_type" value="excel_summary">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    Download Excel Report
+                </button>
+            </form>
+        </div>
+
+        <!-- CSV Export -->
+        <div class="card">
+            <h3 style="margin-bottom: 1rem;">📄 CSV Data Export</h3>
+            <p class="text-secondary" style="margin-bottom: 1.5rem;">
+                Plain text format with daily completion data. Great for further analysis in external tools.
+            </p>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="export_type" value="csv">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    Download CSV
+                </button>
+            </form>
+        </div>
+
+        <!-- JSON Export -->
+        <div class="card">
+            <h3 style="margin-bottom: 1rem;">⚙️ JSON Export</h3>
+            <p class="text-secondary" style="margin-bottom: 1.5rem;">
+                Structured data format perfect for API integrations and programmatic access.
+            </p>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="export_type" value="json">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    Download JSON
+                </button>
+            </form>
+        </div>
+
+        <!-- YAML Export -->
+        <div class="card">
+            <h3 style="margin-bottom: 1rem;">📝 YAML Export</h3>
+            <p class="text-secondary" style="margin-bottom: 1.5rem;">
+                Human-readable configuration format. Ideal for backups and version control.
+            </p>
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="export_type" value="yaml">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    Download YAML
+                </button>
+            </form>
+        </div>
+
+        <!-- My Journey Report -->
+        <div class="card" style="grid-column: span 2;">
+            <h3 style="margin-bottom: 1rem;">🗺️ My Journey Timeline</h3>
+            <p class="text-secondary" style="margin-bottom: 1.5rem;">
+                Complete audit log timeline with milestones and narrative summary in Excel format.
+            </p>
+            <div style="display: flex; gap: 1rem;">
+                <form method="POST" style="flex: 1;">
+                    {% csrf_token %}
+                    <input type="hidden" name="export_type" value="journey">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        Download Journey Report
+                    </button>
+                </form>
+                <a href="{% url 'my_journey' tracker.tracker_id %}" class="btn btn-ghost" style="flex: 1;">
+                    View Online
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

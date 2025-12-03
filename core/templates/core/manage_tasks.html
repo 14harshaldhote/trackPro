@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage Tasks - {{ tracker.name }}{% endblock %}
+
+{% block content %}
+<div class="main-content fade-in">
+    <!-- Header -->
+    <div style="margin-bottom: 2rem;">
+        <div class="card-header" style="border: none; padding: 0;">
+            <div>
+                <a href="{% url 'tracker_detail' tracker.tracker_id %}" class="btn btn-ghost">← Back</a>
+                <h1 style="margin: 1rem 0;">⚙️ Manage Tasks</h1>
+                <p class="text-secondary">{{ tracker.name }}</p>
+            </div>
+            <a href="{% url 'add_task' tracker.tracker_id %}" class="btn btn-primary">
+                ➕ Add New Task
+            </a>
+        </div>
+    </div>
+
+    <!-- Tasks List -->
+    <div class="card">
+        {% if templates %}
+        <div class="task-list-container">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--color-border);">
+                        <th style="width: 30px;"></th>
+                        <th style="text-align: left; padding: 1rem;">Task</th>
+                        <th style="text-align: center; padding: 1rem;">Category</th>
+                        <th style="text-align: center; padding: 1rem;">Recurring</th>
+                        <th style="text-align: center; padding: 1rem;">Weight</th>
+                        <th style="text-align: right; padding: 1rem;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for template in templates %}
+                    <tr class="draggable" data-id="{{ template.template_id }}"
+                        style="border-bottom: 1px solid var(--color-border); transition: background 0.2s;"
+                        onmouseover="this.style.background='var(--color-bg)'"
+                        onmouseout="this.style.background='transparent'">
+                        <td style="padding: 1rem; text-align: center;">
+                            <span class="drag-handle" style="cursor: grab; font-size: 1.2rem;">⋮⋮</span>
+                        </td>
+                        <td style="padding: 1rem;">
+                            <div style="font-weight: 500;">{{ template.description }}</div>
+                        </td>
+                        <td style="text-align: center; padding: 1rem;">
+                            {% if template.category %}
+                            <span class="badge badge-primary">{{ template.category }}</span>
+                            {% else %}
+                            <span class="text-secondary">-</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center; padding: 1rem;">
+                            {% if template.is_recurring %}
+                            <span style="color: var(--color-success);">✓</span>
+                            {% else %}
+                            <span class="text-secondary">-</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: center; padding: 1rem;">
+                            {{ template.weight|default:"1" }}
+                        </td>
+                        <td style="text-align: right; padding: 1rem;">
+                            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                <a href="{% url 'edit_task' template.template_id %}" class="btn btn-ghost btn-sm">
+                                    ✏️ Edit
+                                </a>
+                                <a href="{% url 'duplicate_task' template.template_id %}" class="btn btn-ghost btn-sm">
+                                    📋 Duplicate
+                                </a>
+                                <button
+                                    onclick="confirmDelete('{{ template.template_id }}', '{{ template.description }}')"
+                                    class="btn btn-ghost btn-sm" style="color: var(--color-error);">
+                                    🗑️ Delete
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 3rem;">
+            <p class="text-secondary" style="margin-bottom: 1.5rem;">No tasks yet. Add your first task!</p>
+            <a href="{% url 'add_task' tracker.tracker_id %}" class="btn btn-primary">
+                ➕ Add Task
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Info Card -->
+    <div class="card" style="margin-top: 2rem; background: rgba(var(--color-primary-rgb, 2, 119, 189), 0.1);">
+        <h4 style="margin-bottom: 0.5rem;">💡 Task Management Tips</h4>
+        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li><strong>Edit:</strong> Update task name, category, or properties</li>
+            <li><strong>Duplicate:</strong> Create a copy to modify for a similar task</li>
+            <li><strong>Delete:</strong> Remove template only or all instances</li>
+            <li><strong>Weight:</strong> Used for analytics - higher weight = more importance</li>
+        </ul>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal"
+    style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 500px; margin: 2rem;">
+        <h3 style="margin-bottom: 1rem;">⚠️ Delete Task</h3>
+        <p id="deleteMessage" style="margin-bottom: 1.5rem;"></p>
+
+        <form id="deleteForm" method="post" action="">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="delete_instances" value="yes" style="margin-right: 0.5rem;">
+                    Also delete all historical task instances
+                </label>
+                <small class="text-secondary" style="display: block; margin-top: 0.25rem;">
+                    This will remove all past data for this task. Cannot be undone.
+                </small>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+                <button type="button" onclick="closeDeleteModal()" class="btn btn-ghost" style="flex: 1;">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary"
+                    style="flex: 1; background: var(--color-error); border-color: var(--color-error);">
+                    Delete
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function confirmDelete(templateId, description) {
+        const modal = document.getElementById('deleteModal');
+        const form = document.getElementById('deleteForm');
+        const message = document.getElementById('deleteMessage');
+
+        message.textContent = `Are you sure you want to delete "${description}"?`;
+        form.action = `/task/${templateId}/delete/`;
+        modal.style.display = 'flex';
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+    }
+
+    // Close on background click
+    document.getElementById('deleteModal').addEventListener('click', function (e) {
+        if (e.target === this) {
+            closeDeleteModal();
+        }
+    });
+</script>
+{% endblock %}

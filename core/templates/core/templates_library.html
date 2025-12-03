@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Templates Library{% endblock %}
+
+{% block content %}
+<div class="main-content fade-in">
+    <h1>Templates Library</h1>
+    <p class="text-secondary" style="margin-bottom: 2rem;">Quick-start templates for common tracking goals</p>
+
+    <!-- Quick Start Templates -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="margin-bottom: 1.5rem;">
+            <svg class="icon" width="24" height="24">
+                <use href="/static/icons/sprite.svg#list"></use>
+            </svg>
+            Pre-built Templates
+        </h2>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+            {% for category, tasks in predefined.items %}
+            <div class="card" style="background: var(--color-bg); border-left: 4px solid var(--color-primary);">
+                <h3 style="margin-bottom: 0.75rem;">{{ category }}</h3>
+                <ul style="margin: 0; padding-left: 1.5rem; color: var(--color-text-secondary);">
+                    {% for task in tasks %}
+                    <li style="margin: 0.25rem 0;">{{ task }}</li>
+                    {% endfor %}
+                </ul>
+                <a href="{% url 'create_tracker' %}?template={{ category }}" class="btn btn-primary btn-sm"
+                    style="margin-top: 1rem; width: 100%;">
+                    Use This Template
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- User Templates -->
+    {% if user_templates %}
+    <div class="card">
+        <h2 style="margin-bottom: 1.5rem;">Your Custom Templates</h2>
+
+        {% for tracker_name, data in user_templates.items %}
+        <div style="margin-bottom: 2rem; padding: 1rem; background: var(--color-bg); border-radius: 8px;">
+            <h3 style="margin-bottom: 1rem;">{{ tracker_name }}</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                {% for template in data.templates %}
+                <span class="badge">{{ template.description }}</span>
+                {% endfor %}
+            </div>
+            <a href="{% url 'tracker_detail' data.tracker.tracker_id %}" class="btn btn-ghost btn-sm"
+                style="margin-top: 0.5rem;">
+                View Tracker →
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Empty State -->
+    {% if not user_templates %}
+    <div class="card" style="text-align: center; padding: 3rem;">
+        <p class="text-secondary">No custom templates yet. Create a tracker and customize tasks to build your own
+            templates!</p>
+        <a href="{% url 'create_tracker' %}" class="btn btn-primary" style="margin-top: 1rem;">
+            Create Your First Tracker
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

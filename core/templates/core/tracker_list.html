@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="header-actions"
+    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h1>Your Trackers</h1>
+    <a href="{% url 'create_tracker' %}" class="btn-primary">Create New Tracker</a>
+</div>
+
+<div class="trackers-list">
+    {% for tracker in trackers %}
+    <div class="card">
+        <div style="display: flex; justify-content: space-between;">
+            <div>
+                <h3>{{ tracker.name }}</h3>
+                <p>{{ tracker.description }}</p>
+            </div>
+            <div>
+                <span class="badge">{{ tracker.time_mode }}</span>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <p>No trackers yet.</p>
+    {% endfor %}
+</div>
+
+<style>
+    .btn-primary {
+        background-color: var(--color-primary);
+        color: white;
+        padding: 0.5rem 1rem;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+
+    .badge {
+        background-color: var(--color-bg);
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        border: 1px solid var(--color-border);
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Behavior Analysis - {{ tracker.name }}{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <div style="margin-bottom: 2rem;">
+        <a href="{% url 'tracker_detail' tracker.tracker_id %}" class="btn btn-ghost">← Back</a>
+        <h1 style="margin: 1rem 0;">🧠 Behavior Analysis</h1>
+        <p class="text-secondary">NLP-powered insights from your notes</p>
+    </div>
+
+    <!-- Mood Stats -->
+    <div class="grid-3" style="margin-bottom: 2rem;">
+        <div class="card">
+            <div class="stat-item">
+                <div class="stat-value">{{ sentiment.average_mood|floatformat:2 }}</div>
+                <div class="stat-label">Average Mood</div>
+                <p class="text-secondary" style="font-size: 0.75rem; margin-top: 0.5rem;">
+                    -1 (negative) to +1 (positive)
+                </p>
+            </div>
+        </div>
+        <div class="card">
+            <div class="stat-item">
+                <div class="stat-value">{{ sentiment.daily_mood|length }}</div>
+                <div class="stat-label">Notes Analyzed</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="stat-item">
+                <div class="stat-value">{{ keywords.keywords|length }}</div>
+                <div class="stat-label">Keywords Found</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keywords -->
+    {% if keywords.keywords %}
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h3>Top Keywords</h3>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            {% for keyword, count in keywords.keywords %}
+            <span class="badge badge-primary" style="font-size: 1rem; padding: 0.5rem 1rem;">
+                {{ keyword }} ({{ count }})
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Notes with Sentiment -->
+    {% if sentiment.daily_mood %}
+    <div class="card">
+        <div class="card-header">
+            <h3>Recent Notes & Sentiment</h3>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            {% for note in sentiment.daily_mood|slice:":10" %}
+            <div style="padding: 1rem; border-radius: 8px; background: var(--color-bg);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="font-weight: 600;">{{ note.date }}</span>
+                    <span
+                        class="badge {% if note.compound > 0.3 %}badge-success{% elif note.compound < -0.3 %}badge-warning{% else %}badge-primary{% endif %}">
+                        {{ note.compound|floatformat:2 }}
+                    </span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{ note.pos|floatformat:0 }}%;"></div>
+                </div>
+                <p class="text-secondary" style="font-size: 0.875rem; margin-top: 0.5rem;">
+                    Positive: {{ note.pos|floatformat:2 }} | Neutral: {{ note.neu|floatformat:2 }} | Negative: {{
+                    note.neg|floatformat:2 }}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
