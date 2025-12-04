@@ -1,0 +1,135 @@
+<!-- Settings: Preferences -->
+<div class="panel settings-panel fade-in">
+    <div class="settings-layout">
+        {% include 'settings/_sidebar.html' with active='preferences' %}
+
+        <div class="settings-content">
+            <div class="settings-header">
+                <h1 class="settings-title">Preferences</h1>
+                <p class="settings-subtitle">Customize your experience</p>
+            </div>
+
+            <form id="preferences-form">
+                <!-- Theme -->
+                <div class="settings-section">
+                    <h3>Appearance</h3>
+                    <div class="form-group">
+                        <label class="form-label">Theme</label>
+                        <div class="theme-grid" id="theme-selector">
+                            {% for theme in themes %}
+                            <label class="theme-option">
+                                <input type="radio" name="theme" value="{{ theme.id }}" {% if theme.id==current_theme
+                                    %}checked{% endif %}>
+                                <div class="theme-preview"
+                                    style="background: {{ theme.bg }}; border-color: {{ theme.primary }};">
+                                    <div class="theme-primary" style="background: {{ theme.primary }};"></div>
+                                </div>
+                                <span class="theme-name">{{ theme.name }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sounds -->
+                <div class="settings-section">
+                    <h3>Sounds</h3>
+                    <div class="toggle-group">
+                        <label class="toggle-option">
+                            <div class="toggle-info">
+                                <span class="toggle-label">Completion Sound</span>
+                                <span class="toggle-hint">Play a sound when you complete a task</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="sound_complete" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <label class="toggle-option">
+                            <div class="toggle-info">
+                                <span class="toggle-label">Notification Sound</span>
+                                <span class="toggle-hint">Play a sound for notifications</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="sound_notify" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sound Volume</label>
+                        <input type="range" name="sound_volume" min="0" max="100" value="70" class="form-range">
+                    </div>
+                </div>
+
+                <!-- Notifications -->
+                <div class="settings-section">
+                    <h3>Notifications</h3>
+                    <div class="toggle-group">
+                        <label class="toggle-option">
+                            <div class="toggle-info">
+                                <span class="toggle-label">Push Notifications</span>
+                                <span class="toggle-hint">Receive browser notifications</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="push_enabled" id="push-toggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <label class="toggle-option">
+                            <div class="toggle-info">
+                                <span class="toggle-label">Daily Reminders</span>
+                                <span class="toggle-hint">Get reminded about pending tasks</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="daily_reminder" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <label class="toggle-option">
+                            <div class="toggle-info">
+                                <span class="toggle-label">Weekly Summary</span>
+                                <span class="toggle-hint">Receive weekly progress reports</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="weekly_summary" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Display -->
+                <div class="settings-section">
+                    <h3>Display</h3>
+                    <div class="toggle-group">
+                        <label class="toggle-option">
+                            <div class="toggle-info">
+                                <span class="toggle-label">Compact Mode</span>
+                                <span class="toggle-hint">Show more content with less spacing</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="compact_mode">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                        <label class="toggle-option">
+                            <div class="toggle-info">
+                                <span class="toggle-label">Animations</span>
+                                <span class="toggle-hint">Enable smooth transitions</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" name="animations" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-actions">
+                    <button type="submit" class="btn btn-primary">Save Preferences</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

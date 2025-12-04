@@ -1,0 +1,58 @@
+<!-- Onboarding Overlay -->
+<div id="onboarding-overlay" class="onboarding-overlay" style="display: none;">
+    <div class="onboarding-container">
+        <!-- Progress -->
+        <div class="onboarding-progress">
+            <div class="progress-dots">
+                <span class="dot active" data-step="1"></span>
+                <span class="dot" data-step="2"></span>
+                <span class="dot" data-step="3"></span>
+                <span class="dot" data-step="4"></span>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" id="skip-onboarding">Skip</button>
+        </div>
+
+        <!-- Steps -->
+        <div class="onboarding-steps">
+            <!-- Step 1: Welcome -->
+            <div class="onboarding-step active" data-step="1">
+                <div class="step-illustration">🎉</div>
+                <h2>Welcome to Tracker Pro!</h2>
+                <p>Let's take a quick tour to help you get started.</p>
+            </div>
+
+            <!-- Step 2: Create Tracker -->
+            <div class="onboarding-step" data-step="2">
+                <div class="step-illustration">📊</div>
+                <h2>Create Trackers</h2>
+                <p>Trackers help you organize and monitor your habits, goals, and daily tasks.</p>
+                <div class="step-highlight" data-highlight="new-tracker-btn">
+                    <span class="highlight-pulse"></span>
+                </div>
+            </div>
+
+            <!-- Step 3: Complete Tasks -->
+            <div class="onboarding-step" data-step="3">
+                <div class="step-illustration">✅</div>
+                <h2>Complete Tasks</h2>
+                <p>Click tasks to mark them complete, or use keyboard shortcuts for speed.</p>
+                <div class="keyboard-demo">
+                    <kbd>Space</kbd> to toggle · <kbd>/</kbd> to search
+                </div>
+            </div>
+
+            <!-- Step 4: Track Progress -->
+            <div class="onboarding-step" data-step="4">
+                <div class="step-illustration">📈</div>
+                <h2>Track Your Progress</h2>
+                <p>View analytics, set goals, and celebrate your achievements!</p>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="onboarding-nav">
+            <button type="button" class="btn btn-ghost" id="prev-step" style="visibility: hidden;">Back</button>
+            <button type="button" class="btn btn-primary" id="next-step">Next</button>
+        </div>
+    </div>
+</div>

@@ -185,10 +185,9 @@ AUTHENTICATION_BACKENDS = [
 SITE_ID = 1
 
 # Login/Logout URLs
-# Login/Logout URLs
-LOGIN_URL = '/accounts/login/'
+LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/accounts/login/'
+LOGOUT_REDIRECT_URL = '/login/'
 
 # Allauth account settings (v65+ format)
 ACCOUNT_LOGIN_METHODS = {'email'}  # Use email instead of username

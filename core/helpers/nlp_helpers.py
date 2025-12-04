@@ -180,3 +180,178 @@ def analyze_text_comprehensive(text: str) -> Dict:
         'feelings': extract_feeling_statements(text),
         'numeric_patterns': extract_numeric_patterns(text)
     }
+
+
+def parse_recurrence_pattern(text: str) -> Dict:
+    """
+    Parse natural language recurrence patterns.
+    
+    Supports patterns like:
+        - "every day", "daily"
+        - "every 3 days"
+        - "weekly", "every week"
+        - "on monday and friday"
+        - "weekdays", "weekends"
+        - "monthly", "every month"
+    
+    Returns:
+        {
+            'pattern_type': 'daily' | 'interval' | 'weekly' | 'monthly' | 'custom' | None,
+            'interval': int | None,
+            'days_of_week': List[int] | None,  # 0=Monday, 6=Sunday
+            'raw_match': str | None
+        }
+    """
+    text_lower = text.lower().strip()
+    
+    # Daily patterns
+    if re.match(r'(every\s*day|daily|each\s*day)', text_lower):
+        return {
+            'pattern_type': 'daily',
+            'interval': 1,
+            'days_of_week': None,
+            'raw_match': text_lower
+        }
+    
+    # Interval patterns: "every N days/weeks"
+    interval_match = re.match(r'every\s+(\d+)\s+(day|week|month)s?', text_lower)
+    if interval_match:
+        num = int(interval_match.group(1))
+        unit = interval_match.group(2)
+        return {
+            'pattern_type': 'interval',
+            'interval': num if unit == 'day' else num * 7 if unit == 'week' else num * 30,
+            'days_of_week': None,
+            'raw_match': interval_match.group(0)
+        }
+    
+    # Weekly patterns
+    if re.match(r'(weekly|every\s*week)', text_lower):
+        return {
+            'pattern_type': 'weekly',
+            'interval': 7,
+            'days_of_week': None,
+            'raw_match': text_lower
+        }
+    
+    # Specific days of week
+    day_map = {
+        'monday': 0, 'mon': 0,
+        'tuesday': 1, 'tue': 1,
+        'wednesday': 2, 'wed': 2,
+        'thursday': 3, 'thu': 3,
+        'friday': 4, 'fri': 4,
+        'saturday': 5, 'sat': 5,
+        'sunday': 6, 'sun': 6
+    }
+    
+    days_pattern = r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)\b'
+    found_days = re.findall(days_pattern, text_lower)
+    
+    if found_days:
+        days_of_week = sorted(set(day_map[d] for d in found_days))
+        return {
+            'pattern_type': 'custom',
+            'interval': None,
+            'days_of_week': days_of_week,
+            'raw_match': ', '.join(found_days)
+        }
+    
+    # Weekdays/Weekends
+    if 'weekday' in text_lower:
+        return {
+            'pattern_type': 'custom',
+            'interval': None,
+            'days_of_week': [0, 1, 2, 3, 4],  # Mon-Fri
+            'raw_match': 'weekdays'
+        }
+    
+    if 'weekend' in text_lower:
+        return {
+            'pattern_type': 'custom',
+            'interval': None,
+            'days_of_week': [5, 6],  # Sat-Sun
+            'raw_match': 'weekends'
+        }
+    
+    # Monthly patterns
+    if re.match(r'(monthly|every\s*month)', text_lower):
+        return {
+            'pattern_type': 'monthly',
+            'interval': 30,
+            'days_of_week': None,
+            'raw_match': text_lower
+        }
+    
+    # No pattern found
+    return {
+        'pattern_type': None,
+        'interval': None,
+        'days_of_week': None,
+        'raw_match': None
+    }
+
+
+def extract_goal_keywords(text: str) -> Dict:
+    """
+    Extract goal-related keywords and sentiment from text.
+    
+    Identifies:
+        - Goal verbs (achieve, complete, reach, etc.)
+        - Time references (by next week, in 30 days)
+        - Quantitative targets (lose 5 kg, save $1000)
+        - Priority indicators (must, important, critical)
+    
+    Returns:
+        {
+            'goal_verbs': List[str],
+            'time_references': List[str],
+            'targets': List[Dict],
+            'priority_level': 'high' | 'medium' | 'low',
+            'is_goal_statement': bool
+        }
+    """
+    text_lower = text.lower()
+    
+    # Goal action verbs
+    goal_verbs_pattern = r'\b(achieve|complete|finish|accomplish|reach|attain|gain|lose|improve|increase|decrease|start|stop|learn|master|build|create|develop|establish)\b'
+    goal_verbs = re.findall(goal_verbs_pattern, text_lower)
+    
+    # Time references
+    time_pattern = r'\b(by\s+(next\s+)?(week|month|year|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|in\s+\d+\s+(days?|weeks?|months?)|before\s+\w+|until\s+\w+)\b'
+    time_refs = re.findall(time_pattern, text_lower)
+    time_references = [t[0] if isinstance(t, tuple) else t for t in time_refs]
+    
+    # Quantitative targets (number + unit)
+    targets = []
+    target_pattern = r'(\d+(?:\.\d+)?)\s*(kg|lbs?|pounds?|km|miles?|hours?|minutes?|\$|dollars?|times?|reps?|pages?|books?|%|percent)'
+    target_matches = re.findall(target_pattern, text_lower)
+    for value, unit in target_matches:
+        targets.append({'value': float(value), 'unit': unit})
+    
+    # Priority indicators
+    high_priority = ['must', 'critical', 'essential', 'urgent', 'important', 'priority']
+    medium_priority = ['should', 'want to', 'would like', 'plan to']
+    
+    priority = 'low'
+    for word in high_priority:
+        if word in text_lower:
+            priority = 'high'
+            break
+    if priority == 'low':
+        for word in medium_priority:
+            if word in text_lower:
+                priority = 'medium'
+                break
+    
+    # Determine if this looks like a goal statement
+    is_goal = bool(goal_verbs) or bool(targets) or bool(time_references)
+    
+    return {
+        'goal_verbs': list(set(goal_verbs)),
+        'time_references': time_references,
+        'targets': targets,
+        'priority_level': priority,
+        'is_goal_statement': is_goal
+    }
+

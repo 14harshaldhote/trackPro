@@ -1,0 +1,138 @@
+<!-- Analytics Panel -->
+<div class="panel analytics-panel fade-in">
+    <!-- Header -->
+    <div class="panel-header">
+        <div>
+            <nav class="breadcrumb">
+                <a href="/" data-nav>Dashboard</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>Analytics</span>
+            </nav>
+            <h1 class="panel-title">Analytics</h1>
+        </div>
+        <div class="panel-actions">
+            <!-- Time Range Selector -->
+            <div class="time-range-selector" role="group" aria-label="Time range">
+                <button class="range-btn" data-range="7">7D</button>
+                <button class="range-btn active" data-range="30">30D</button>
+                <button class="range-btn" data-range="90">90D</button>
+                <button class="range-btn" data-range="365">1Y</button>
+            </div>
+
+            <button class="btn btn-ghost" id="export-charts">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Insights Banner -->
+    {% include 'partials/insight_banner.html' %}
+
+    <!-- Stats Overview -->
+    <div class="analytics-stats">
+        <div class="analytics-stat">
+            <div class="stat-value">{{ stats.completion_rate }}%</div>
+            <div class="stat-label">Completion Rate</div>
+            <div class="stat-change {% if stats.rate_change >= 0 %}positive{% else %}negative{% endif %}">
+                {{ stats.rate_change|floatformat:1 }}% vs last period
+            </div>
+        </div>
+        <div class="analytics-stat">
+            <div class="stat-value">{{ stats.total_completed }}</div>
+            <div class="stat-label">Tasks Done</div>
+        </div>
+        <div class="analytics-stat">
+            <div class="stat-value">{{ stats.best_streak }}</div>
+            <div class="stat-label">Best Streak 🔥</div>
+        </div>
+        <div class="analytics-stat">
+            <div class="stat-value">{{ stats.avg_per_day|floatformat:1 }}</div>
+            <div class="stat-label">Avg/Day</div>
+        </div>
+    </div>
+
+    <!-- Main Chart Area -->
+    <div class="chart-section">
+        <div class="chart-header">
+            <h3>Completion Trend</h3>
+            <div class="chart-type-toggle">
+                <button class="chart-type-btn active" data-type="line">Line</button>
+                <button class="chart-type-btn" data-type="bar">Bar</button>
+            </div>
+        </div>
+        <div class="chart-container" id="completion-chart-container">
+            {% include 'partials/chart_line.html' with chart_id="completion-chart" %}
+        </div>
+    </div>
+
+    <!-- Two Column Charts -->
+    <div class="charts-grid">
+        <!-- Category Breakdown -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <h3>By Category</h3>
+            </div>
+            <div class="chart-container chart-container-sm">
+                {% include 'partials/chart_pie.html' with chart_id="category-chart" %}
+            </div>
+        </div>
+
+        <!-- Time of Day -->
+        <div class="chart-section">
+            <div class="chart-header">
+                <h3>By Time of Day</h3>
+            </div>
+            <div class="chart-container chart-container-sm">
+                {% include 'partials/chart_bar.html' with chart_id="time-chart" %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="chart-section">
+        <div class="chart-header">
+            <h3>Activity Heatmap</h3>
+            <span class="text-muted">Contributions in the last year</span>
+        </div>
+        {% include 'partials/chart_heatmap.html' %}
+    </div>
+
+    <!-- Tracker Comparison -->
+    <div class="chart-section">
+        <div class="chart-header">
+            <h3>Tracker Comparison</h3>
+            <div class="comparison-selectors">
+                <select id="compare-tracker-1" class="form-select form-select-sm">
+                    {% for tracker in trackers %}
+                    <option value="{{ tracker.id }}">{{ tracker.name }}</option>
+                    {% endfor %}
+                </select>
+                <span class="text-muted">vs</span>
+                <select id="compare-tracker-2" class="form-select form-select-sm">
+                    <option value="">Select tracker</option>
+                    {% for tracker in trackers %}
+                    <option value="{{ tracker.id }}">{{ tracker.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="chart-container" id="comparison-chart-container">
+            {% include 'partials/chart_line.html' with chart_id="comparison-chart" multi=True %}
+        </div>
+    </div>
+
+    <!-- Forecast -->
+    <div class="forecast-section">
+        <div class="forecast-icon">🔮</div>
+        <div class="forecast-content">
+            <h4>Forecast</h4>
+            <p>{{ forecast.message }}</p>
+            <p class="text-muted text-sm">Based on your {{ forecast.days_analyzed }} day trend</p>
+        </div>
+    </div>
+</div>

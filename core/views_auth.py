@@ -266,3 +266,29 @@ def api_validate_email(request):
         
     except json.JSONDecodeError:
         return JsonResponse({'available': False, 'error': 'Invalid JSON'}, status=400)
+
+
+# ============================================================================
+# AUTH PAGES (Render custom templates)
+# ============================================================================
+
+def login_page(request):
+    """Render login page"""
+    from django.shortcuts import render, redirect
+    if request.user.is_authenticated:
+        return redirect('/')
+    return render(request, 'auth/login.html')
+
+
+def signup_page(request):
+    """Render signup page"""
+    from django.shortcuts import render, redirect
+    if request.user.is_authenticated:
+        return redirect('/')
+    return render(request, 'auth/signup.html')
+
+
+def forgot_password(request):
+    """Render forgot password page"""
+    from django.shortcuts import render
+    return render(request, 'auth/forgot_password.html')

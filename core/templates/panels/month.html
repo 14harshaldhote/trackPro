@@ -1,0 +1,140 @@
+<!-- Month View Panel -->
+<div class="panel month-panel fade-in">
+    <!-- Header -->
+    <div class="panel-header">
+        <div>
+            <h1 class="panel-title">{{ current_month|date:"F Y" }}</h1>
+            <p class="panel-subtitle">Monthly Overview</p>
+        </div>
+        <div class="panel-actions">
+            <!-- Month Navigation -->
+            <div class="date-nav">
+                <a href="/month/?date={{ prev_month|date:'Y-m-d' }}" class="btn btn-icon" data-nav
+                    title="Previous month">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </a>
+                <button class="btn btn-ghost" id="month-picker-toggle">
+                    {{ current_month|date:"M Y" }}
+                </button>
+                <a href="/month/?date={{ next_month|date:'Y-m-d' }}" class="btn btn-icon" data-nav title="Next month">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </a>
+            </div>
+
+            {% if not is_current_month %}
+            <a href="/month/" class="btn btn-ghost btn-sm" data-nav>Current Month</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Month Stats -->
+    <div class="month-summary">
+        <div class="summary-card large">
+            <div class="summary-value">{{ month_stats.completion_rate }}%</div>
+            <div class="summary-label">Overall Completion</div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ month_stats.completion_rate }}%"></div>
+            </div>
+        </div>
+        <div class="summary-group">
+            <div class="summary-item">
+                <span class="summary-value">{{ month_stats.total_tasks }}</span>
+                <span class="summary-label">Total Tasks</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-value">{{ month_stats.completed }}</span>
+                <span class="summary-label">Completed</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-value">{{ month_stats.longest_streak }}</span>
+                <span class="summary-label">Best Streak</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-value">{{ month_stats.active_days }}</span>
+                <span class="summary-label">Active Days</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Grid -->
+    <div class="calendar-container">
+        <div class="calendar-header">
+            <span>Sun</span>
+            <span>Mon</span>
+            <span>Tue</span>
+            <span>Wed</span>
+            <span>Thu</span>
+            <span>Fri</span>
+            <span>Sat</span>
+        </div>
+
+        <div class="calendar-grid">
+            {% for day in calendar_days %}
+            <div class="calendar-day 
+                        {% if not day.in_month %}other-month{% endif %}
+                        {% if day.is_today %}is-today{% endif %}
+                        {% if day.is_future %}is-future{% endif %}" data-date="{{ day.date|date:'Y-m-d' }}">
+
+                <div class="calendar-day-header">
+                    <span class="calendar-day-number">{{ day.date|date:"j" }}</span>
+                    {% if day.is_today %}
+                    <span class="today-dot"></span>
+                    {% endif %}
+                </div>
+
+                {% if day.in_month and day.total > 0 %}
+                <div class="calendar-day-content">
+                    <div class="calendar-progress" style="--progress: {{ day.progress }}%"
+                        title="{{ day.completed }}/{{ day.total }} completed">
+                    </div>
+                    <span class="calendar-count">{{ day.completed }}/{{ day.total }}</span>
+                </div>
+                {% endif %}
+
+                {% if day.in_month %}
+                <a href="/today/?date={{ day.date|date:'Y-m-d' }}" class="calendar-day-link" data-nav></a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Monthly Tracker Breakdown -->
+    <div class="month-breakdown">
+        <h3 class="section-title">Tracker Performance</h3>
+        <div class="tracker-breakdown-list">
+            {% for tracker in tracker_stats %}
+            <div class="breakdown-item">
+                <div class="breakdown-header">
+                    <a href="/tracker/{{ tracker.id }}/" class="breakdown-name" data-nav>{{ tracker.name }}</a>
+                    <span class="breakdown-rate">{{ tracker.completion_rate }}%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{ tracker.completion_rate }}%"></div>
+                </div>
+                <div class="breakdown-meta">
+                    {{ tracker.completed }}/{{ tracker.total }} tasks
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-muted">No tracker data for this month.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Export -->
+    <div class="month-actions">
+        <button class="btn btn-ghost" id="export-month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export Report
+        </button>
+    </div>
+</div>

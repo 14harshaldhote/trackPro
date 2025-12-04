@@ -1,0 +1,136 @@
+<!-- Offline Panel -->
+<div class="error-panel offline-panel fade-in">
+    <div class="error-content">
+        <div class="error-icon offline-icon">
+            <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)"
+                stroke-width="1.5" opacity="0.5">
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+                <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+                <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+                <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                <line x1="12" y1="20" x2="12.01" y2="20"></line>
+            </svg>
+        </div>
+
+        <h1 class="error-title">You're Offline</h1>
+        <p class="error-message">
+            Check your internet connection and try again. Your data is safe and will sync when you're back online.
+        </p>
+
+        <div class="offline-status">
+            <div class="status-dot offline"></div>
+            <span>No internet connection</span>
+        </div>
+
+        <div class="error-actions">
+            <button class="btn btn-primary" id="retry-connection">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    style="margin-right: 0.5rem;">
+                    <path d="M21 2v6h-6"></path>
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                </svg>
+                Retry Connection
+            </button>
+        </div>
+
+        <div class="offline-tip">
+            <p>💡 <strong>Tip:</strong> Some features work offline. Try viewing cached trackers or adding tasks that
+                will sync later.</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .offline-panel .error-icon {
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 0.5;
+        }
+
+        50% {
+            opacity: 0.8;
+        }
+    }
+
+    .offline-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: rgba(239, 68, 68, 0.1);
+        border-radius: 9999px;
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+        color: #EF4444;
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #EF4444;
+        animation: blink 1.5s infinite;
+    }
+
+    @keyframes blink {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.3;
+        }
+    }
+
+    .status-dot.online {
+        background: #10B981;
+        animation: none;
+    }
+
+    .offline-tip {
+        margin-top: 2rem;
+        padding: 1rem;
+        background: rgba(var(--color-primary-rgb, 2, 119, 189), 0.1);
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: var(--color-text-secondary);
+    }
+</style>
+
+<script>
+    // Auto-retry connection
+    document.getElementById('retry-connection').addEventListener('click', async function () {
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner"></span> Checking...';
+
+        try {
+            await fetch('/api/auth/status/', { cache: 'no-store' });
+            // If successful, reload
+            window.location.reload();
+        } catch (e) {
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.5rem;">
+            <path d="M21 2v6h-6"></path>
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+        </svg> Retry Connection`;
+            App?.showToast('error', 'Still offline', 'Please check your connection');
+        }
+    });
+
+    // Listen for online event
+    window.addEventListener('online', () => {
+        document.querySelector('.status-dot').classList.add('online');
+        document.querySelector('.offline-status span').textContent = 'Back online!';
+        setTimeout(() => window.location.reload(), 1000);
+    });
+</script>

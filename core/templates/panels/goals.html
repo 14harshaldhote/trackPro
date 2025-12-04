@@ -1,0 +1,122 @@
+<!-- Goals Panel -->
+<div class="panel goals-panel fade-in">
+    <!-- Header -->
+    <div class="panel-header">
+        <div>
+            <nav class="breadcrumb">
+                <a href="/" data-nav>Dashboard</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>Goals</span>
+            </nav>
+            <h1 class="panel-title">Goals</h1>
+        </div>
+        <div class="panel-actions">
+            <button class="btn btn-primary" data-action="open-modal" data-modal="add-goal">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                New Goal
+            </button>
+        </div>
+    </div>
+
+    <!-- Active Goals -->
+    <div class="goals-section">
+        <h3 class="section-title">Active Goals</h3>
+        <div class="goals-grid">
+            {% for goal in active_goals %}
+            <div class="goal-card {% if goal.progress >= 100 %}completed{% endif %}" data-goal-id="{{ goal.id }}">
+                <div class="goal-header">
+                    <span class="goal-icon">{{ goal.icon|default:"🎯" }}</span>
+                    <div class="goal-info">
+                        <h4 class="goal-title">{{ goal.name }}</h4>
+                        <span class="goal-tracker">{{ goal.tracker_name }}</span>
+                    </div>
+                    <button class="btn btn-icon btn-sm" data-action="context-menu">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="1"></circle>
+                            <circle cx="12" cy="5" r="1"></circle>
+                            <circle cx="12" cy="19" r="1"></circle>
+                        </svg>
+                    </button>
+                </div>
+
+                {% include 'partials/goal_progress.html' with progress=goal.progress target=goal.target
+                current=goal.current %}
+
+                <div class="goal-stats">
+                    <div class="goal-stat">
+                        <span class="goal-stat-value">{{ goal.current }}</span>
+                        <span class="goal-stat-label">of {{ goal.target }} {{ goal.unit }}</span>
+                    </div>
+                    <div class="goal-stat">
+                        <span class="goal-stat-value">{{ goal.days_left }}</span>
+                        <span class="goal-stat-label">days left</span>
+                    </div>
+                </div>
+
+                <div class="goal-forecast">
+                    {% if goal.on_track %}
+                    <span class="on-track">✓ On track</span>
+                    {% else %}
+                    <span class="behind">⚠ {{ goal.behind_by }} behind pace</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="empty-state">
+                <div class="empty-state-icon">🎯</div>
+                <h3>No Active Goals</h3>
+                <p>Set a goal to stay motivated and track your progress.</p>
+                <button class="btn btn-primary" data-action="open-modal" data-modal="add-goal">Create Goal</button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Completed Goals -->
+    {% if completed_goals %}
+    <div class="goals-section">
+        <h3 class="section-title">🏆 Completed Goals</h3>
+        <div class="completed-goals-list">
+            {% for goal in completed_goals %}
+            <div class="completed-goal-item">
+                <span class="goal-icon">{{ goal.icon|default:"✓" }}</span>
+                <div class="goal-info">
+                    <span class="goal-name">{{ goal.name }}</span>
+                    <span class="goal-completed-date">Completed {{ goal.completed_at|timesince }} ago</span>
+                </div>
+                <span class="goal-celebration">🎉</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Goal Types Guide -->
+    <div class="goal-types-section">
+        <h3 class="section-title">Goal Types</h3>
+        <div class="goal-types-grid">
+            <div class="goal-type-card">
+                <span class="goal-type-icon">📊</span>
+                <h4>Complete X Tasks</h4>
+                <p>Complete a specific number of tasks within a timeframe.</p>
+            </div>
+            <div class="goal-type-card">
+                <span class="goal-type-icon">🔥</span>
+                <h4>Streak Goal</h4>
+                <p>Maintain a streak for a set number of consecutive days.</p>
+            </div>
+            <div class="goal-type-card">
+                <span class="goal-type-icon">📈</span>
+                <h4>Completion Rate</h4>
+                <p>Achieve a target completion percentage over time.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confetti Container -->
+<canvas id="confetti-canvas" class="confetti-canvas"></canvas>

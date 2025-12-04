@@ -1,0 +1,124 @@
+<!-- Help Center Panel -->
+<div class="panel help-panel fade-in">
+    <div class="panel-header">
+        <div>
+            <h1 class="panel-title">Help Center</h1>
+            <p class="panel-subtitle">Find answers and get support</p>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="help-search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="help-search-input" placeholder="Search for help..." id="help-search">
+    </div>
+
+    <!-- Quick Links -->
+    <div class="help-quick-links">
+        <a href="#getting-started" class="quick-link">
+            <span class="quick-link-icon">🚀</span>
+            <span>Getting Started</span>
+        </a>
+        <a href="#trackers" class="quick-link">
+            <span class="quick-link-icon">📊</span>
+            <span>Using Trackers</span>
+        </a>
+        <a href="#keyboard" class="quick-link">
+            <span class="quick-link-icon">⌨️</span>
+            <span>Keyboard Shortcuts</span>
+        </a>
+        <a href="#mobile" class="quick-link">
+            <span class="quick-link-icon">📱</span>
+            <span>Mobile App</span>
+        </a>
+    </div>
+
+    <!-- FAQ -->
+    <div class="help-section" id="getting-started">
+        <h2>Getting Started</h2>
+        <div class="faq-list">
+            <details class="faq-item">
+                <summary class="faq-question">How do I create my first tracker?</summary>
+                <div class="faq-answer">
+                    <p>Click the <strong>New Tracker</strong> button in the sidebar or press <kbd>N</kbd>. Give your
+                        tracker a name, choose a type, and add your tasks.</p>
+                </div>
+            </details>
+            <details class="faq-item">
+                <summary class="faq-question">What's the difference between tracker types?</summary>
+                <div class="faq-answer">
+                    <ul>
+                        <li><strong>Daily</strong> - Tasks reset each day</li>
+                        <li><strong>Weekly</strong> - Tasks reset each week</li>
+                        <li><strong>Custom</strong> - Set your own schedule</li>
+                    </ul>
+                </div>
+            </details>
+            <details class="faq-item">
+                <summary class="faq-question">How do I mark tasks as complete?</summary>
+                <div class="faq-answer">
+                    <p>Click the checkbox next to any task, or select it and press <kbd>Space</kbd>. You can also
+                        right-click for more options.</p>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <div class="help-section" id="trackers">
+        <h2>Using Trackers</h2>
+        <div class="faq-list">
+            <details class="faq-item">
+                <summary class="faq-question">Can I reorder tasks?</summary>
+                <div class="faq-answer">
+                    <p>Yes! Drag tasks using the handle on the left side. Your order is automatically saved.</p>
+                </div>
+            </details>
+            <details class="faq-item">
+                <summary class="faq-question">How do I set goals?</summary>
+                <div class="faq-answer">
+                    <p>Go to the Goals panel from the sidebar. Click "New Goal" and choose your target type: task count,
+                        streak days, or completion rate.</p>
+                </div>
+            </details>
+            <details class="faq-item">
+                <summary class="faq-question">What do the colors on the heatmap mean?</summary>
+                <div class="faq-answer">
+                    <p>Darker colors = more tasks completed that day. Hover over any cell to see the exact count.</p>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <div class="help-section" id="keyboard">
+        <h2>Keyboard Shortcuts</h2>
+        <div class="shortcut-quick-ref">
+            <div class="shortcut-ref-item">
+                <kbd>?</kbd>
+                <span>Show all shortcuts</span>
+            </div>
+            <div class="shortcut-ref-item">
+                <kbd>/</kbd>
+                <span>Search</span>
+            </div>
+            <div class="shortcut-ref-item">
+                <kbd>N</kbd>
+                <span>New tracker</span>
+            </div>
+            <div class="shortcut-ref-item">
+                <kbd>Space</kbd>
+                <span>Toggle task</span>
+            </div>
+        </div>
+        <a href="/settings/keyboard/" class="btn btn-ghost" data-nav>View All Shortcuts →</a>
+    </div>
+
+    <!-- Contact -->
+    <div class="help-contact">
+        <h3>Still need help?</h3>
+        <p>Our support team is here to help you.</p>
+        <a href="mailto:support@trackerpro.app" class="btn btn-primary">Contact Support</a>
+    </div>
+</div>

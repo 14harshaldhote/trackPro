@@ -1,0 +1,138 @@
+<!-- Add Tracker Modal -->
+<div class="modal-dialog" role="document">
+    <div class="modal-header">
+        <h3 class="modal-title">Create New Tracker</h3>
+        <button type="button" class="modal-close" data-action="close-modal" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+
+    <form id="add-tracker-form" action="/api/trackers/create/" method="POST" data-ajax>
+        <div class="modal-body">
+            <!-- Tracker Name -->
+            <div class="form-group">
+                <label for="tracker-name" class="form-label">Tracker Name *</label>
+                <input type="text" id="tracker-name" name="name" class="form-input"
+                    placeholder="e.g., Morning Routine, Fitness, Study" required maxlength="100">
+                <div class="field-error" id="name-error"></div>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group">
+                <label for="tracker-description" class="form-label">Description</label>
+                <textarea id="tracker-description" name="description" class="form-input" rows="2"
+                    placeholder="What will you track?"></textarea>
+            </div>
+
+            <!-- Time Period -->
+            <div class="form-group">
+                <label for="tracker-period" class="form-label">Time Period</label>
+                <select id="tracker-period" name="time_period" class="form-select">
+                    <option value="daily" selected>Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="custom">Custom Range</option>
+                </select>
+            </div>
+
+            <!-- Quick Template -->
+            <div class="form-group">
+                <label class="form-label">Start from Template (Optional)</label>
+                <div class="template-grid">
+                    <label class="template-option">
+                        <input type="radio" name="template" value="">
+                        <span class="template-card">
+                            <span class="template-icon">🆕</span>
+                            <span class="template-name">Blank</span>
+                        </span>
+                    </label>
+                    <label class="template-option">
+                        <input type="radio" name="template" value="productivity">
+                        <span class="template-card">
+                            <span class="template-icon">⚡</span>
+                            <span class="template-name">Productivity</span>
+                        </span>
+                    </label>
+                    <label class="template-option">
+                        <input type="radio" name="template" value="wellbeing">
+                        <span class="template-card">
+                            <span class="template-icon">🧘</span>
+                            <span class="template-name">Wellbeing</span>
+                        </span>
+                    </label>
+                    <label class="template-option">
+                        <input type="radio" name="template" value="fitness">
+                        <span class="template-card">
+                            <span class="template-icon">💪</span>
+                            <span class="template-name">Fitness</span>
+                        </span>
+                    </label>
+                    <label class="template-option">
+                        <input type="radio" name="template" value="study">
+                        <span class="template-card">
+                            <span class="template-icon">📚</span>
+                            <span class="template-name">Study</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="create-tracker-btn">
+                Create Tracker
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .template-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .template-option {
+        cursor: pointer;
+    }
+
+    .template-option input {
+        display: none;
+    }
+
+    .template-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0.75rem;
+        border: 2px solid var(--color-border);
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .template-option input:checked+.template-card {
+        border-color: var(--color-primary);
+        background: rgba(var(--color-primary-rgb, 2, 119, 189), 0.1);
+    }
+
+    .template-card:hover {
+        border-color: var(--color-primary);
+    }
+
+    .template-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .template-name {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--color-text-secondary);
+        text-align: center;
+    }
+</style>

@@ -1,0 +1,16 @@
+<!-- Animated Goal Progress Ring -->
+<div class="goal-progress-ring" data-progress="{{ progress }}">
+    <svg viewBox="0 0 100 100" class="progress-svg">
+        <!-- Background circle -->
+        <circle class="progress-bg" cx="50" cy="50" r="42" fill="none" stroke-width="8" />
+        <!-- Progress circle -->
+        <circle class="progress-fill" cx="50" cy="50" r="42" fill="none" stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="264" stroke-dashoffset="{{ offset|default:264 }}" style="--progress: {{ progress }}%;" />
+    </svg>
+    <div class="progress-center">
+        <span class="progress-value">{{ progress }}%</span>
+        {% if progress >= 100 %}
+        <span class="progress-complete">🎉</span>
+        {% endif %}
+    </div>
+</div>

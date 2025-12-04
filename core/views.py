@@ -116,9 +116,11 @@ def tracker_detail(request, tracker_id):
 @login_required
 def analytics_dashboard(request, tracker_id):
     """Full analytics dashboard with all metrics."""
-    tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
-    if not tracker:
-        return redirect('tracker_list')
+    from core.helpers.auth_helpers import get_user_tracker_or_404
+    
+    # Permission check: user must own this tracker
+    tracker_obj = get_user_tracker_or_404(tracker_id, request.user)
+    tracker = crud.model_to_dict(tracker_obj)
     
     # Core metrics
     completion = analytics.compute_completion_rate(tracker_id)
@@ -475,29 +477,6 @@ def week_view(request, tracker_id):
         'today': today,
     }
     return render(request, 'core/week.html', context)
-    
-    # Calculate week stats
-    all_tasks = [day['task'] for row in grid_data for day in row['days'] if day['task']]
-    total_tasks = len(all_tasks)
-    done_tasks = sum(1 for t in all_tasks if t.get('status') == 'DONE')
-    completion_rate = (done_tasks / total_tasks * 100) if total_tasks > 0 else 0
-    
-    context = {
-        'tracker': tracker,
-        'grid_data': grid_data,
-        'week_days': week_days,
-        'week_start': week_start,
-        'week_end': week_days[-1],
-        'prev_week': week_offset - 1,
-        'next_week': week_offset + 1,
-        'total_tasks': total_tasks,
-        'done_tasks': done_tasks,
-        'completion_rate': completion_rate,
-        'status_info': STATUS_INFO,
-        'day_names': [day_name[d.weekday()] for d in week_days],
-        'today': today,
-    }
-    return render(request, 'core/week.html', context)
 
 @login_required
 def custom_range_view(request, tracker_id):
@@ -545,26 +524,6 @@ def custom_range_view(request, tracker_id):
         'total_tasks': result['stats']['total_tasks'],
         'done_tasks': result['stats']['done_tasks'],
         'completion_rate': result['stats']['completion_rate'],
-        'status_info': STATUS_INFO,
-        'today': today,
-    }
-    return render(request, 'core/custom_range.html', context)
-    
-    # Calculate stats
-    all_tasks = [day['task'] for row in grid_data for day in row['days'] if day['task']]
-    total_tasks = len(all_tasks)
-    done_tasks = sum(1 for t in all_tasks if t.get('status') == 'DONE')
-    completion_rate = (done_tasks / total_tasks * 100) if total_tasks > 0 else 0
-    
-    context = {
-        'tracker': tracker,
-        'grid_data': grid_data,
-        'date_range': date_range,
-        'start_date': start_date,
-        'end_date': end_date,
-        'total_tasks': total_tasks,
-        'done_tasks': done_tasks,
-        'completion_rate': completion_rate,
         'status_info': STATUS_INFO,
         'today': today,
     }
@@ -1109,3 +1068,286 @@ def api_mark_overdue_missed(request, tracker_id):
         'marked_count': marked,
         'message': f'{marked} overdue tasks marked as MISSED'
     })
+
+
+# ============================================================================
+# NEW VIEWS: Weekly Review, Blocker Analytics, Heatmap
+# ============================================================================
+
+@login_required
+def weekly_review(request, tracker_id):
+    """
+    Weekly/Monthly review showing achievements, misses, and progress summary.
+    Provides plain-English insights and recommendations.
+    """
+    from core.helpers.auth_helpers import get_user_tracker_or_404
+    from calendar import monthrange
+    
+    # Permission check
+    tracker_obj = get_user_tracker_or_404(tracker_id, request.user)
+    tracker = crud.model_to_dict(tracker_obj)
+    
+    today = date.today()
+    review_type = request.GET.get('type', 'week')  # 'week' or 'month'
+    
+    if review_type == 'month':
+        # Get current month dates
+        _, num_days = monthrange(today.year, today.month)
+        start_date = date(today.year, today.month, 1)
+        end_date = date(today.year, today.month, num_days)
+        period_name = today.strftime('%B %Y')
+    else:
+        # Get current week (Mon-Sun)
+        days_since_monday = today.weekday()
+        start_date = today - timedelta(days=days_since_monday)
+        end_date = start_date + timedelta(days=6)
+        period_name = f"Week of {start_date.strftime('%B %d')}"
+    
+    # Get analytics for the period
+    completion = analytics.compute_completion_rate(tracker_id, start_date, end_date)
+    streaks = analytics.detect_streaks(tracker_id)
+    
+    # Get task breakdown
+    from collections import defaultdict
+    category_stats = defaultdict(lambda: {'done': 0, 'total': 0})
+    
+    instances = crud.get_tracker_instances(tracker_id)
+    templates = crud.get_task_templates_for_tracker(tracker_id)
+    template_map = {t['template_id']: t for t in templates}
+    
+    achievements = []
+    misses = []
+    
+    for inst in instances:
+        inst_date = inst['period_start']
+        if isinstance(inst_date, str):
+            inst_date = date.fromisoformat(inst_date)
+        
+        if start_date <= inst_date <= end_date:
+            tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
+            for task in tasks:
+                template = template_map.get(task.get('template_id'), {})
+                category = template.get('category', 'Uncategorized')
+                category_stats[category]['total'] += 1
+                
+                if task.get('status') == 'DONE':
+                    category_stats[category]['done'] += 1
+                    achievements.append({
+                        'task': template.get('description', 'Task'),
+                        'date': inst_date
+                    })
+                elif task.get('status') in ['MISSED', 'TODO'] and inst_date < today:
+                    misses.append({
+                        'task': template.get('description', 'Task'),
+                        'date': inst_date
+                    })
+    
+    # Generate recommendations based on data
+    recommendations = []
+    completion_rate = completion.get('value', 0)
+    
+    if completion_rate < 50:
+        recommendations.append("Consider reducing the number of daily tasks to increase completion rate.")
+    if completion_rate >= 80:
+        recommendations.append("Excellent progress! You might be ready to add new habits.")
+    if len(misses) > len(achievements):
+        recommendations.append("Focus on your top 2-3 most important tasks first.")
+    
+    # Calculate category percentages
+    for cat, stats in category_stats.items():
+        stats['percentage'] = (stats['done'] / stats['total'] * 100) if stats['total'] > 0 else 0
+    
+    context = {
+        'tracker': tracker,
+        'period_name': period_name,
+        'review_type': review_type,
+        'start_date': start_date,
+        'end_date': end_date,
+        'completion': completion,
+        'streaks': streaks,
+        'category_stats': dict(category_stats),
+        'achievements': achievements[:10],  # Top 10
+        'misses': misses[:10],
+        'recommendations': recommendations,
+    }
+    return render(request, 'core/weekly_review.html', context)
+
+
+@login_required
+def blocker_analytics(request, tracker_id):
+    """
+    Blocker analytics showing patterns of blocked tasks.
+    Helps identify why tasks get blocked and when.
+    """
+    from core.helpers.auth_helpers import get_user_tracker_or_404
+    from collections import Counter
+    
+    # Permission check
+    tracker_obj = get_user_tracker_or_404(tracker_id, request.user)
+    tracker = crud.model_to_dict(tracker_obj)
+    
+    today = date.today()
+    days = int(request.GET.get('days', 30))
+    start_date = today - timedelta(days=days)
+    
+    # Collect blocker data
+    blocked_tasks = []
+    blocker_by_day = Counter()
+    blocker_by_category = Counter()
+    blocker_notes = []
+    
+    instances = crud.get_tracker_instances(tracker_id)
+    templates = crud.get_task_templates_for_tracker(tracker_id)
+    template_map = {t['template_id']: t for t in templates}
+    
+    for inst in instances:
+        inst_date = inst['period_start']
+        if isinstance(inst_date, str):
+            inst_date = date.fromisoformat(inst_date)
+        
+        if inst_date < start_date:
+            continue
+        
+        tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
+        for task in tasks:
+            if task.get('status') == 'BLOCKED':
+                template = template_map.get(task.get('template_id'), {})
+                category = template.get('category', 'Uncategorized')
+                
+                blocked_tasks.append({
+                    'task': template.get('description', 'Task'),
+                    'category': category,
+                    'date': inst_date,
+                    'notes': task.get('notes', '')
+                })
+                
+                blocker_by_day[inst_date.strftime('%A')] += 1  # Day of week
+                blocker_by_category[category] += 1
+                
+                if task.get('notes'):
+                    blocker_notes.append(task.get('notes'))
+    
+    # Extract common blocker reasons using NLP
+    from core.helpers import nlp_helpers
+    common_reasons = []
+    if blocker_notes:
+        combined_notes = ' '.join(blocker_notes)
+        keywords = nlp_helpers.extract_keywords(combined_notes, top_n=5)
+        common_reasons = [kw[0] for kw in keywords]
+    
+    # Find most blocked day
+    most_blocked_day = blocker_by_day.most_common(1)[0] if blocker_by_day else None
+    most_blocked_category = blocker_by_category.most_common(1)[0] if blocker_by_category else None
+    
+    # Generate insights
+    insights = []
+    if most_blocked_day:
+        insights.append(f"Most tasks are blocked on {most_blocked_day[0]}s ({most_blocked_day[1]} times)")
+    if most_blocked_category:
+        insights.append(f"'{most_blocked_category[0]}' category has the most blockers ({most_blocked_category[1]})")
+    if common_reasons:
+        insights.append(f"Common blocking themes: {', '.join(common_reasons)}")
+    
+    context = {
+        'tracker': tracker,
+        'days': days,
+        'blocked_tasks': blocked_tasks[:20],  # Most recent 20
+        'blocker_by_day': dict(blocker_by_day),
+        'blocker_by_category': dict(blocker_by_category),
+        'common_reasons': common_reasons,
+        'insights': insights,
+        'total_blocked': len(blocked_tasks),
+    }
+    return render(request, 'core/blocker_analytics.html', context)
+
+
+@login_required
+def heatmap_view(request, tracker_id):
+    """
+    Consistency heatmap showing daily completion patterns.
+    GitHub-style contribution graph.
+    """
+    from core.helpers.auth_helpers import get_user_tracker_or_404
+    
+    # Permission check
+    tracker_obj = get_user_tracker_or_404(tracker_id, request.user)
+    tracker = crud.model_to_dict(tracker_obj)
+    
+    weeks = int(request.GET.get('weeks', 12))
+    today = date.today()
+    
+    # Calculate date range (start from Sunday to align weeks)
+    days_since_sunday = (today.weekday() + 1) % 7
+    end_date = today
+    start_date = today - timedelta(days=(weeks * 7) + days_since_sunday)
+    
+    # Get completion data
+    completion_data = analytics.compute_completion_rate(tracker_id, start_date, end_date)
+    daily_rates = {r['date']: r['rate'] for r in completion_data.get('daily_rates', [])}
+    
+    # Build heatmap structure (weeks x 7 days)
+    heatmap_data = []
+    current_date = start_date
+    
+    while current_date <= end_date:
+        week_data = []
+        for day in range(7):  # Sunday to Saturday
+            date_str = current_date.isoformat()
+            rate = daily_rates.get(date_str, 0)
+            
+            # Determine color level (0-4)
+            if rate == 0:
+                level = 0
+            elif rate < 25:
+                level = 1
+            elif rate < 50:
+                level = 2
+            elif rate < 75:
+                level = 3
+            else:
+                level = 4
+            
+            week_data.append({
+                'date': current_date,
+                'rate': rate,
+                'level': level,
+            })
+            current_date += timedelta(days=1)
+        
+        heatmap_data.append(week_data)
+    
+    # Calculate streak info
+    streaks = analytics.detect_streaks(tracker_id)
+    
+    # Find best and worst days
+    from collections import defaultdict
+    day_averages = defaultdict(list)
+    
+    for week in heatmap_data:
+        for i, day in enumerate(week):
+            if day['rate'] > 0:
+                day_averages[i].append(day['rate'])
+    
+    day_names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    best_day = None
+    worst_day = None
+    
+    if day_averages:
+        day_means = {d: sum(rates)/len(rates) for d, rates in day_averages.items() if rates}
+        if day_means:
+            best_day_idx = max(day_means, key=day_means.get)
+            worst_day_idx = min(day_means, key=day_means.get)
+            best_day = {'name': day_names[best_day_idx], 'avg': day_means[best_day_idx]}
+            worst_day = {'name': day_names[worst_day_idx], 'avg': day_means[worst_day_idx]}
+    
+    context = {
+        'tracker': tracker,
+        'heatmap_data': heatmap_data,
+        'weeks': weeks,
+        'streaks': streaks,
+        'best_day': best_day,
+        'worst_day': worst_day,
+        'month_labels': [],  # Could add month separators
+    }
+    return render(request, 'core/heatmap.html', context)
+

@@ -1,0 +1,146 @@
+<!-- Today View Panel -->
+<div class="panel today-panel fade-in">
+    <!-- Header -->
+    <div class="panel-header">
+        <div>
+            <h1 class="panel-title">Today</h1>
+            <p class="panel-subtitle">{{ today|date:"l, F j, Y" }}</p>
+        </div>
+        <div class="panel-actions">
+            <!-- Date Navigation -->
+            <div class="date-nav">
+                <a href="/today/?date={{ prev_day|date:'Y-m-d' }}" class="btn btn-icon" data-nav title="Previous day">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </a>
+                <button class="btn btn-ghost" id="date-picker-toggle">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    {{ today|date:"M j" }}
+                </button>
+                <a href="/today/?date={{ next_day|date:'Y-m-d' }}" class="btn btn-icon" data-nav title="Next day">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </a>
+            </div>
+
+            {% if not is_today %}
+            <a href="/today/" class="btn btn-ghost btn-sm" data-nav>Go to Today</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Progress Summary -->
+    <div class="day-summary">
+        <div class="summary-stat">
+            <div class="summary-value">{{ completed_count }}</div>
+            <div class="summary-label">Completed</div>
+        </div>
+        <div class="summary-divider"></div>
+        <div class="summary-stat">
+            <div class="summary-value">{{ pending_count }}</div>
+            <div class="summary-label">Pending</div>
+        </div>
+        <div class="summary-divider"></div>
+        <div class="summary-stat">
+            <div class="summary-value">{{ progress }}%</div>
+            <div class="summary-label">Progress</div>
+            <div class="progress-bar progress-inline">
+                <div class="progress-fill" style="width: {{ progress }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="tab-bar">
+        <button class="tab active" data-filter="all">All ({{ total_count }})</button>
+        <button class="tab" data-filter="pending">Pending ({{ pending_count }})</button>
+        <button class="tab" data-filter="done">Done ({{ completed_count }})</button>
+        <button class="tab" data-filter="missed">Missed ({{ missed_count }})</button>
+    </div>
+
+    <!-- Tasks Grouped by Tracker -->
+    <div class="task-groups" id="today-tasks">
+        {% for group in task_groups %}
+        <div class="task-group" data-tracker-id="{{ group.tracker.id }}">
+            <div class="task-group-header">
+                <a href="/tracker/{{ group.tracker.id }}/" class="group-title" data-nav>
+                    {{ group.tracker.name }}
+                </a>
+                <span class="group-progress">{{ group.completed }}/{{ group.total }}</span>
+            </div>
+
+            <div class="task-list">
+                {% for task in group.tasks %}
+                <div class="task-row" data-task-id="{{ task.id }}" data-status="{{ task.status }}">
+                    <button class="task-toggle" data-action="toggle">
+                        <span class="status-icon status-{{ task.status|lower }}"></span>
+                    </button>
+                    <div class="task-content">
+                        <span class="task-description {% if task.status == 'DONE' %}completed{% endif %}">
+                            {{ task.description }}
+                        </span>
+                        {% if task.category %}
+                        <span class="task-category">{{ task.category }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="task-actions">
+                        <button class="btn btn-icon btn-sm" data-action="edit">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📅</div>
+            <h3 class="empty-state-title">No Tasks for This Day</h3>
+            <p class="empty-state-description">There are no scheduled tasks for {{ today|date:"F j, Y" }}.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Day Note -->
+    <div class="day-note-section">
+        <div class="section-header">
+            <h3 class="section-title">Day Note</h3>
+        </div>
+        <textarea id="day-note" class="form-textarea" placeholder="Add a note about your day..." rows="3"
+            data-date="{{ today|date:'Y-m-d' }}">{{ day_note }}</textarea>
+        <button class="btn btn-ghost btn-sm" id="save-note" style="margin-top:0.5rem;">Save Note</button>
+    </div>
+</div>
+
+<!-- Date Picker Popup -->
+<div class="date-picker-popup" id="date-picker-popup" style="display:none;">
+    <div class="date-picker-header">
+        <button class="btn btn-icon btn-sm" id="prev-month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </button>
+        <span id="current-month-year"></span>
+        <button class="btn btn-icon btn-sm" id="next-month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </button>
+    </div>
+    <div class="date-picker-grid">
+        <div class="date-picker-days">
+            <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+        </div>
+        <div class="date-picker-dates" id="date-picker-dates"></div>
+    </div>
+</div>

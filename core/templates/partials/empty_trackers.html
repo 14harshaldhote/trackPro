@@ -1,0 +1,32 @@
+<!-- Empty State: No Trackers -->
+<div class="empty-state empty-trackers">
+    <div class="empty-illustration">
+        <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="60" cy="60" r="50" fill="currentColor" opacity="0.1" />
+            <rect x="35" y="30" width="50" height="60" rx="4" fill="currentColor" opacity="0.2" />
+            <rect x="42" y="42" width="30" height="4" rx="2" fill="currentColor" opacity="0.4" />
+            <rect x="42" y="52" width="36" height="4" rx="2" fill="currentColor" opacity="0.3" />
+            <rect x="42" y="62" width="24" height="4" rx="2" fill="currentColor" opacity="0.3" />
+            <circle cx="75" cy="75" r="18" fill="var(--color-primary)" />
+            <line x1="75" y1="68" x2="75" y2="82" stroke="white" stroke-width="3" stroke-linecap="round" />
+            <line x1="68" y1="75" x2="82" y2="75" stroke="white" stroke-width="3" stroke-linecap="round" />
+        </svg>
+    </div>
+    <h3 class="empty-title">No trackers yet</h3>
+    <p class="empty-description">Create your first tracker to start building better habits and achieving your goals.</p>
+    <button class="btn btn-primary" data-action="open-modal" data-modal="add-tracker">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Create Your First Tracker
+    </button>
+    <div class="empty-suggestions">
+        <p class="text-sm text-muted">Or try a template:</p>
+        <div class="suggestion-chips">
+            <button class="chip" data-template="morning-routine">🌅 Morning Routine</button>
+            <button class="chip" data-template="fitness">💪 Fitness</button>
+            <button class="chip" data-template="learning">📚 Learning</button>
+        </div>
+    </div>
+</div>

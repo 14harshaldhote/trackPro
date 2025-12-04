@@ -1,0 +1,157 @@
+<!-- Insights Panel -->
+<div class="panel insights-panel fade-in">
+    <!-- Header -->
+    <div class="panel-header">
+        <div>
+            <nav class="breadcrumb">
+                <a href="/" data-nav>Dashboard</a>
+                <span class="breadcrumb-separator">/</span>
+                <span>Insights</span>
+            </nav>
+            <h1 class="panel-title">Insights</h1>
+            <p class="panel-subtitle">AI-powered analysis of your patterns</p>
+        </div>
+    </div>
+
+    <!-- Primary Insight -->
+    {% if primary_insight %}
+    <div class="primary-insight">
+        <div class="insight-glow"></div>
+        <div class="insight-icon">{{ primary_insight.icon }}</div>
+        <div class="insight-content">
+            <h2 class="insight-title">{{ primary_insight.title }}</h2>
+            <p class="insight-message">{{ primary_insight.message }}</p>
+            {% if primary_insight.action %}
+            <a href="{{ primary_insight.action_url }}" class="btn btn-primary btn-sm" data-nav>{{ primary_insight.action
+                }}</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Insight Cards Grid -->
+    <div class="insights-grid">
+        <!-- Best Day -->
+        <div class="insight-card">
+            <div class="insight-card-icon">📅</div>
+            <h3>Best Day</h3>
+            <p class="insight-highlight">{{ insights.best_day }}</p>
+            <p class="insight-detail">You complete {{ insights.best_day_rate }}% of tasks on {{ insights.best_day }}s
+            </p>
+        </div>
+
+        <!-- Best Time -->
+        <div class="insight-card">
+            <div class="insight-card-icon">⏰</div>
+            <h3>Peak Hours</h3>
+            <p class="insight-highlight">{{ insights.best_time }}</p>
+            <p class="insight-detail">Your most productive time is {{ insights.best_time }}</p>
+        </div>
+
+        <!-- Streak Info -->
+        <div class="insight-card">
+            <div class="insight-card-icon">🔥</div>
+            <h3>Streak Analysis</h3>
+            <p class="insight-highlight">{{ insights.current_streak }} days</p>
+            <p class="insight-detail">Your longest streak was {{ insights.longest_streak }} days</p>
+        </div>
+
+        <!-- Consistency Score -->
+        <div class="insight-card">
+            <div class="insight-card-icon">📊</div>
+            <h3>Consistency</h3>
+            <div class="consistency-meter">
+                <div class="consistency-fill" style="width: {{ insights.consistency_score }}%"></div>
+            </div>
+            <p class="insight-detail">{{ insights.consistency_score }}% consistent over last 30 days</p>
+        </div>
+
+        <!-- Category Champion -->
+        <div class="insight-card">
+            <div class="insight-card-icon">🏆</div>
+            <h3>Top Category</h3>
+            <p class="insight-highlight">{{ insights.top_category }}</p>
+            <p class="insight-detail">{{ insights.top_category_count }} tasks completed</p>
+        </div>
+
+        <!-- Improvement Area -->
+        <div class="insight-card improvement">
+            <div class="insight-card-icon">💡</div>
+            <h3>Room to Grow</h3>
+            <p class="insight-highlight">{{ insights.improvement_area }}</p>
+            <p class="insight-detail">{{ insights.improvement_tip }}</p>
+        </div>
+    </div>
+
+    <!-- Behavioral Patterns -->
+    <div class="patterns-section">
+        <h3 class="section-title">Behavioral Patterns</h3>
+        <div class="patterns-list">
+            {% for pattern in patterns %}
+            <div class="pattern-item {{ pattern.type }}">
+                <span class="pattern-icon">{{ pattern.icon }}</span>
+                <div class="pattern-content">
+                    <p class="pattern-title">{{ pattern.title }}</p>
+                    <p class="pattern-description">{{ pattern.description }}</p>
+                </div>
+                {% if pattern.trend %}
+                <span class="pattern-trend {{ pattern.trend }}">
+                    {% if pattern.trend == 'up' %}↑{% else %}↓{% endif %}
+                </span>
+                {% endif %}
+            </div>
+            {% empty %}
+            <p class="text-muted">Keep tracking for more insights!</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="recommendations-section">
+        <h3 class="section-title">Recommendations</h3>
+        <div class="recommendations-grid">
+            {% for rec in recommendations %}
+            <div class="recommendation-card">
+                <span class="rec-number">{{ forloop.counter }}</span>
+                <div class="rec-content">
+                    <h4>{{ rec.title }}</h4>
+                    <p>{{ rec.description }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Weekly Comparison -->
+    <div class="comparison-section">
+        <h3 class="section-title">This Week vs Last Week</h3>
+        <div class="week-comparison">
+            <div class="comparison-metric">
+                <span class="metric-label">Tasks Completed</span>
+                <div class="metric-bars">
+                    <div class="bar last-week" style="width: {{ comparison.last_week_tasks_pct }}%">
+                        <span>{{ comparison.last_week_tasks }}</span>
+                    </div>
+                    <div class="bar this-week" style="width: {{ comparison.this_week_tasks_pct }}%">
+                        <span>{{ comparison.this_week_tasks }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="comparison-metric">
+                <span class="metric-label">Completion Rate</span>
+                <div class="metric-bars">
+                    <div class="bar last-week" style="width: {{ comparison.last_week_rate }}%">
+                        <span>{{ comparison.last_week_rate }}%</span>
+                    </div>
+                    <div class="bar this-week" style="width: {{ comparison.this_week_rate }}%">
+                        <span>{{ comparison.this_week_rate }}%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="comparison-legend">
+                <span class="legend-item last"><span class="dot"></span> Last Week</span>
+                <span class="legend-item this"><span class="dot"></span> This Week</span>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,143 @@
+<!-- Export Data Modal -->
+<div class="modal-header">
+    <h2 class="modal-title">Export Data</h2>
+    <button type="button" class="btn btn-icon" data-action="close-modal" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+    </button>
+</div>
+
+<div class="modal-body">
+    <form id="export-form" data-validate>
+        <!-- Format Selection -->
+        <div class="form-group">
+            <label class="form-label">Export Format</label>
+            <div class="export-formats">
+                <label class="export-format-option">
+                    <input type="radio" name="format" value="csv" checked>
+                    <div class="format-card">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span>CSV</span>
+                        <small>Spreadsheet compatible</small>
+                    </div>
+                </label>
+                <label class="export-format-option">
+                    <input type="radio" name="format" value="json">
+                    <div class="format-card">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <polyline points="16 18 22 12 16 6"></polyline>
+                            <polyline points="8 6 2 12 8 18"></polyline>
+                        </svg>
+                        <span>JSON</span>
+                        <small>Developer friendly</small>
+                    </div>
+                </label>
+                <label class="export-format-option">
+                    <input type="radio" name="format" value="pdf">
+                    <div class="format-card">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        </svg>
+                        <span>PDF</span>
+                        <small>Print ready report</small>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Date Range -->
+        <div class="form-group">
+            <label class="form-label">Date Range</label>
+            <div class="date-range-inputs">
+                <div>
+                    <label class="text-sm text-muted">From</label>
+                    <input type="date" name="start_date" class="form-input">
+                </div>
+                <div>
+                    <label class="text-sm text-muted">To</label>
+                    <input type="date" name="end_date" class="form-input">
+                </div>
+            </div>
+            <div class="quick-ranges mt-2">
+                <button type="button" class="btn btn-ghost btn-sm" data-range="7">Last 7 days</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-range="30">Last 30 days</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-range="all">All time</button>
+            </div>
+        </div>
+
+        <!-- Include Options -->
+        <div class="form-group">
+            <label class="form-label">Include</label>
+            <div class="checkbox-group">
+                <label class="checkbox-option">
+                    <input type="checkbox" name="include_tasks" value="1" checked>
+                    <span>Tasks</span>
+                </label>
+                <label class="checkbox-option">
+                    <input type="checkbox" name="include_notes" value="1" checked>
+                    <span>Notes</span>
+                </label>
+                <label class="checkbox-option">
+                    <input type="checkbox" name="include_stats" value="1" checked>
+                    <span>Statistics</span>
+                </label>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="modal-footer">
+    <button type="button" class="btn btn-ghost" data-action="close-modal">Cancel</button>
+    <button type="button" class="btn btn-primary" id="export-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Download Export
+    </button>
+</div>
+
+<script>
+    (function () {
+        const trackerId = '{{ tracker_id }}';
+        const form = document.getElementById('export-form');
+        const exportBtn = document.getElementById('export-btn');
+
+        // Quick date ranges
+        document.querySelectorAll('[data-range]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const days = btn.dataset.range;
+                const endDate = new Date().toISOString().split('T')[0];
+
+                if (days === 'all') {
+                    form.start_date.value = '';
+                    form.end_date.value = '';
+                } else {
+                    const start = new Date();
+                    start.setDate(start.getDate() - parseInt(days));
+                    form.start_date.value = start.toISOString().split('T')[0];
+                    form.end_date.value = endDate;
+                }
+            });
+        });
+
+        // Export
+        exportBtn.addEventListener('click', () => {
+            const format = form.format.value;
+            const params = new URLSearchParams(new FormData(form));
+
+            window.location.href = `/api/tracker/${trackerId}/export/?${params.toString()}`;
+            App.closeModal();
+        });
+    })();
+</script>

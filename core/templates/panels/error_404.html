@@ -1,0 +1,99 @@
+<!-- Error 404 Panel -->
+<div class="error-panel fade-in">
+    <div class="error-content">
+        <div class="error-icon">
+            <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-secondary)"
+                stroke-width="1.5" opacity="0.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+        </div>
+
+        <h1 class="error-title">Page Not Found</h1>
+        <p class="error-message">
+            The page you're looking for doesn't exist or has been moved.
+        </p>
+
+        <div class="error-actions">
+            <a href="/" class="btn btn-primary" data-nav>Go to Dashboard</a>
+            <button class="btn btn-ghost" onclick="history.back()">Go Back</button>
+        </div>
+
+        <div class="error-help">
+            <p>Looking for something specific?</p>
+            <ul>
+                <li><a href="/trackers/" data-nav>View all trackers</a></li>
+                <li><a href="/help/" data-nav>Help center</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+    .error-panel {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 60vh;
+        text-align: center;
+        padding: 2rem;
+    }
+
+    .error-content {
+        max-width: 400px;
+    }
+
+    .error-icon {
+        margin-bottom: 1.5rem;
+    }
+
+    .error-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+        color: var(--color-text-primary);
+    }
+
+    .error-message {
+        color: var(--color-text-secondary);
+        margin-bottom: 2rem;
+        line-height: 1.6;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-bottom: 2rem;
+    }
+
+    .error-help {
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--color-border);
+    }
+
+    .error-help p {
+        font-size: 0.875rem;
+        color: var(--color-text-secondary);
+        margin-bottom: 0.5rem;
+    }
+
+    .error-help ul {
+        list-style: none;
+        padding: 0;
+        display: flex;
+        gap: 1.5rem;
+        justify-content: center;
+    }
+
+    .error-help a {
+        color: var(--color-primary);
+        text-decoration: none;
+        font-size: 0.875rem;
+    }
+
+    .error-help a:hover {
+        text-decoration: underline;
+    }
+</style>

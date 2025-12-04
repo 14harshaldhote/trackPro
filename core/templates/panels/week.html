@@ -1,0 +1,143 @@
+<!-- Week View Panel -->
+<div class="panel week-panel fade-in">
+    <!-- Header -->
+    <div class="panel-header">
+        <div>
+            <h1 class="panel-title">Week View</h1>
+            <p class="panel-subtitle">{{ week_start|date:"M j" }} - {{ week_end|date:"M j, Y" }}</p>
+        </div>
+        <div class="panel-actions">
+            <!-- Week Navigation -->
+            <div class="date-nav">
+                <a href="/week/?date={{ prev_week|date:'Y-m-d' }}" class="btn btn-icon" data-nav title="Previous week">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </a>
+                <button class="btn btn-ghost" id="week-picker-toggle">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                    </svg>
+                    Week {{ week_number }}
+                </button>
+                <a href="/week/?date={{ next_week|date:'Y-m-d' }}" class="btn btn-icon" data-nav title="Next week">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </a>
+            </div>
+
+            {% if not is_current_week %}
+            <a href="/week/" class="btn btn-ghost btn-sm" data-nav>Current Week</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Week Progress -->
+    <div class="week-summary">
+        <div class="summary-card">
+            <div class="summary-value">{{ week_stats.completed }}</div>
+            <div class="summary-label">Tasks Completed</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">{{ week_stats.completion_rate }}%</div>
+            <div class="summary-label">Completion Rate</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">{{ week_stats.best_day|default:"-" }}</div>
+            <div class="summary-label">Best Day</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">{{ week_stats.streak }}</div>
+            <div class="summary-label">Current Streak</div>
+        </div>
+    </div>
+
+    <!-- Week Grid -->
+    <div class="week-grid">
+        {% for day in days %}
+        <div class="week-day {% if day.is_today %}is-today{% endif %} {% if day.date > today %}is-future{% endif %}"
+            data-date="{{ day.date|date:'Y-m-d' }}">
+
+            <div class="week-day-header">
+                <span class="day-name">{{ day.date|date:"D" }}</span>
+                <span class="day-number">{{ day.date|date:"j" }}</span>
+                {% if day.is_today %}
+                <span class="today-badge">Today</span>
+                {% endif %}
+            </div>
+
+            <div class="week-day-progress">
+                <div class="mini-progress">
+                    <div class="mini-progress-fill" style="width: {{ day.progress }}%"></div>
+                </div>
+                <span class="mini-progress-text">{{ day.completed }}/{{ day.total }}</span>
+            </div>
+
+            <div class="week-day-tasks">
+                {% for task in day.tasks|slice:":5" %}
+                <div class="week-task {% if task.status == 'DONE' %}done{% endif %}" data-task-id="{{ task.id }}"
+                    title="{{ task.description }}">
+                    <span class="week-task-status status-{{ task.status|lower }}"></span>
+                    <span class="week-task-text">{{ task.description|truncatewords:6 }}</span>
+                </div>
+                {% endfor %}
+
+                {% if day.tasks|length > 5 %}
+                <a href="/today/?date={{ day.date|date:'Y-m-d' }}" class="week-task-more" data-nav>
+                    +{{ day.tasks|length|add:"-5" }} more
+                </a>
+                {% endif %}
+            </div>
+
+            <a href="/today/?date={{ day.date|date:'Y-m-d' }}" class="week-day-link" data-nav>
+                View Day
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Weekly Heatmap -->
+    <div class="week-heatmap">
+        <h3 class="section-title">Activity by Time of Day</h3>
+        <div class="heatmap-grid">
+            <div class="heatmap-row">
+                <span class="heatmap-label">Morning</span>
+                {% for day in days %}
+                <div class="heatmap-cell" style="--intensity: {{ day.morning_rate }}"
+                    title="{{ day.date|date:'D' }}: {{ day.morning_completed }}/{{ day.morning_total }}">
+                </div>
+                {% endfor %}
+            </div>
+            <div class="heatmap-row">
+                <span class="heatmap-label">Afternoon</span>
+                {% for day in days %}
+                <div class="heatmap-cell" style="--intensity: {{ day.afternoon_rate }}"
+                    title="{{ day.date|date:'D' }}: {{ day.afternoon_completed }}/{{ day.afternoon_total }}">
+                </div>
+                {% endfor %}
+            </div>
+            <div class="heatmap-row">
+                <span class="heatmap-label">Evening</span>
+                {% for day in days %}
+                <div class="heatmap-cell" style="--intensity: {{ day.evening_rate }}"
+                    title="{{ day.date|date:'D' }}: {{ day.evening_completed }}/{{ day.evening_total }}">
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="heatmap-legend">
+            <span>Less</span>
+            <div class="legend-scale">
+                <div class="legend-cell" style="--intensity: 0"></div>
+                <div class="legend-cell" style="--intensity: 0.25"></div>
+                <div class="legend-cell" style="--intensity: 0.5"></div>
+                <div class="legend-cell" style="--intensity: 0.75"></div>
+                <div class="legend-cell" style="--intensity: 1"></div>
+            </div>
+            <span>More</span>
+        </div>
+    </div>
+</div>
