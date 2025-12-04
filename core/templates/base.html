@@ -8,7 +8,10 @@
     <title>Tracker Pro</title>
     <link rel="stylesheet" href="{% static 'core/css/themes.css' %}">
     <link rel="stylesheet" href="{% static 'core/css/components.css' %}">
+    <link rel="stylesheet" href="{% static 'core/css/auth.css' %}">
+
     <link rel="stylesheet" href="{% static 'core/css/enhancements.css' %}">
+    <link rel="icon" type="image/x-icon" href="{% static 'icons/fav.ico' %}">
 </head>
 
 <body>
@@ -36,7 +39,8 @@
         </svg>
     </div>
 
-    <div class="sidebar-layout">
+    <div class="sidebar-layout {% if not user.is_authenticated %}auth-layout{% endif %}">
+        {% if user.is_authenticated %}
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="brand"
@@ -45,6 +49,17 @@
                     <use href="/static/icons/sprite.svg#chart"></use>
                 </svg>
                 Tracker Pro
+            </div>
+
+            <div
+                style="background: rgba(var(--color-primary-rgb, 2, 119, 189), 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                <div style="font-size: 0.75rem; color: var(--color-text-secondary); margin-bottom: 0.25rem;">Logged in
+                    as</div>
+                <div style="font-weight: 600; margin-bottom: 0.75rem; color: var(--color-text-secondary); word-break: break-word;">{{ user.email }}</div>
+                <a href="{% url 'logout' %}" class="btn btn-ghost logout-btn" data-logout
+                    style="width: 100%; justify-content: center; font-size: 0.875rem; text-decoration: none; color: var(--color-text-secondary); border: 1px solid var(--color-border);">
+                    Logout
+                </a>
             </div>
 
             <!-- Main Navigation -->
@@ -144,6 +159,7 @@
                 </select>
             </div>
         </aside>
+        {% endif %}
 
         <!-- Main Content -->
         <main class="main-content">
@@ -151,6 +167,23 @@
             {% endblock %}
         </main>
     </div>
+
+    <style>
+        /* Auth Layout Overrides */
+        .auth-layout {
+            display: block !important;
+            height: 100vh;
+            width: 100vw;
+            overflow-x: hidden;
+        }
+
+        .auth-layout .main-content {
+            padding: 0 !important;
+            width: 100%;
+            height: 100%;
+            max-width: none !important;
+        }
+    </style>
 
     <script>
         // Theme Switcher Logic
@@ -170,6 +203,11 @@
 
     <!-- Enhancements Script -->
     <script src="{% static 'core/js/enhancements.js' %}"></script>
+
+    {% if user.is_authenticated %}
+    <!-- Authentication Script (for logout functionality) -->
+    <script type="module" src="{% static 'core/js/auth.js' %}"></script>
+    {% endif %}
 </body>
 
 </html>

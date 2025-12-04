@@ -9,7 +9,7 @@ class CoreConfig(AppConfig):
     def ready(self):
         # Prevent scheduler from starting twice (reloader)
         if 'runserver' in sys.argv:
-            from core import scheduler
+            from core.integrations import scheduler
             
             # Note: Commenting out initial check to avoid DB access during app initialization
             # The scheduler will run the check on its first interval instead

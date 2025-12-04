@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block title %}{% trans "Sign In" %}{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="brand">
+            <div class="brand-logo">
+                <img src="{% static 'icons/fav.png' %}" alt="Tracker Pro">
+            </div>
+            <h1 class="brand-name">Tracker Pro</h1>
+            <p class="brand-tagline">Track your habits, achieve your goals</p>
+        </div>
+
+        <h2 class="auth-heading">{% trans "Sign In" %}</h2>
+        <p class="auth-subheading">
+            {% blocktrans with provider.name as provider %}You are about to connect a new third party account from {{ provider }}.{% endblocktrans %}
+        </p>
+
+        <form method="post" class="auth-form">
+            {% csrf_token %}
+            <button type="submit" class="btn-primary-full">
+                {% trans "Continue" %}
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p><a href="{% url 'account_login' %}">← Back to Login</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

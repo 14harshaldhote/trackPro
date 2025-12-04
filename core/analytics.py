@@ -13,7 +13,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional
-from core import crud, nlp_utils, metric_helpers
+from core.repositories import base_repository as crud
+from core.helpers import nlp_helpers as nlp_utils
+from core.helpers import metric_helpers
+from core.helpers.cache_helpers import cache_result, CACHE_TIMEOUTS
 
 def get_plot_as_base64(fig):
     """Converts a matplotlib figure to base64 string."""
@@ -28,6 +31,7 @@ def get_plot_as_base64(fig):
 # CORE METRICS
 # ====================================================================
 
+@cache_result(timeout=CACHE_TIMEOUTS['completion_rate'], key_prefix='completion_rate')
 def compute_completion_rate(tracker_id: str, start_date: Optional[date] = None, end_date: Optional[date] = None) -> Dict:
     """
     Computes completion rate using pandas aggregations.
@@ -103,6 +107,7 @@ def compute_completion_rate(tracker_id: str, start_date: Optional[date] = None, 
         'computed_at': datetime.now()
     }
 
+@cache_result(timeout=CACHE_TIMEOUTS['streaks'], key_prefix='streaks')
 def detect_streaks(tracker_id: str, task_template_id: Optional[str] = None) -> Dict:
     """
     Detects current and longest streaks using NumPy run-length encoding.
@@ -163,6 +168,7 @@ def detect_streaks(tracker_id: str, task_template_id: Optional[str] = None) -> D
         'computed_at': datetime.now()
     }
 
+@cache_result(timeout=CACHE_TIMEOUTS['consistency'], key_prefix='consistency')
 def compute_consistency_score(tracker_id: str, window_days: int = 7) -> Dict:
     """
     Computes consistency score using rolling window analysis.
@@ -215,6 +221,7 @@ def compute_consistency_score(tracker_id: str, window_days: int = 7) -> Dict:
         'computed_at': datetime.now()
     }
 
+@cache_result(timeout=CACHE_TIMEOUTS['tracker_stats'], key_prefix='balance')
 def compute_balance_score(tracker_id: str) -> Dict:
     """
     Computes balance score using category distribution entropy.
@@ -258,6 +265,7 @@ def compute_balance_score(tracker_id: str) -> Dict:
         'computed_at': datetime.now()
     }
 
+@cache_result(timeout=CACHE_TIMEOUTS['analytics'], key_prefix='effort')
 def compute_effort_index(tracker_id: str, start_date: Optional[date] = None, end_date: Optional[date] = None) -> Dict:
     """
     Computes effort index combining task difficulty and duration.
@@ -601,6 +609,7 @@ def generate_streak_timeline(tracker_id):
     
     return get_plot_as_base64(fig)
 
+@cache_result(timeout=CACHE_TIMEOUTS['tracker_stats'], key_prefix='tracker_stats')
 def compute_tracker_stats(tracker_id):
     """
     Computes comprehensive statistics for a tracker.

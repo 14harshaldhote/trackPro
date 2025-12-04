@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="main-content">
+    <div class="page-header" style="margin-bottom: 2rem;">
+        <h1>Insights - {{ tracker.name }}</h1>
+        <p class="text-secondary">Plain-English insights and personalized recommendations</p>
+    </div>
+
+    <!-- Key Metrics Summary -->
+    <div class="grid-3" style="margin-bottom: 2rem;">
+        <div class="card">
+            <h3 style="margin-bottom: 0.5rem;">Completion Rate</h3>
+            <div class="stat-value" style="font-size: 2.5rem; color: var(--color-primary);">{{ completion|floatformat:0 }}%</div>
+        </div>
+        <div class="card">
+            <h3 style="margin-bottom: 0.5rem;">Current Streak</h3>
+            <div class="stat-value" style="font-size: 2.5rem; color: var(--color-primary);">{{ streaks.current }} days</div>
+        </div>
+        <div class="card">
+            <h3 style="margin-bottom: 0.5rem;">Consistency Score</h3>
+            <div class="stat-value" style="font-size: 2.5rem; color: var(--color-primary);">{{ consistency|floatformat:0 }}%</div>
+        </div>
+    </div>
+
+    <!-- Insights -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h2>Your Insights</h2>
+        </div>
+        {% if insights %}
+        {% for insight in insights %}
+        <div class="insight-item" style="padding: 1rem; margin-bottom: 1rem; border-left: 4px solid 
+                {% if insight.type == 'success' %}#10b981{% elif insight.type == 'warning' %}#f59e0b{% else %}#3b82f6{% endif %}; 
+                background: rgba(0,0,0,0.02); border-radius: 8px;">
+            <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem;">{{ insight.title }}</h3>
+            <p style="margin: 0; color: var(--color-text-secondary);">{{ insight.message }}</p>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p style="color: var(--color-text-secondary); text-align: center; padding: 2rem;">
+            Keep tracking to generate insights!
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- Recommendations -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h2>Recommendations</h2>
+        </div>
+        {% if recommendations %}
+        <ul style="list-style: none; padding: 0;">
+            {% for rec in recommendations %}
+            <li
+                style="padding: 0.75rem; border-bottom: 1px solid var(--color-border); display: flex; align-items: start; gap: 0.75rem;">
+                <span style="color: var(--color-primary); font-size: 1.2rem;">💡</span>
+                <span>{{ rec }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p style="color: var(--color-text-secondary); text-align: center; padding: 2rem;">
+            No recommendations yet. Keep tracking!
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- Task Performance -->
+    {% if task_insights %}
+    <div class="card">
+        <div class="card-header">
+            <h2>Task Performance</h2>
+        </div>
+        {% for item in task_insights %}
+        <div style="padding: 1rem; border-bottom: 1px solid var(--color-border);">
+            <h3 style="margin-bottom: 0.5rem; font-size: 1rem;">{{ item.task.description }}</h3>
+            <div style="display: flex; gap: 1rem; color: var(--color-text-secondary); font-size: 0.875rem;">
+                <span>Completion: {{ item.performance.completion|default:"0" }}%</span>
+                <span>Total: {{ item.performance.total|default:"0" }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="margin-top: 2rem; text-align: center;">
+        <a href="{% url 'tracker_detail' tracker.tracker_id %}" class="btn btn-ghost">← Back to Tracker</a>
+    </div>
+</div>
+{% endblock %}

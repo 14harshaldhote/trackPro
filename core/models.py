@@ -13,6 +13,7 @@ class TrackerDefinition(models.Model):
     ]
     
     tracker_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='trackers', null=True)
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True, default='')
     time_mode = models.CharField(max_length=20, choices=TIME_MODE_CHOICES, default='daily')
@@ -23,6 +24,8 @@ class TrackerDefinition(models.Model):
         db_table = 'tracker_definitions'
         ordering = ['-created_at']
         indexes = [
+            models.Index(fields=['user', 'time_mode']),
+            models.Index(fields=['user', '-created_at']),
             models.Index(fields=['time_mode']),
             models.Index(fields=['created_at']),
         ]
@@ -69,8 +72,13 @@ class TrackerInstance(models.Model):
         unique_together = [['tracker', 'tracking_date']]
         ordering = ['-tracking_date']
         indexes = [
-            models.Index(fields=['tracker', 'tracking_date']),
+            # Date range queries (optimized for get_day_grid_data)
+            models.Index(fields=['tracker', 'tracking_date', 'status'], name='instance_date_lookup'),
+            models.Index(fields=['tracker', '-tracking_date'], name='instance_recent'),
+            
+            # Single field indexes
             models.Index(fields=['tracking_date']),
+            models.Index(fields=['status']),
         ]
     
     def __str__(self):
@@ -101,9 +109,18 @@ class TaskInstance(models.Model):
         db_table = 'task_instances'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['tracker_instance', 'status']),
+            # Optimized for grid queries (get_day_grid_data)
+            models.Index(fields=['tracker_instance', 'template', 'status'], name='task_grid_lookup'),
+            
+            # Analytics queries
+            models.Index(fields=['status', 'completed_at'], name='task_analytics'),
+            models.Index(fields=['template', 'status'], name='task_template_status'),
+            
+            # Single field indexes
+            models.Index(fields=['tracker_instance']),
             models.Index(fields=['template']),
             models.Index(fields=['status']),
+            models.Index(fields=['-created_at']),
         ]
     
     def __str__(self):

@@ -15,7 +15,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trackerWeb.settings')
 import django
 django.setup()
 
-from core import crud
+from core.repositories import base_repository as crud
 
 def generate_synthetic_tracker(
     name: str,

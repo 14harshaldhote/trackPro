@@ -1,4 +1,4 @@
-from core import crud
+from core.repositories import base_repository as crud
 import uuid
 
 PREDEFINED_TEMPLATES = {

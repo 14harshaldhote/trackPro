@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import views_auth
 
 urlpatterns = [
     # Main pages
@@ -40,4 +41,14 @@ urlpatterns = [
     path('api/task/<str:task_id>/toggle/', views.api_toggle_task, name='api_toggle_task'),
     path('api/tasks/bulk-update/', views.api_bulk_status_update, name='api_bulk_update'),
     path('api/tracker/<str:tracker_id>/mark-overdue/', views.api_mark_overdue_missed, name='api_mark_overdue'),
+    
+    # Authentication API
+    path('api/auth/login/', views_auth.api_login, name='api_login'),
+    path('api/auth/signup/', views_auth.api_signup, name='api_signup'),
+    path('api/auth/logout/', views_auth.api_logout, name='api_logout'),
+    path('api/auth/status/', views_auth.api_check_auth, name='api_check_auth'),
+    path('api/auth/validate-email/', views_auth.api_validate_email, name='api_validate_email'),
+    
+    # Standard Logout (for non-AJAX fallbacks)
+    path('logout/', views_auth.api_logout, name='logout'),
 ]

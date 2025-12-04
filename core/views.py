@@ -1,34 +1,52 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
-from core import crud, services, templates, analytics, exports
-from datetime import date, datetime, timedelta
-import uuid
+from django.contrib.auth.decorators import login_required
+from datetime import date, timedelta, datetime
+import json
 
+from core.repositories import base_repository as crud
+from core.services import instance_service as services
+from core import templates, analytics
+from core.exports import exporter as exports
+from core.models import TrackerDefinition
+import uuid
+from core.utils.constants import STATUS_INFO
+
+# ============================================================================
+# DASHBOARD & HOME
+# ============================================================================
+
+@login_required # Added decorator
 def dashboard(request):
     """
-    Main dashboard view.
-    Shows today's tasks and active trackers with quick stats.
+    Main dashboard showing all trackers and their quick stats.
+    Optimized with caching (analytics decorated with @cache_result).
+    MULTI-USER: Filters trackers by logged-in user.
     """
+    from core.models import TrackerDefinition # Added import inside function
+    
     today = date.today()
     
-    # Ensure instances exist for today
-    services.check_all_trackers(today)
+    # Ensure instances exist for all active trackers (user's trackers only)
+    user_trackers = TrackerDefinition.objects.filter(user=request.user) # Filter by user
+    for tracker in user_trackers:
+        services.ensure_tracker_instance(tracker.tracker_id, today) # Fixed function call
     
-    # Get all trackers with stats
-    trackers = crud.get_all_tracker_definitions()
-    
+    # Get all trackers with their stats (filtered by user)
     tracker_stats = []
-    for tracker in trackers:
+    for tracker in user_trackers: # Iterate over user's trackers
         try:
-            stats = analytics.compute_tracker_stats(tracker['tracker_id'])
+            # compute_tracker_stats is now cached (5 min timeout)
+            stats = analytics.compute_tracker_stats(tracker.tracker_id)
             tracker_stats.append({
-                'tracker': tracker,
+                'tracker': crud.model_to_dict(tracker), # Convert model to dict
                 'stats': stats
             })
-        except:
+        except Exception as e:
+            # Log error but continue with other trackers
             tracker_stats.append({
-                'tracker': tracker,
+                'tracker': crud.model_to_dict(tracker), # Convert model to dict
                 'stats': {}
             })
     
@@ -38,13 +56,16 @@ def dashboard(request):
     }
     return render(request, 'core/dashboard.html', context)
 
+@login_required
 def tracker_list(request):
-    """List and manage trackers."""
-    trackers = crud.get_all_tracker_definitions()
+    """List and manage trackers (user's trackers only)."""
+    from core.helpers.auth_helpers import get_user_trackers
+    trackers = [crud.model_to_dict(t) for t in get_user_trackers(request.user)]
     return render(request, 'core/tracker_list.html', {'trackers': trackers})
 
+@login_required
 def create_tracker(request):
-    """Create a new tracker."""
+    """Create a new tracker (assigns to logged-in user)."""
     if request.method == 'POST':
         name = request.POST.get('name')
         time_mode = request.POST.get('time_mode')
@@ -52,13 +73,14 @@ def create_tracker(request):
         category = request.POST.get('category')
         
         tracker_id = str(uuid.uuid4())
-        crud.db.insert('TrackerDefinitions', {
-            'tracker_id': tracker_id,
-            'name': name,
-            'time_mode': time_mode,
-            'description': description,
-            'created_at': date.today().isoformat()
-        })
+        # Create using ORM to handle user field
+        tracker = TrackerDefinition.objects.create(
+            tracker_id=tracker_id,
+            user=request.user,  # Assign to logged-in user
+            name=name,
+            time_mode=time_mode,
+            description=description
+        )
         
         if category:
             templates.initialize_templates(tracker_id, category)
@@ -67,11 +89,14 @@ def create_tracker(request):
         
     return render(request, 'core/create_tracker.html')
 
+@login_required
 def tracker_detail(request, tracker_id):
-    """Detailed tracker view with inline analytics."""
-    tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
-    if not tracker:
-        return redirect('tracker_list')
+    """Detailed tracker view with inline analytics (user must own tracker)."""
+    from core.helpers.auth_helpers import get_user_tracker_or_404
+    
+    # Permission check: user must own this tracker
+    tracker_obj = get_user_tracker_or_404(tracker_id, request.user)
+    tracker = crud.model_to_dict(tracker_obj)
     
     # Get comprehensive stats
     completion = analytics.compute_completion_rate(tracker_id)
@@ -79,25 +104,16 @@ def tracker_detail(request, tracker_id):
     consistency = analytics.compute_consistency_score(tracker_id)
     balance = analytics.compute_balance_score(tracker_id)
     
-    # Get recent instances
-    instances = crud.get_tracker_instances(tracker_id)[-10:]  # Last 10
-    
-    # Get charts
-    completion_chart = analytics.generate_completion_chart(tracker_id)
-    category_chart = analytics.generate_category_pie_chart(tracker_id)
-    
     context = {
         'tracker': tracker,
         'completion': completion,
         'streaks': streaks,
         'consistency': consistency,
         'balance': balance,
-        'instances': instances,
-        'completion_chart': completion_chart,
-        'category_chart': category_chart,
     }
     return render(request, 'core/tracker_detail.html', context)
 
+@login_required
 def analytics_dashboard(request, tracker_id):
     """Full analytics dashboard with all metrics."""
     tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
@@ -132,6 +148,7 @@ def analytics_dashboard(request, tracker_id):
     return render(request, 'core/analytics_dashboard.html', context)
 
 
+@login_required
 def delete_tracker(request, tracker_id):
     """
     Delete a tracker and all associated data.
@@ -165,6 +182,7 @@ def delete_tracker(request, tracker_id):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
+@login_required
 def behavior_analysis(request, tracker_id):
     """Behavior insights with NLP analysis."""
     tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
@@ -184,6 +202,7 @@ def behavior_analysis(request, tracker_id):
     }
     return render(request, 'core/behavior_analysis.html', context)
 
+@login_required
 def correlations(request, tracker_id):
     """Correlation matrix and insights."""
     tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
@@ -203,6 +222,7 @@ def correlations(request, tracker_id):
     }
     return render(request, 'core/correlations.html', context)
 
+@login_required
 def forecast_view(request, tracker_id):
     """Time-series forecasts."""
     tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
@@ -226,6 +246,7 @@ def forecast_view(request, tracker_id):
     }
     return render(request, 'core/forecast.html', context)
 
+@login_required
 def export_center(request, tracker_id):
     """Export hub for all formats."""
     tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
@@ -286,6 +307,7 @@ def export_center(request, tracker_id):
     }
     return render(request, 'core/export_center.html', context)
 
+@login_required
 def my_journey(request, tracker_id):
     """Audit log timeline."""
     tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
@@ -301,124 +323,95 @@ def my_journey(request, tracker_id):
     }
     return render(request, 'core/my_journey.html', context)
 
+@login_required
 def monthly_tracker(request, tracker_id):
     """
     Interactive monthly habit tracker view.
     Shows a grid with tasks/activities as rows and days of month as columns.
-    """
-    from calendar import monthrange
     
-    tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
-    if not tracker:
-        return redirect('tracker_list')
+    REFACTORED: Uses GridBuilderService to eliminate code duplication
+    """
+    from core.services.grid_builder_service import GridBuilderService
     
     # Get current month or from query params
     today = date.today()
     year = int(request.GET.get('year', today.year))
     month = int(request.GET.get('month', today.month))
     
-    # Get number of days in month
+    # Ensure instances exist for the month
+    from calendar import monthrange
     _, num_days = monthrange(year, month)
+    for day in range(1, num_days + 1):
+        services.ensure_tracker_instance(tracker_id, date(year, month, day))
     
-    # Get all task templates for this tracker
-    templates = crud.get_task_templates_for_tracker(tracker_id)
+    # Build grid using service
+    builder = GridBuilderService(tracker_id)
+    result = builder.build_monthly_grid(year, month)
     
-    # Build calendar matrix
-    calendar_data = []
-    for template in templates:
-        row = {
-            'template': template,
-            'days': []
-        }
-        
-        for day in range(1, num_days + 1):
-            current_date = date(year, month, day)
-            
-            # Find if there's a task instance for this day
-            instances = crud.get_tracker_instances(tracker_id)
-            task_instance = None
-            
-            for inst in instances:
-                if inst['period_start'] == current_date.isoformat():
-                    tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
-                    task_instance = next((t for t in tasks if t['template_id'] == template['template_id']), None)
-                    break
-            
-            row['days'].append({
-                'day': day,
-                'date': current_date,
-                'task': task_instance,
-                'is_done': task_instance and task_instance.get('status') == 'DONE' if task_instance else False,
-                'is_today': current_date == today
-            })
-        
-        calendar_data.append(row)
+    if not result['tracker']:
+        return redirect('tracker_list')
     
-    # Month navigation
-    prev_month = month - 1 if month > 1 else 12
-    prev_year = year if month > 1 else year - 1
-    next_month = month + 1 if month < 12 else 1
-    next_year = year if month < 12 else year + 1
-    
+    # Prepare context
     context = {
-        'tracker': tracker,
-        'calendar_data': calendar_data,
-        'year': year,
-        'month': month,
-        'month_name': date(year, month, 1).strftime('%B %Y'),
-        'prev_year': prev_year,
-        'prev_month': prev_month,
-        'next_year': next_year,
-        'next_month': next_month,
-        'num_days': num_days,
+        'tracker': result['tracker'],
+        'calendar_data': result['grid'],
+        'year': result['year'],
+        'month': result['month'],
+        'month_name': result['month_name'],
+        'prev_year': result['prev_year'],
+        'prev_month': result['prev_month'],
+        'next_year': result['next_year'],
+        'next_month': result['next_month'],
+        'num_days': result['num_days'],
     }
     return render(request, 'core/monthly_tracker.html', context)
 
+
+
+@login_required
 def today_view(request, tracker_id):
     """
     Today-focused view: Simple grid of tasks with status toggles.
     Focus on "What do I need to do TODAY?"
-    """
-    from core.constants import STATUS_INFO
     
-    tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
-    if not tracker:
-        return redirect('tracker_list')
+    OPTIMIZED: Uses get_day_grid_data to fetch all data in ~3 queries
+    """
+    from core.utils.constants import STATUS_INFO
     
     today = date.today()
     
     # Ensure instances exist for today
     services.ensure_tracker_instance(tracker_id, today)
     
-    # Get all task templates
-    templates = crud.get_task_templates_for_tracker(tracker_id)
+    # OPTIMIZED: Fetch all data in minimal queries
+    grid_data = crud.get_day_grid_data(tracker_id, [today])
     
-    # Get today's tracker instance
-    instances = crud.get_tracker_instances(tracker_id)
-    today_instance = next((inst for inst in instances if inst['period_start'] == today.isoformat()), None)
+    tracker = grid_data['tracker']
+    if not tracker:
+        return redirect('tracker_list')
+    
+    templates = grid_data['templates']
+    instances_map = grid_data['instances_map']
+    
+    # Get today's instance from map
+    today_instance = instances_map.get(today.isoformat())
     
     # Build task list with status
     tasks_data = []
-    if today_instance:
-        task_instances = crud.get_task_instances_for_tracker_instance(today_instance['instance_id'])
+    for template in templates:
+        task = None
+        if today_instance and 'tasks' in today_instance:
+            task = next(
+                (t for t in today_instance['tasks'] if t.get('template_id') == template['template_id']),
+                None
+            )
         
-        for template in templates:
-            task = next((t for t in task_instances if t['template_id'] == template['template_id']), None)
-            
-            tasks_data.append({
-                'template': template,
-                'task': task,
-                'status': task.get('status', 'TODO') if task else 'TODO',
-                'notes': task.get('notes', '') if task else '',
-            })
-    else:
-        for template in templates:
-            tasks_data.append({
-                'template': template,
-                'task': None,
-                'status': 'TODO',
-                'notes': '',
-            })
+        tasks_data.append({
+            'template': template,
+            'task': task,
+            'status': task.get('status', 'TODO') if task else 'TODO',
+            'notes': task.get('notes', '') if task else '',
+        })
     
     # Calculate completion stats
     total_tasks = len(tasks_data)
@@ -438,62 +431,50 @@ def today_view(request, tracker_id):
     }
     return render(request, 'core/today.html', context)
 
+@login_required
 def week_view(request, tracker_id):
     """
     Week view: 7-day grid (Mon-Sun) × Tasks with status cells.
-    """
-    from core.constants import STATUS_INFO
-    from calendar import day_name
     
-    tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
-    if not tracker:
-        return redirect('tracker_list')
+    REFACTORED: Uses GridBuilderService to eliminate code duplication
+    """
+    from core.services.grid_builder_service import GridBuilderService
     
     # Get week offset from query params (default = current week)
     week_offset = int(request.GET.get('week', 0))
     
-    # Calculate week start (Monday)
+    # Ensure instances exist for the week
     today = date.today()
     days_since_monday = today.weekday()
     week_start = today - timedelta(days=days_since_monday) + timedelta(weeks=week_offset)
-    
-    # Generate 7 days
     week_days = [week_start + timedelta(days=i) for i in range(7)]
     
-    # Ensure instances exist
     for day in week_days:
         services.ensure_tracker_instance(tracker_id, day)
     
-    # Get templates
-    templates = crud.get_task_templates_for_tracker(tracker_id)
+    # Build grid using service
+    builder = GridBuilderService(tracker_id)
+    result = builder.build_week_grid(week_offset)
     
-    # Build grid: rows = templates, cols = 7 days
-    grid_data = []
-    for template in templates:
-        row = {
-            'template': template,
-            'days': []
-        }
-        
-        for day in week_days:
-            # Find instance for this day
-            instances = crud.get_tracker_instances(tracker_id)
-            day_instance = next((inst for inst in instances if inst['period_start'] == day.isoformat()), None)
-            
-            if day_instance:
-                task_instances = crud.get_task_instances_for_tracker_instance(day_instance['instance_id'])
-                task = next((t for t in task_instances if t['template_id'] == template['template_id']), None)
-            else:
-                task = None
-            
-            row['days'].append({
-                'date': day,
-                'task': task,
-                'status': task.get('status', 'TODO') if task else 'TODO',
-                'is_today': day == today
-            })
-        
-        grid_data.append(row)
+    if not result['tracker']:
+        return redirect('tracker_list')
+    
+    # Calculate week stats from grid
+    context = {
+        'tracker': result['tracker'],
+        'grid_data': result['grid'],
+        'week_days': result['dates'],
+        'week_start': result['week_start'],
+        'week_end': result['week_end'],
+        'week_offset': week_offset,
+        'prev_week': week_offset - 1,
+        'next_week': week_offset + 1,
+        'total_tasks': result['stats']['total_tasks'],
+        'done_tasks': result['stats']['done_tasks'],
+        'completion_rate': result['stats']['completion_rate'],
+        'today': today,
+    }
+    return render(request, 'core/week.html', context)
     
     # Calculate week stats
     all_tasks = [day['task'] for row in grid_data for day in row['days'] if day['task']]
@@ -518,15 +499,15 @@ def week_view(request, tracker_id):
     }
     return render(request, 'core/week.html', context)
 
+@login_required
 def custom_range_view(request, tracker_id):
     """
     Custom date range view: User selects start and end dates.
-    """
-    from core.constants import STATUS_INFO
     
-    tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
-    if not tracker:
-        return redirect('tracker_list')
+    REFACTORED: Uses GridBuilderService to eliminate code duplication
+    """
+    from core.services.grid_builder_service import GridBuilderService
+    from core.utils.constants import STATUS_INFO
     
     # Get date range from query params or default to last 7 days
     today = date.today()
@@ -540,46 +521,34 @@ def custom_range_view(request, tracker_id):
         start_date = today - timedelta(days=6)
         end_date = today
     
-    # Generate date range
+    # Generate date range and ensure instances exist
     date_range = []
     current = start_date
     while current <= end_date:
         date_range.append(current)
+        services.ensure_tracker_instance(tracker_id, current)
         current += timedelta(days=1)
     
-    # Ensure instances exist
-    for day in date_range:
-        services.ensure_tracker_instance(tracker_id, day)
+    # Build grid using service
+    builder = GridBuilderService(tracker_id)
+    result = builder.build_custom_range_grid(start_date, end_date)
     
-    # Get templates
-    templates = crud.get_task_templates_for_tracker(tracker_id)
+    if not result['tracker']:
+        return redirect('tracker_list')
     
-    # Build grid
-    grid_data = []
-    for template in templates:
-        row = {
-            'template': template,
-            'days': []
-        }
-        
-        for day in date_range:
-            instances = crud.get_tracker_instances(tracker_id)
-            day_instance = next((inst for inst in instances if inst['period_start'] == day.isoformat()), None)
-            
-            if day_instance:
-                task_instances = crud.get_task_instances_for_tracker_instance(day_instance['instance_id'])
-                task = next((t for t in task_instances if t['template_id'] == template['template_id']), None)
-            else:
-                task = None
-            
-            row['days'].append({
-                'date': day,
-                'task': task,
-                'status': task.get('status', 'TODO') if task else 'TODO',
-                'is_today': day == today
-            })
-        
-        grid_data.append(row)
+    context = {
+        'tracker': result['tracker'],
+        'grid_data': result['grid'],
+        'start_date': start_date,
+        'end_date': end_date,
+        'num_days': result['num_days'],
+        'total_tasks': result['stats']['total_tasks'],
+        'done_tasks': result['stats']['done_tasks'],
+        'completion_rate': result['stats']['completion_rate'],
+        'status_info': STATUS_INFO,
+        'today': today,
+    }
+    return render(request, 'core/custom_range.html', context)
     
     # Calculate stats
     all_tasks = [day['task'] for row in grid_data for day in row['days'] if day['task']]
@@ -601,6 +570,7 @@ def custom_range_view(request, tracker_id):
     }
     return render(request, 'core/custom_range.html', context)
 
+@login_required
 def manage_tasks(request, tracker_id):
     """
     Manage all tasks for a tracker: view, edit, delete, reorder.
@@ -617,6 +587,7 @@ def manage_tasks(request, tracker_id):
     }
     return render(request, 'core/manage_tasks.html', context)
 
+@login_required
 def add_task(request, tracker_id):
     """
     Add a new task template to tracker.
@@ -650,6 +621,7 @@ def add_task(request, tracker_id):
     }
     return render(request, 'core/add_task.html', context)
 
+@login_required
 def edit_task(request, template_id):
     """
     Edit existing task template.
@@ -679,6 +651,7 @@ def edit_task(request, template_id):
     }
     return render(request, 'core/edit_task.html', context)
 
+@login_required
 def delete_task(request, template_id):
     """
     Delete task template and optionally all instances.
@@ -707,6 +680,7 @@ def delete_task(request, template_id):
     
     return redirect('manage_tasks', tracker_id=tracker_id)
 
+@login_required
 def duplicate_task(request, template_id):
     """
     Duplicate an existing task template.
@@ -729,6 +703,7 @@ def duplicate_task(request, template_id):
     
     return redirect('manage_tasks', tracker_id=template['tracker_id'])
 
+@login_required
 def templates_library(request):
     """
     View all available templates (pre-built + user-created).
@@ -753,6 +728,7 @@ def templates_library(request):
     }
     return render(request, 'core/templates_library.html', context)
 
+@login_required
 def save_as_template(request, tracker_id):
     """
     Save current tracker tasks as a reusable template.
@@ -770,6 +746,7 @@ def save_as_template(request, tracker_id):
     
     return redirect('templates_library')
 
+@login_required
 def apply_template(request, tracker_id):
     """
     Apply a template to tracker (add all template tasks).
@@ -785,6 +762,7 @@ def apply_template(request, tracker_id):
     
     return redirect('manage_tasks', tracker_id=tracker_id)
 
+@login_required
 def insights_view(request, tracker_id):
     """
     Simple, plain-English insights and recommendations.
@@ -802,7 +780,12 @@ def insights_view(request, tracker_id):
         else:
             completion = completion_data or 0
             
-        streaks = analytics.detect_streaks(tracker_id)
+        streaks_data = analytics.detect_streaks(tracker_id)
+        # Ensure streaks is a dict with required keys
+        if isinstance(streaks_data, dict) and 'current' in streaks_data and 'longest' in streaks_data:
+            streaks = streaks_data
+        else:
+            streaks = {'current': 0, 'longest': 0}
         
         consistency_data = analytics.compute_consistency_score(tracker_id)
         if isinstance(consistency_data, dict):
@@ -947,12 +930,14 @@ def get_task_performance(tracker_id, template_id):
         'message': message
     }
 
+@login_required
 def help_center(request):
     """
     Help center with guides, FAQs, and getting started info.
     """
     return render(request, 'core/help_center.html')
 
+@login_required
 def history(request):
     """View past performance across all trackers."""
     trackers = crud.get_all_tracker_definitions()
@@ -978,74 +963,94 @@ def history(request):
 
 # API Endpoints for dynamic interactions
 @require_http_methods(["POST"])
+@login_required
 def api_toggle_task(request, task_id):
     """
     Toggle task status through cycle: TODO → IN_PROGRESS → DONE → TODO.
     Also supports direct status setting via 'status' POST parameter.
+    
+    REFACTORED: Uses TaskService with proper exception handling
     """
-    from core.constants import STATUS_TODO, STATUS_IN_PROGRESS, STATUS_DONE
+    from core.services.task_service import TaskService
+    from core.exceptions import TaskNotFoundError, InvalidStatusError, ValidationError
     
-    task = crud.db.fetch_by_id('TaskInstances', 'task_instance_id', task_id)
-    if not task:
-        return JsonResponse({'status': 'error', 'message': 'Task not found'}, status=404)
+    task_service = TaskService()
     
-    # Check if explicit status is provided
-    new_status = request.POST.get('status')
+    try:
+        # Check if explicit status is provided
+        new_status = request.POST.get('status')
+        
+        if new_status:
+            # Set specific status
+            task = task_service.update_task_status(task_id, new_status)
+        else:
+            # Toggle through cycle
+            task = task_service.toggle_task_status(task_id)
+        
+        return JsonResponse({
+            'status': 'success',
+            'new_status': task.get('status'),
+            'task_id': task_id
+        })
     
-    if not new_status:
-        # Cycle through statuses
-        current_status = task.get('status', STATUS_TODO)
-        status_cycle = {
-            STATUS_TODO: STATUS_IN_PROGRESS,
-            STATUS_IN_PROGRESS: STATUS_DONE,
-            STATUS_DONE: STATUS_TODO,
-        }
-        new_status = status_cycle.get(current_status, STATUS_TODO)
-    
-    # Update task
-    crud.db.update('TaskInstances', 'task_instance_id', task_id, {'status': new_status})
-    
-    return JsonResponse({
-        'status': 'success',
-        'task_id': task_id,
-        'new_status': new_status
-    })
+    except TaskNotFoundError as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=404)
+    except InvalidStatusError as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    except ValidationError as e:
+        return JsonResponse({'status': 'error', 'message': f'{e.field}: {e.message}'}, status=400)
+    except Exception as e:
+        import logging
+        logging.error(f"Unexpected error in api_toggle_task: {e}")
+        return JsonResponse({'status': 'error', 'message': 'An unexpected error occurred'}, status=500)
 
 @require_http_methods(["POST"])
+@login_required
 def api_bulk_status_update(request):
     """
-    Update multiple tasks to the same status.
-    POST params: task_ids (comma-separated), status
+    Update multiple tasks to the same status in a single request.
+    Expects: task_ids (list) and status (string) in POST data.
+    
+    REFACTORED: Uses TaskService for transaction-safe bulk updates
     """
-    from core.constants import STATUS_CHOICES
+    from core.services.task_service import TaskService
+    import json
     
-    task_ids_str = request.POST.get('task_ids', '')
-    new_status = request.POST.get('status', 'DONE')
+    try:
+        data = json.loads(request.body)
+        task_ids = data.get('task_ids', [])
+        status = data.get('status')
+        
+        if not task_ids or not status:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'task_ids and status are required'
+            }, status=400)
+        
+        # Use service for bulk update
+        task_service = TaskService()
+        result = task_service.bulk_update_tasks(task_ids, status)
+        
+        return JsonResponse({
+            'status': 'success',
+            'updated': result['updated'],
+            'failed': result['failed'],
+            'total': len(task_ids)
+        })
     
-    if not task_ids_str or new_status not in STATUS_CHOICES:
-        return JsonResponse({'status': 'error', 'message': 'Invalid parameters'}, status=400)
-    
-    task_ids = [tid.strip() for tid in task_ids_str.split(',')]
-    updated = 0
-    
-    for task_id in task_ids:
-        task = crud.db.fetch_by_id('TaskInstances', 'task_instance_id', task_id)
-        if task:
-            crud.db.update('TaskInstances', 'task_instance_id', task_id, {'status': new_status})
-            updated += 1
-    
-    return JsonResponse({
-        'status': 'success',
-        'updated_count': updated,
-        'new_status': new_status
-    })
+    except ValueError as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': 'Bulk update failed'}, status=500)
+
 
 @require_http_methods(["POST"])
+@login_required
 def api_mark_overdue_missed(request, tracker_id):
     """
     Automatically mark all overdue TODO tasks as MISSED.
     """
-    from core.constants import STATUS_TODO, STATUS_MISSED
+    from core.utils.constants import STATUS_TODO, STATUS_MISSED
     
     tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
     if not tracker:
