@@ -47,7 +47,8 @@ def compute_completion_rate(tracker_id: str, start_date: Optional[date] = None, 
             'computed_at': datetime
         }
     """
-    instances = crud.get_tracker_instances(tracker_id)
+    # Use optimized query that prefetches tasks
+    instances = crud.get_tracker_instances_with_tasks(tracker_id, start_date, end_date)
     
     if not instances:
         return {
@@ -59,20 +60,15 @@ def compute_completion_rate(tracker_id: str, start_date: Optional[date] = None, 
             'computed_at': datetime.now()
         }
     
-    # Build DataFrame
+    # Build DataFrame - tasks are already prefetched
     data = []
     for inst in instances:
-        inst_date = inst['period_start']
+        inst_date = inst.get('period_start') or inst.get('tracking_date')
         if isinstance(inst_date, str):
             inst_date = date.fromisoformat(inst_date)
         
-        # Filter by date range
-        if start_date and inst_date < start_date:
-            continue
-        if end_date and inst_date > end_date:
-            continue
-        
-        tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
+        # Tasks are nested in the instance dict from prefetch
+        tasks = inst.get('tasks', [])
         if not tasks:
             continue
         
@@ -121,17 +117,19 @@ def detect_streaks(tracker_id: str, task_template_id: Optional[str] = None) -> D
             'computed_at': datetime
         }
     """
-    instances = crud.get_tracker_instances(tracker_id)
+    # Use optimized prefetch query
+    instances = crud.get_tracker_instances_with_tasks(tracker_id)
     
     # Build date-indexed completion series
     completion_data = {}
     
     for inst in instances:
-        inst_date = inst['period_start']
+        inst_date = inst.get('period_start') or inst.get('tracking_date')
         if isinstance(inst_date, str):
             inst_date = date.fromisoformat(inst_date)
         
-        tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
+        # Tasks already prefetched
+        tasks = inst.get('tasks', [])
         
         # Filter by template if specified
         if task_template_id:
@@ -183,16 +181,18 @@ def compute_consistency_score(tracker_id: str, window_days: int = 7) -> Dict:
             'computed_at': datetime
         }
     """
-    instances = crud.get_tracker_instances(tracker_id)
+    # Use optimized prefetch query
+    instances = crud.get_tracker_instances_with_tasks(tracker_id)
     
     # Build completion series
     completion_data = {}
     for inst in instances:
-        inst_date = inst['period_start']
+        inst_date = inst.get('period_start') or inst.get('tracking_date')
         if isinstance(inst_date, str):
             inst_date = date.fromisoformat(inst_date)
         
-        tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
+        # Tasks already prefetched
+        tasks = inst.get('tasks', [])
         completed = any(t.get('status') == 'DONE' for t in tasks) if tasks else False
         completion_data[inst_date] = completed
     
@@ -241,11 +241,13 @@ def compute_balance_score(tracker_id: str) -> Dict:
     templates = crud.get_task_templates_for_tracker(tracker_id)
     template_map = {t['template_id']: t.get('category', 'Uncategorized') for t in templates}
     
-    instances = crud.get_tracker_instances(tracker_id)
+    # Use optimized prefetch query
+    instances = crud.get_tracker_instances_with_tasks(tracker_id)
     category_counts = {}
     
     for inst in instances:
-        tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
+        # Tasks already prefetched
+        tasks = inst.get('tasks', [])
         for t in tasks:
             cat = template_map.get(t.get('template_id'), 'Uncategorized')
             category_counts[cat] = category_counts.get(cat, 0) + 1
@@ -284,21 +286,14 @@ def compute_effort_index(tracker_id: str, start_date: Optional[date] = None, end
     templates = crud.get_task_templates_for_tracker(tracker_id)
     template_map = {t['template_id']: t.get('weight', 1) for t in templates}
     
-    instances = crud.get_tracker_instances(tracker_id)
+    # Use optimized prefetch query with date filtering
+    instances = crud.get_tracker_instances_with_tasks(tracker_id, start_date, end_date)
     total_effort = 0.0
     task_count = 0
     
     for inst in instances:
-        inst_date = inst['period_start']
-        if isinstance(inst_date, str):
-            inst_date = date.fromisoformat(inst_date)
-        
-        if start_date and inst_date < start_date:
-            continue
-        if end_date and inst_date > end_date:
-            continue
-        
-        tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
+        # Tasks already prefetched
+        tasks = inst.get('tasks', [])
         for t in tasks:
             if t.get('status') == 'DONE':
                 weight = template_map.get(t.get('template_id'), 1)

@@ -297,14 +297,20 @@ def compute_correlation_matrix(data_dict: Dict[str, np.ndarray], method: str = '
                     p_values[metric1][metric2] = 1.0
                     significant[metric1][metric2] = False
                 else:
-                    if method == 'pearson':
-                        corr, p_val = stats.pearsonr(arr1, arr2)
-                    else:  # spearman
-                        corr, p_val = stats.spearmanr(arr1, arr2)
-                    
-                    corr_matrix[metric1][metric2] = float(corr)
-                    p_values[metric1][metric2] = float(p_val)
-                    significant[metric1][metric2] = p_val < 0.05
+                    # Check for constant arrays (no variance) - correlation undefined
+                    if np.std(arr1) == 0 or np.std(arr2) == 0:
+                        corr_matrix[metric1][metric2] = 0.0
+                        p_values[metric1][metric2] = 1.0
+                        significant[metric1][metric2] = False
+                    else:
+                        if method == 'pearson':
+                            corr, p_val = stats.pearsonr(arr1, arr2)
+                        else:  # spearman
+                            corr, p_val = stats.spearmanr(arr1, arr2)
+                        
+                        corr_matrix[metric1][metric2] = float(corr)
+                        p_values[metric1][metric2] = float(p_val)
+                        significant[metric1][metric2] = p_val < 0.05
     
     return {
         'correlation_matrix': corr_matrix,

@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 import uuid
 
 
@@ -19,6 +20,9 @@ class TrackerDefinition(models.Model):
     time_mode = models.CharField(max_length=20, choices=TIME_MODE_CHOICES, default='daily')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Audit history - tracks all changes with user attribution
+    history = HistoricalRecords()
     
     class Meta:
         db_table = 'tracker_definitions'
@@ -45,6 +49,9 @@ class TaskTemplate(models.Model):
     weight = models.IntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     
+    # Audit history
+    history = HistoricalRecords()
+    
     class Meta:
         db_table = 'task_templates'
         ordering = ['tracker', 'description']
@@ -66,6 +73,9 @@ class TrackerInstance(models.Model):
     period_end = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, default='active')
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Audit history
+    history = HistoricalRecords()
     
     class Meta:
         db_table = 'tracker_instances'
@@ -104,6 +114,9 @@ class TaskInstance(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Audit history - critical for tracking task status changes
+    history = HistoricalRecords()
     
     class Meta:
         db_table = 'task_instances'
@@ -145,6 +158,9 @@ class DayNote(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    # Audit history - tracks journal edits
+    history = HistoricalRecords()
+    
     class Meta:
         db_table = 'day_notes'
         unique_together = [['tracker', 'date']]
@@ -155,3 +171,4 @@ class DayNote(models.Model):
     
     def __str__(self):
         return f"Note for {self.tracker.name} on {self.date}"
+

@@ -766,6 +766,8 @@ def apply_template(request, tracker_id):
 def insights_view(request, tracker_id):
     """
     Simple, plain-English insights and recommendations.
+    
+    Integrates with behavioral InsightsEngine for research-backed insights.
     """
     tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
     if not tracker:
@@ -774,39 +776,66 @@ def insights_view(request, tracker_id):
     # Get basic stats
     try:
         completion_data = analytics.compute_completion_rate(tracker_id)
-        # Handle both dict and float returns
-        if isinstance(completion_data, dict):
-            completion = completion_data.get('completion_rate', 0)
-        else:
-            completion = completion_data or 0
+        # Analytics returns {'value': float, ...}
+        completion = completion_data.get('value', 0) if isinstance(completion_data, dict) else 0
             
         streaks_data = analytics.detect_streaks(tracker_id)
-        # Ensure streaks is a dict with required keys
-        if isinstance(streaks_data, dict) and 'current' in streaks_data and 'longest' in streaks_data:
-            streaks = streaks_data
+        # Analytics returns {'value': {'current_streak': int, 'longest_streak': int}, ...}
+        if isinstance(streaks_data, dict) and 'value' in streaks_data:
+            streaks_value = streaks_data['value']
+            streaks = {
+                'current': streaks_value.get('current_streak', 0),
+                'longest': streaks_value.get('longest_streak', 0)
+            }
         else:
             streaks = {'current': 0, 'longest': 0}
         
         consistency_data = analytics.compute_consistency_score(tracker_id)
-        if isinstance(consistency_data, dict):
-            consistency = consistency_data.get('consistency_score', 0)
-        else:
-            consistency = consistency_data or 0
+        # Analytics returns {'value': float, ...}
+        consistency = consistency_data.get('value', 0) if isinstance(consistency_data, dict) else 0
     except Exception as e:
         print(f"Error getting analytics: {e}")
         completion = 0
         streaks = {'current': 0, 'longest': 0}
         consistency = 0
     
-    # Generate insights
-    insights = generate_plain_english_insights(tracker_id, completion, consistency, streaks)
+    # Generate insights from behavioral engine
+    try:
+        from core.behavioral import get_insights
+        behavioral_insights = get_insights(tracker_id)
+        # Convert to template-friendly format
+        insights = []
+        for bi in behavioral_insights:
+            # Map severity to type for styling
+            type_map = {'high': 'warning', 'medium': 'info', 'low': 'success'}
+            insights.append({
+                'type': type_map.get(bi.get('severity', 'low'), 'info'),
+                'title': bi.get('title', ''),
+                'message': bi.get('description', '') + (f" {bi.get('suggested_action', '')}" if bi.get('suggested_action') else '')
+            })
+    except Exception as e:
+        print(f"Error getting behavioral insights: {e}")
+        insights = []
+    
+    # Fall back to plain English insights if no behavioral insights
+    if not insights:
+        insights = generate_plain_english_insights(tracker_id, completion, consistency, streaks)
+    
+    # Generate recommendations
     recommendations = generate_recommendations(tracker_id, completion, consistency)
+    # Format recommendations as strings if they're dicts
+    formatted_recs = []
+    for rec in recommendations:
+        if isinstance(rec, dict):
+            formatted_recs.append(f"{rec.get('title', '')}: {rec.get('suggestion', '')}")
+        else:
+            formatted_recs.append(str(rec))
     
     # Get per-task performance
-    templates = crud.get_task_templates_for_tracker(tracker_id)
+    templates_list = crud.get_task_templates_for_tracker(tracker_id)
     task_insights = []
     
-    for template in templates[:5]:  # Top 5 tasks
+    for template in templates_list[:5]:  # Top 5 tasks
         task_perf = get_task_performance(tracker_id, template['template_id'])
         task_insights.append({
             'task': template,
@@ -819,7 +848,7 @@ def insights_view(request, tracker_id):
         'consistency': consistency,
         'streaks': streaks,
         'insights': insights,
-        'recommendations': recommendations,
+        'recommendations': formatted_recs,
         'task_insights': task_insights,
     }
     return render(request, 'core/insights.html', context)

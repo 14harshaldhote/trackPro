@@ -1,4 +1,7 @@
-dDjango>=5.0.0
+Django>=5.0.0
+django-allauth>=0.57.0
+djangorestframework
+django-oauth-toolkit
 openpyxl
 pandas
 filelock
@@ -10,7 +13,6 @@ nltk
 python-dotenv
 xlsxwriter
 matplotlib
-django-allauth>=0.57.0
 seaborn
 apscheduler
 marshmallow
@@ -18,3 +20,14 @@ tablib
 watchdog
 xlrd
 xlwt
+spacy
+requests
+pillow
+pydantic
+pyjwt
+cryptography
+dj-database-url
+psycopg2-binary
+whitenoise
+gunicorn
+django-simple-history>=3.4.0
