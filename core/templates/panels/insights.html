@@ -33,7 +33,15 @@
     <div class="insights-grid">
         <!-- Best Day -->
         <div class="insight-card">
-            <div class="insight-card-icon">📅</div>
+            <div class="insight-card-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+            </div>
             <h3>Best Day</h3>
             <p class="insight-highlight">{{ insights.best_day }}</p>
             <p class="insight-detail">You complete {{ insights.best_day_rate }}% of tasks on {{ insights.best_day }}s
@@ -42,7 +50,13 @@
 
         <!-- Best Time -->
         <div class="insight-card">
-            <div class="insight-card-icon">⏰</div>
+            <div class="insight-card-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+            </div>
             <h3>Peak Hours</h3>
             <p class="insight-highlight">{{ insights.best_time }}</p>
             <p class="insight-detail">Your most productive time is {{ insights.best_time }}</p>
@@ -50,7 +64,14 @@
 
         <!-- Streak Info -->
         <div class="insight-card">
-            <div class="insight-card-icon">🔥</div>
+            <div class="insight-card-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.5-3.3.3-1.1 1-2.2 2.5-3.2.5 1 1.5 2 2 3z">
+                    </path>
+                </svg>
+            </div>
             <h3>Streak Analysis</h3>
             <p class="insight-highlight">{{ insights.current_streak }} days</p>
             <p class="insight-detail">Your longest streak was {{ insights.longest_streak }} days</p>
@@ -58,7 +79,14 @@
 
         <!-- Consistency Score -->
         <div class="insight-card">
-            <div class="insight-card-icon">📊</div>
+            <div class="insight-card-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="20" x2="12" y2="10"></line>
+                    <line x1="18" y1="20" x2="18" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="16"></line>
+                </svg>
+            </div>
             <h3>Consistency</h3>
             <div class="consistency-meter">
                 <div class="consistency-fill" style="width: {{ insights.consistency_score }}%"></div>
@@ -68,7 +96,17 @@
 
         <!-- Category Champion -->
         <div class="insight-card">
-            <div class="insight-card-icon">🏆</div>
+            <div class="insight-card-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                    <path d="M4 22h16"></path>
+                    <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path>
+                    <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path>
+                    <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path>
+                </svg>
+            </div>
             <h3>Top Category</h3>
             <p class="insight-highlight">{{ insights.top_category }}</p>
             <p class="insight-detail">{{ insights.top_category_count }} tasks completed</p>
@@ -76,7 +114,16 @@
 
         <!-- Improvement Area -->
         <div class="insight-card improvement">
-            <div class="insight-card-icon">💡</div>
+            <div class="insight-card-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5">
+                    </path>
+                    <path d="M9 18h6"></path>
+                    <path d="M10 22h4"></path>
+                </svg>
+            </div>
             <h3>Room to Grow</h3>
             <p class="insight-highlight">{{ insights.improvement_area }}</p>
             <p class="insight-detail">{{ insights.improvement_tip }}</p>

@@ -462,16 +462,22 @@ App.createFAB = function () {
 };
 
 App.handleFABAction = function (action) {
+    console.log('[FAB] 🔘 handleFABAction called with:', action);
     switch (action) {
         case 'add-task':
-            this.openModal('add-task');
+            console.log('[FAB] Loading add_task modal');
+            this.loadModal('/modals/add_task/');
             break;
         case 'add-tracker':
-            this.openModal('add-tracker');
+            console.log('[FAB] Loading add_tracker modal');
+            this.loadModal('/modals/add_tracker/');
             break;
         case 'add-goal':
-            this.openModal('add-goal');
+            console.log('[FAB] Loading add_goal modal');
+            this.loadModal('/modals/add_goal/');
             break;
+        default:
+            console.warn('[FAB] Unknown action:', action);
     }
 };
 
@@ -479,6 +485,8 @@ App.handleFABAction = function (action) {
 // MODAL SYSTEM
 // ============================================================================
 App.bindModals = function () {
+    console.log('[Modal] 🔧 bindModals() called');
+
     document.addEventListener('click', (e) => {
         const trigger = e.target.closest('[data-action="open-modal"]');
         if (trigger) {
@@ -486,46 +494,84 @@ App.bindModals = function () {
             const modalId = trigger.dataset.modal;
             const modalUrl = trigger.dataset.modalUrl;
 
+            console.log('[Modal] 🖱️ Modal trigger clicked:', { modalId, modalUrl, trigger });
+
             if (modalUrl) {
+                console.log('[Modal] 📡 Loading modal from URL:', modalUrl);
                 this.loadModal(modalUrl);
             } else if (modalId) {
+                console.log('[Modal] 📂 Opening static modal by ID:', modalId);
                 this.openModal(modalId);
+            } else {
+                console.warn('[Modal] ⚠️ No modalUrl or modalId found on trigger');
             }
         }
 
         const closeBtn = e.target.closest('[data-action="close-modal"]');
         if (closeBtn) {
+            console.log('[Modal] ❌ Close button clicked');
             this.closeModal();
         }
     });
 
     document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
-        backdrop.addEventListener('click', () => this.closeModal());
+        backdrop.addEventListener('click', () => {
+            console.log('[Modal] 🖱️ Backdrop clicked - closing modal');
+            this.closeModal();
+        });
     });
+
+    console.log('[Modal] ✅ bindModals() complete');
 };
 
 App.openModal = function (modalId) {
+    console.log('[Modal] 📂 openModal() called with ID:', modalId);
+
     const modal = document.getElementById(`${modalId}-modal`) || document.getElementById('modal-overlay');
+    console.log('[Modal] 🔍 Looking for modal element:', {
+        searchedId: `${modalId}-modal`,
+        fallbackId: 'modal-overlay',
+        found: !!modal,
+        element: modal
+    });
+
     if (modal) {
         modal.classList.add('active');
         modal.setAttribute('aria-hidden', 'false');
         this.state.activeModal = modal;
         this.trapFocus(modal);
         document.body.style.overflow = 'hidden';
+        console.log('[Modal] ✅ Modal opened successfully:', modalId);
+    } else {
+        console.error('[Modal] ❌ Modal element not found for ID:', modalId);
     }
 };
 
 App.loadModal = async function (url) {
+    console.log('[Modal] 📡 loadModal() called with URL:', url);
+
     const overlay = document.getElementById('modal-overlay');
     const container = document.getElementById('modal-container');
 
-    if (!overlay || !container) return;
+    console.log('[Modal] 🔍 Modal elements:', {
+        overlayFound: !!overlay,
+        containerFound: !!container,
+        overlay,
+        container
+    });
+
+    if (!overlay || !container) {
+        console.error('[Modal] ❌ Missing modal-overlay or modal-container');
+        return;
+    }
 
     // Show loading in modal
+    console.log('[Modal] ⏳ Showing loading spinner');
     container.innerHTML = '<div class="modal-dialog"><div class="modal-body" style="text-align:center;padding:3rem"><div class="loading-spinner loading-spinner-lg"></div></div></div>';
     overlay.classList.add('active');
 
     try {
+        console.log('[Modal] 🌐 Fetching modal content from:', url);
         const response = await fetch(url, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
@@ -533,10 +579,19 @@ App.loadModal = async function (url) {
             }
         });
 
-        if (!response.ok) throw new Error('Failed to load modal');
+        console.log('[Modal] 📥 Response received:', {
+            ok: response.ok,
+            status: response.status,
+            statusText: response.statusText
+        });
+
+        if (!response.ok) throw new Error(`Failed to load modal: ${response.status} ${response.statusText}`);
 
         const html = await response.text();
+        console.log('[Modal] 📄 HTML content received, length:', html.length);
+
         container.innerHTML = html;
+        console.log('[Modal] ✅ Modal content injected into container');
 
         overlay.setAttribute('aria-hidden', 'false');
         this.state.activeModal = overlay;
@@ -544,26 +599,34 @@ App.loadModal = async function (url) {
         document.body.style.overflow = 'hidden';
 
         this.bindForms(container);
+        console.log('[Modal] ✅ Modal fully loaded and ready');
 
     } catch (error) {
-        console.error('Modal load error:', error);
+        console.error('[Modal] ❌ Modal load error:', error);
         this.showToast('error', 'Failed to load', error.message);
         this.closeModal();
     }
 };
 
 App.closeModal = function () {
+    console.log('[Modal] ❌ closeModal() called');
+    console.log('[Modal] 🔍 Current activeModal:', this.state.activeModal);
+
     if (this.state.activeModal) {
         this.state.activeModal.classList.remove('active');
         this.state.activeModal.setAttribute('aria-hidden', 'true');
         this.state.activeModal = null;
         document.body.style.overflow = '';
+        console.log('[Modal] ✅ Active modal closed');
     }
 
     document.querySelectorAll('.modal-overlay.active').forEach(modal => {
+        console.log('[Modal] 🧹 Cleaning up additional active modal:', modal.id);
         modal.classList.remove('active');
         modal.setAttribute('aria-hidden', 'true');
     });
+
+    console.log('[Modal] ✅ closeModal() complete');
 };
 
 App.trapFocus = function (element) {
@@ -596,6 +659,7 @@ App.trapFocus = function (element) {
 };
 
 App.confirmDelete = function (type, id) {
+    console.log('[Modal] 🗑️ confirmDelete called:', { type, id });
     window.deleteConfig = {
         url: `/api/${type}/${id}/delete/`,
         type: type,
@@ -604,7 +668,7 @@ App.confirmDelete = function (type, id) {
             this.loadPanel(window.location.pathname, false);
         }
     };
-    this.loadModal('/modal/confirm_delete/');
+    this.loadModal('/modals/confirm_delete/');
 };
 
 // ============================================================================
@@ -771,13 +835,15 @@ App.bindKeyboardShortcuts = function () {
 
         if (e.key === 'n') {
             e.preventDefault();
-            this.openModal('add-tracker');
+            console.log('[Keyboard] "n" pressed - loading add_tracker modal');
+            this.loadModal('/modals/add_tracker/');
             return;
         }
 
         if (e.key === 't' && this.state.currentTracker) {
             e.preventDefault();
-            this.openModal('add-task');
+            console.log('[Keyboard] "t" pressed - loading add_task modal');
+            this.loadModal('/modals/add_task/');
             return;
         }
 

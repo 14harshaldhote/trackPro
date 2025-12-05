@@ -13,11 +13,19 @@ class TrackerDefinition(models.Model):
         ('monthly', 'Monthly'),
     ]
     
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('paused', 'Paused'),
+        ('completed', 'Completed'),
+        ('archived', 'Archived'),
+    ]
+    
     tracker_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='trackers', null=True)
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True, default='')
     time_mode = models.CharField(max_length=20, choices=TIME_MODE_CHOICES, default='daily')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -36,10 +44,51 @@ class TrackerDefinition(models.Model):
     
     def __str__(self):
         return f"{self.name} ({self.time_mode})"
+    
+    @property
+    def time_period(self):
+        """Alias for time_mode for template compatibility."""
+        return self.time_mode
+    
+    @property
+    def id(self):
+        """Alias for tracker_id for template compatibility."""
+        return self.tracker_id
+    
+    @property
+    def task_count(self):
+        """Total number of task templates for this tracker."""
+        return self.templates.count()
+    
+    @property
+    def completed_count(self):
+        """Count of completed task instances across all tracker instances."""
+        from django.db.models import Count
+        return TaskInstance.objects.filter(
+            tracker_instance__tracker=self,
+            status='DONE'
+        ).count()
+    
+    @property
+    def progress(self):
+        """Overall completion percentage (0-100)."""
+        total = TaskInstance.objects.filter(tracker_instance__tracker=self).count()
+        if total == 0:
+            return 0
+        done = self.completed_count
+        return int((done / total) * 100)
 
 
 class TaskTemplate(models.Model):
     """Template for tasks within a tracker (e.g., Exercise, Meditate, Read)"""
+    
+    TIME_OF_DAY_CHOICES = [
+        ('anytime', 'Any Time'),
+        ('morning', 'Morning'),
+        ('afternoon', 'Afternoon'),
+        ('evening', 'Evening'),
+        ('night', 'Night'),
+    ]
     
     template_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
     tracker = models.ForeignKey(TrackerDefinition, on_delete=models.CASCADE, related_name='templates')
@@ -47,6 +96,7 @@ class TaskTemplate(models.Model):
     is_recurring = models.BooleanField(default=True)
     category = models.CharField(max_length=100, blank=True, default='')
     weight = models.IntegerField(default=1)
+    time_of_day = models.CharField(max_length=20, choices=TIME_OF_DAY_CHOICES, default='anytime')
     created_at = models.DateTimeField(auto_now_add=True)
     
     # Audit history
@@ -104,6 +154,7 @@ class TaskInstance(models.Model):
         ('DONE', 'Done'),
         ('MISSED', 'Missed'),
         ('BLOCKED', 'Blocked'),
+        ('SKIPPED', 'Skipped'),
     ]
     
     task_instance_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
@@ -228,11 +279,23 @@ class Goal(models.Model):
         ('critical', 'Critical'),
     ]
     
+    GOAL_TYPE_CHOICES = [
+        ('habit', 'Habit'),
+        ('achievement', 'Achievement'),
+        ('project', 'Project'),
+    ]
+    
     goal_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='goals')
+    tracker = models.ForeignKey('TrackerDefinition', on_delete=models.SET_NULL, null=True, blank=True, related_name='goals')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, default='')
+    icon = models.CharField(max_length=50, blank=True, default='🎯')
+    goal_type = models.CharField(max_length=20, choices=GOAL_TYPE_CHOICES, default='habit')
     target_date = models.DateField(null=True, blank=True)
+    target_value = models.FloatField(null=True, blank=True)  # Numeric target (e.g., 30 days)
+    current_value = models.FloatField(default=0.0)  # Current progress value
+    unit = models.CharField(max_length=50, blank=True, default='')  # e.g., 'days', 'hours', 'tasks'
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
     progress = models.FloatField(default=0.0)  # 0-100%
@@ -354,6 +417,11 @@ class UserPreferences(models.Model):
     
     user = models.OneToOneField('auth.User', on_delete=models.CASCADE, primary_key=True, related_name='preferences')
     
+    # Localization
+    timezone = models.CharField(max_length=50, default='UTC')
+    date_format = models.CharField(max_length=20, default='YYYY-MM-DD')  # Display format
+    week_start = models.IntegerField(default=0)  # 0=Monday, 6=Sunday
+    
     # Notifications
     daily_reminder_enabled = models.BooleanField(default=True)
     daily_reminder_time = models.TimeField(null=True, blank=True)  # e.g., 08:00
@@ -364,6 +432,17 @@ class UserPreferences(models.Model):
     default_view = models.CharField(max_length=20, choices=VIEW_CHOICES, default='week')
     theme = models.CharField(max_length=20, choices=THEME_CHOICES, default='light')
     show_completed_tasks = models.BooleanField(default=True)
+    compact_mode = models.BooleanField(default=False)
+    animations = models.BooleanField(default=True)
+    
+    # Sound settings
+    sound_complete = models.BooleanField(default=True)
+    sound_notify = models.BooleanField(default=True)
+    sound_volume = models.IntegerField(default=50)  # 0-100
+    
+    # Keyboard & Push
+    keyboard_enabled = models.BooleanField(default=True)
+    push_enabled = models.BooleanField(default=False)
     
     # Analytics settings
     streak_threshold = models.IntegerField(default=80)  # % completion for streak
@@ -383,3 +462,83 @@ class UserPreferences(models.Model):
         return f"Preferences for {self.user.username}"
 
 
+class Notification(models.Model):
+    """In-app notifications for users."""
+    
+    TYPE_CHOICES = [
+        ('info', 'Information'),
+        ('success', 'Success'),
+        ('warning', 'Warning'),
+        ('error', 'Error'),
+        ('reminder', 'Reminder'),
+        ('achievement', 'Achievement'),
+    ]
+    
+    notification_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='notifications')
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='info')
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    link = models.CharField(max_length=500, blank=True, default='')
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'notifications'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['user', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.type}: {self.title}"
+
+
+class ShareLink(models.Model):
+    """Shareable links for trackers."""
+    
+    PERMISSION_CHOICES = [
+        ('view', 'View Only'),
+        ('edit', 'Can Edit'),
+    ]
+    
+    share_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
+    tracker = models.ForeignKey(TrackerDefinition, on_delete=models.CASCADE, related_name='share_links')
+    created_by = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='created_shares')
+    token = models.CharField(max_length=64, unique=True)
+    permission = models.CharField(max_length=20, choices=PERMISSION_CHOICES, default='view')
+    password_hash = models.CharField(max_length=128, blank=True, default='')
+    expires_at = models.DateTimeField(null=True, blank=True)
+    max_uses = models.IntegerField(null=True, blank=True)
+    use_count = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'share_links'
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['tracker', 'is_active']),
+        ]
+    
+    def __str__(self):
+        return f"Share: {self.tracker.name} ({self.permission})"
+    
+    @property
+    def is_expired(self):
+        """Check if the share link has expired."""
+        if self.expires_at is None:
+            return False
+        return timezone.now() > self.expires_at
+    
+    @property
+    def is_valid(self):
+        """Check if the share link is still valid."""
+        if not self.is_active:
+            return False
+        if self.is_expired:
+            return False
+        if self.max_uses and self.use_count >= self.max_uses:
+            return False
+        return True

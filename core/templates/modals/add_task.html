@@ -203,3 +203,160 @@
         color: var(--color-text-secondary);
     }
 </style>
+<script>
+    // ==============================
+    // Add Task Modal Debug Logging
+    // ==============================
+    console.log("[AddTaskModal] 🧪 Debug script loaded - start");
+
+    document.addEventListener("DOMContentLoaded", function () {
+        console.log("[AddTaskModal] DOMContentLoaded fired");
+
+        const modalDialog = document.querySelector(".modal-dialog");
+        const form = document.getElementById("add-task-form");
+        const trackerIdInput = document.getElementById("tracker-id");
+        const descriptionInput = document.getElementById("task-description");
+        const categoryInput = document.getElementById("task-category");
+        const weightInputs = document.querySelectorAll("input[name='weight']");
+        const isRecurringCheckbox = document.getElementById("is-recurring");
+        const timeSelect = document.getElementById("task-time");
+        const goalSelect = document.getElementById("task-goal");
+        const closeButtons = document.querySelectorAll("[data-action='close-modal']");
+        const submitBtn = document.getElementById("create-task-btn");
+
+        console.log("[AddTaskModal] Elements found:", {
+            modalDialog,
+            form,
+            trackerIdInput,
+            descriptionInput,
+            categoryInput,
+            weightInputsCount: weightInputs.length,
+            isRecurringCheckbox,
+            timeSelect,
+            goalSelect,
+            closeButtonsCount: closeButtons.length,
+            submitBtn
+        });
+
+        // Helper to log complete current state
+        function logFormState(prefix = "[AddTaskModal] Current state") {
+            let selectedWeight = null;
+            weightInputs.forEach(w => {
+                if (w.checked) selectedWeight = w.value;
+            });
+
+            const data = {
+                tracker_id: trackerIdInput ? trackerIdInput.value : null,
+                description: descriptionInput ? descriptionInput.value : null,
+                category: categoryInput ? categoryInput.value : null,
+                weight: selectedWeight,
+                is_recurring: isRecurringCheckbox ? isRecurringCheckbox.checked : null,
+                time_of_day: timeSelect ? timeSelect.value : null,
+                goal_id: goalSelect ? goalSelect.value : null,
+            };
+            console.log(prefix, data);
+        }
+
+        // ==========================
+        // Modal open/close logging
+        // ==========================
+        if (modalDialog) {
+            console.log("[AddTaskModal] Modal dialog exists in DOM");
+
+            // If you have your own open-modal logic elsewhere,
+            // you can call logFormState() from there as well.
+        } else {
+            console.warn("[AddTaskModal] ❗ modal-dialog not found");
+        }
+
+        closeButtons.forEach((btn, index) => {
+            console.log(`[AddTaskModal] Close button #${index + 1} wired`);
+            btn.addEventListener("click", function () {
+                console.log("[AddTaskModal] ❌ Close button clicked", { index });
+                logFormState("[AddTaskModal] State at close click");
+            });
+        });
+
+        // ==========================
+        // Field change logging
+        // ==========================
+
+        if (descriptionInput) {
+            descriptionInput.addEventListener("input", function (e) {
+                console.log("[AddTaskModal] 📝 Description changed:", e.target.value);
+            });
+        }
+
+        if (categoryInput) {
+            categoryInput.addEventListener("input", function (e) {
+                console.log("[AddTaskModal] 🏷️ Category changed:", e.target.value);
+            });
+        }
+
+        weightInputs.forEach((input) => {
+            input.addEventListener("change", function (e) {
+                console.log("[AddTaskModal] ⚖️ Weight changed:", e.target.value);
+                logFormState("[AddTaskModal] State after weight change");
+            });
+        });
+
+        if (isRecurringCheckbox) {
+            isRecurringCheckbox.addEventListener("change", function (e) {
+                console.log("[AddTaskModal] 🔁 is_recurring toggled:", e.target.checked);
+                logFormState("[AddTaskModal] State after is_recurring toggle");
+            });
+        }
+
+        if (timeSelect) {
+            timeSelect.addEventListener("change", function (e) {
+                console.log("[AddTaskModal] ⏰ Time of day changed:", e.target.value);
+            });
+        }
+
+        if (goalSelect) {
+            goalSelect.addEventListener("change", function (e) {
+                console.log("[AddTaskModal] 🎯 Goal linked changed:", e.target.value);
+            });
+        }
+
+        // ==========================
+        // Form submit logging
+        // ==========================
+        if (form) {
+            console.log("[AddTaskModal] ✅ Form found, attaching submit handler");
+
+            form.addEventListener("submit", function (e) {
+                console.log("[AddTaskModal] 🚀 Form submit triggered");
+
+                // If you're using data-ajax and preventing default elsewhere, 
+                // you can comment/uncomment this as needed.
+                // e.preventDefault();
+
+                // Log raw form data
+                const formData = new FormData(form);
+                const payload = {};
+                formData.forEach((value, key) => {
+                    payload[key] = value;
+                });
+
+                console.log("[AddTaskModal] 📦 FormData payload:", payload);
+                logFormState("[AddTaskModal] State at submit");
+
+                if (submitBtn) {
+                    console.log("[AddTaskModal] Submit button state:", {
+                        disabled: submitBtn.disabled,
+                        text: submitBtn.innerText
+                    });
+                }
+
+                console.log("[AddTaskModal] ✅ Submit handler completed");
+            });
+        } else {
+            console.warn("[AddTaskModal] ❗ Form #add-task-form not found");
+        }
+
+        console.log("[AddTaskModal] 🧪 Debug wiring complete - end of script");
+    });
+
+    console.log("[AddTaskModal] 🧪 Script tag parsed - end");
+</script>

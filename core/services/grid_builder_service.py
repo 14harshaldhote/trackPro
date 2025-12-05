@@ -346,3 +346,92 @@ class GridBuilderService:
         result['today'] = date.today()
         
         return result
+    
+    def get_time_of_day_breakdown(self, start_date: date = None, end_date: date = None) -> Dict:
+        """
+        Get task completion breakdown by time of day.
+        
+        Args:
+            start_date: Start date (default: 7 days ago)
+            end_date: End date (default: today)
+        
+        Returns:
+            {
+                'morning': {'total': int, 'completed': int, 'rate': float},
+                'afternoon': {...},
+                'evening': {...},
+                'unspecified': {...}
+            }
+        """
+        from core.models import TaskInstance, TaskTemplate
+        
+        if end_date is None:
+            end_date = date.today()
+        if start_date is None:
+            start_date = end_date - timedelta(days=7)
+        
+        # Get all task instances for this tracker in the date range
+        tasks = TaskInstance.objects.filter(
+            tracker_instance__tracker__tracker_id=self.tracker_id,
+            tracker_instance__period_start__gte=start_date,
+            tracker_instance__period_end__lte=end_date
+        ).select_related('template')
+        
+        breakdown = {
+            'morning': {'total': 0, 'completed': 0, 'rate': 0},
+            'afternoon': {'total': 0, 'completed': 0, 'rate': 0},
+            'evening': {'total': 0, 'completed': 0, 'rate': 0},
+            'unspecified': {'total': 0, 'completed': 0, 'rate': 0}
+        }
+        
+        for task in tasks:
+            time_of_day = getattr(task.template, 'time_of_day', None) or 'unspecified'
+            if time_of_day not in breakdown:
+                time_of_day = 'unspecified'
+            
+            breakdown[time_of_day]['total'] += 1
+            if task.status == 'DONE':
+                breakdown[time_of_day]['completed'] += 1
+        
+        # Calculate rates
+        for key in breakdown:
+            total = breakdown[key]['total']
+            completed = breakdown[key]['completed']
+            breakdown[key]['rate'] = round(completed / total * 100, 1) if total > 0 else 0
+        
+        return breakdown
+    
+    def get_daily_time_pattern(self, days: int = 14) -> Dict:
+        """
+        Analyze daily completion patterns by time of day.
+        
+        Returns optimal time suggestions based on historical data.
+        """
+        from core.models import TaskInstance
+        
+        today = date.today()
+        start_date = today - timedelta(days=days)
+        
+        tasks = TaskInstance.objects.filter(
+            tracker_instance__tracker__tracker_id=self.tracker_id,
+            tracker_instance__period_start__gte=start_date,
+            status='DONE'
+        ).select_related('template')
+        
+        # Track which time of day has best completion
+        time_counts = {'morning': 0, 'afternoon': 0, 'evening': 0}
+        
+        for task in tasks:
+            time_of_day = getattr(task.template, 'time_of_day', 'morning') or 'morning'
+            if time_of_day in time_counts:
+                time_counts[time_of_day] += 1
+        
+        # Find best time
+        best_time = max(time_counts.items(), key=lambda x: x[1])[0] if any(time_counts.values()) else 'morning'
+        
+        return {
+            'time_counts': time_counts,
+            'best_time': best_time,
+            'recommendation': f"You complete more tasks in the {best_time}. Consider scheduling important tasks then."
+        }
+

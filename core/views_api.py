@@ -23,26 +23,37 @@ from .models import TrackerDefinition, TrackerInstance, DayNote
 @require_POST
 def api_task_toggle(request, task_id):
     """Toggle task status with optimistic UI support"""
+    from .models import TaskInstance
     try:
-        instance = get_object_or_404(
-            TrackerInstance, 
-            id=task_id, 
-            tracker_definition__user=request.user
+        task = get_object_or_404(
+            TaskInstance, 
+            task_instance_id=task_id, 
+            tracker_instance__tracker__user=request.user
         )
         
-        old_status = instance.status
+        old_status = task.status
         
-        # Cycle through statuses: PENDING -> DONE -> SKIPPED -> PENDING
+        # Cycle through statuses: TODO -> DONE -> SKIPPED -> TODO
         status_cycle = {
-            'PENDING': 'DONE',
+            'TODO': 'DONE',
+            'IN_PROGRESS': 'DONE',
             'DONE': 'SKIPPED',
-            'SKIPPED': 'PENDING',
-            'MISSED': 'DONE'
+            'SKIPPED': 'TODO',
+            'MISSED': 'DONE',
+            'BLOCKED': 'TODO'
         }
         
         new_status = status_cycle.get(old_status, 'DONE')
-        instance.status = new_status
-        instance.save()
+        task.status = new_status
+        
+        # Update completed_at timestamp
+        if new_status == 'DONE':
+            from django.utils import timezone
+            task.completed_at = timezone.now()
+        else:
+            task.completed_at = None
+            
+        task.save()
         
         return JsonResponse({
             'success': True,
@@ -580,3 +591,490 @@ def api_validate_field(request):
             'valid': False,
             'errors': [str(e)]
         }, status=400)
+
+
+# ============================================================================
+# INSIGHTS API ENDPOINT
+# ============================================================================
+
+@login_required
+@require_GET
+def api_insights(request, tracker_id=None):
+    """
+    Get behavioral insights for tracker(s).
+    
+    GET /api/insights/              - All user's tracker insights
+    GET /api/insights/<tracker_id>/ - Single tracker insights
+    
+    Returns: JSON list of insights with severity, description, actions
+    """
+    from core.behavioral import get_insights
+    
+    try:
+        if tracker_id:
+            # Single tracker
+            tracker = get_object_or_404(
+                TrackerDefinition,
+                tracker_id=tracker_id,
+                user=request.user
+            )
+            insights = get_insights(tracker_id)
+            for insight in insights:
+                insight['tracker_name'] = tracker.name
+        else:
+            # All user trackers
+            insights = []
+            trackers = TrackerDefinition.objects.filter(user=request.user)
+            for tracker in trackers:
+                try:
+                    tracker_insights = get_insights(tracker.tracker_id)
+                    for insight in tracker_insights:
+                        insight['tracker_name'] = tracker.name
+                        insight['tracker_id'] = tracker.tracker_id
+                    insights.extend(tracker_insights)
+                except Exception:
+                    continue
+        
+        # Sort by severity
+        severity_order = {'high': 0, 'medium': 1, 'low': 2}
+        insights.sort(key=lambda x: severity_order.get(x.get('severity', 'low'), 3))
+        
+        return JsonResponse({
+            'success': True,
+            'insights': insights,
+            'count': len(insights)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+# ============================================================================
+# CHART DATA API ENDPOINT
+# ============================================================================
+
+@login_required
+@require_GET
+def api_chart_data(request):
+    """
+    Get chart data for analytics visualizations.
+    
+    GET /api/chart-data/?type=bar&tracker_id=xxx&days=30
+    
+    Types: bar, line, pie, completion
+    """
+    from core import analytics
+    
+    try:
+        chart_type = request.GET.get('type', 'bar')
+        tracker_id = request.GET.get('tracker_id')
+        days = int(request.GET.get('days', 30))
+        
+        if tracker_id:
+            tracker = get_object_or_404(
+                TrackerDefinition,
+                tracker_id=tracker_id,
+                user=request.user
+            )
+        
+        if chart_type == 'completion':
+            # Daily completion rates
+            stats = analytics.compute_completion_rate(tracker_id) if tracker_id else {}
+            return JsonResponse({
+                'success': True,
+                'chart_type': 'line',
+                'data': {
+                    'labels': [],  # Dates
+                    'datasets': [{
+                        'label': 'Completion Rate',
+                        'data': [],
+                        'borderColor': 'rgb(99, 102, 241)',
+                        'tension': 0.3
+                    }]
+                },
+                'raw': stats
+            })
+        
+        elif chart_type == 'pie':
+            # Category distribution
+            stats = analytics.compute_balance_score(tracker_id) if tracker_id else {}
+            categories = stats.get('category_distribution', {})
+            return JsonResponse({
+                'success': True,
+                'chart_type': 'pie',
+                'data': {
+                    'labels': list(categories.keys()),
+                    'datasets': [{
+                        'data': list(categories.values()),
+                        'backgroundColor': [
+                            'rgb(99, 102, 241)',
+                            'rgb(34, 197, 94)',
+                            'rgb(249, 115, 22)',
+                            'rgb(236, 72, 153)',
+                            'rgb(14, 165, 233)'
+                        ]
+                    }]
+                }
+            })
+        
+        elif chart_type == 'bar':
+            # Weekly task counts
+            data = []
+            labels = []
+            today = date.today()
+            for i in range(7):
+                day = today - timedelta(days=6-i)
+                labels.append(day.strftime('%a'))
+                
+                day_count = 0
+                if tracker_id:
+                    instances = TrackerInstance.objects.filter(
+                        tracker_definition__tracker_id=tracker_id,
+                        date=day,
+                        status='DONE'
+                    ).count()
+                    day_count = instances
+                else:
+                    instances = TrackerInstance.objects.filter(
+                        tracker_definition__user=request.user,
+                        date=day,
+                        status='DONE'
+                    ).count()
+                    day_count = instances
+                data.append(day_count)
+            
+            return JsonResponse({
+                'success': True,
+                'chart_type': 'bar',
+                'data': {
+                    'labels': labels,
+                    'datasets': [{
+                        'label': 'Tasks Completed',
+                        'data': data,
+                        'backgroundColor': 'rgba(99, 102, 241, 0.8)'
+                    }]
+                }
+            })
+        
+        return JsonResponse({
+            'success': False,
+            'error': f'Unknown chart type: {chart_type}'
+        }, status=400)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+# ============================================================================
+# HEATMAP DATA API ENDPOINT
+# ============================================================================
+
+@login_required
+@require_GET
+def api_heatmap_data(request):
+    """
+    Get heatmap data for completion visualization.
+    
+    GET /api/heatmap/?tracker_id=xxx&weeks=12
+    
+    Returns: Grid of completion levels (0-4) for GitHub-style heatmap
+    """
+    try:
+        tracker_id = request.GET.get('tracker_id')
+        weeks = int(request.GET.get('weeks', 12))
+        
+        today = date.today()
+        
+        # Build grid: 7 rows (days) x N columns (weeks)
+        heatmap_data = []
+        
+        # Start from Sunday
+        days_since_sunday = (today.weekday() + 1) % 7
+        start_date = today - timedelta(days=(weeks * 7) + days_since_sunday)
+        
+        # Import TaskInstance for task-based completion
+        from .models import TaskInstance, TrackerInstance
+        
+        current_date = start_date
+        for week in range(weeks + 1):
+            week_data = []
+            for day in range(7):
+                if current_date > today:
+                    week_data.append({'date': None, 'level': 0, 'count': 0})
+                else:
+                    # Get task completion for this day using TaskInstance
+                    base_filter = {
+                        'tracker_instance__tracker__user': request.user,
+                        'tracker_instance__period_start__lte': current_date,
+                        'tracker_instance__period_end__gte': current_date
+                    }
+                    
+                    if tracker_id:
+                        base_filter['tracker_instance__tracker__tracker_id'] = tracker_id
+                    
+                    done = TaskInstance.objects.filter(
+                        status='DONE',
+                        **base_filter
+                    ).count()
+                    
+                    total = TaskInstance.objects.filter(**base_filter).count()
+                    
+                    rate = (done / total * 100) if total else 0
+                    
+                    # Determine level (0-4) for GitHub-style heatmap
+                    if total == 0:
+                        level = 0
+                    elif rate == 0:
+                        level = 0
+                    elif rate < 25:
+                        level = 1
+                    elif rate < 50:
+                        level = 2
+                    elif rate < 75:
+                        level = 3
+                    else:
+                        level = 4
+                    
+                    week_data.append({
+                        'date': current_date.isoformat(),
+                        'level': level,
+                        'count': done,
+                        'total': total,
+                        'rate': int(rate)
+                    })
+                
+                current_date += timedelta(days=1)
+            
+            heatmap_data.append(week_data)
+        
+        return JsonResponse({
+            'success': True,
+            'heatmap': heatmap_data,
+            'weeks': weeks
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+# ============================================================================
+# BULK STATUS UPDATE (Moved from views.py)
+# ============================================================================
+
+@login_required
+@require_POST
+def api_bulk_status_update(request):
+    """
+    Update multiple tasks to the same status in a single request.
+    Expects: task_ids (list) and status (string) in POST data.
+    """
+    try:
+        data = json.loads(request.body)
+        task_ids = data.get('task_ids', [])
+        status = data.get('status')
+        
+        if not task_ids or not status:
+            return JsonResponse({
+                'success': False,
+                'error': 'task_ids and status are required'
+            }, status=400)
+        
+        # Update all tasks
+        updated = TrackerInstance.objects.filter(
+            id__in=task_ids,
+            tracker_definition__user=request.user
+        ).update(status=status)
+        
+        return JsonResponse({
+            'success': True,
+            'updated': updated,
+            'total': len(task_ids)
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+@require_POST
+def api_mark_overdue_missed(request, tracker_id):
+    """
+    Automatically mark all overdue TODO tasks as MISSED.
+    """
+    try:
+        tracker = get_object_or_404(
+            TrackerDefinition,
+            tracker_id=tracker_id,
+            user=request.user
+        )
+        
+        today = date.today()
+        
+        # Mark all past pending tasks as missed
+        marked = TrackerInstance.objects.filter(
+            tracker_definition=tracker,
+            date__lt=today,
+            status__in=['PENDING', 'TODO']
+        ).update(status='MISSED')
+        
+        return JsonResponse({
+            'success': True,
+            'marked_count': marked,
+            'message': f'{marked} overdue tasks marked as MISSED'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+# ============================================================================
+# GOALS API
+# ============================================================================
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def api_goals(request):
+    """Goals API endpoint for listing and creating goals"""
+    from .models import Goal
+    
+    if request.method == 'GET':
+        goals = Goal.objects.filter(user=request.user).values(
+            'goal_id', 'title', 'description', 'icon', 'goal_type',
+            'target_date', 'target_value', 'current_value', 'unit',
+            'status', 'priority', 'progress'
+        )
+        return JsonResponse({'success': True, 'goals': list(goals)})
+    
+    elif request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            goal = Goal.objects.create(
+                user=request.user,
+                title=data.get('title', ''),
+                description=data.get('description', ''),
+                icon=data.get('icon', '🎯'),
+                goal_type=data.get('type', 'habit'),
+                target_date=data.get('target_date'),
+                target_value=data.get('target_value'),
+                unit=data.get('unit', ''),
+                status='active',
+            )
+            return JsonResponse({
+                'success': True, 
+                'goal_id': goal.goal_id,
+                'message': 'Goal created successfully'
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+# ============================================================================
+# USER PREFERENCES API
+# ============================================================================
+
+@login_required
+@require_http_methods(['GET', 'PUT'])
+def api_preferences(request):
+    """User preferences API endpoint"""
+    from .models import UserPreferences
+    
+    prefs, created = UserPreferences.objects.get_or_create(user=request.user)
+    
+    if request.method == 'GET':
+        return JsonResponse({
+            'success': True,
+            'preferences': {
+                'theme': prefs.theme,
+                'default_view': prefs.default_view,
+                'timezone': prefs.timezone,
+                'date_format': prefs.date_format,
+                'week_start': prefs.week_start,
+                'daily_reminder_enabled': prefs.daily_reminder_enabled,
+                'sound_complete': prefs.sound_complete,
+                'sound_notify': prefs.sound_notify,
+                'sound_volume': prefs.sound_volume,
+                'compact_mode': prefs.compact_mode,
+                'animations': prefs.animations,
+                'keyboard_enabled': prefs.keyboard_enabled,
+                'push_enabled': prefs.push_enabled,
+            }
+        })
+    
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            
+            # Update only provided fields
+            fields = ['theme', 'default_view', 'timezone', 'date_format', 'week_start',
+                     'daily_reminder_enabled', 'sound_complete', 'sound_notify', 
+                     'sound_volume', 'compact_mode', 'animations', 'keyboard_enabled', 'push_enabled']
+            
+            for field in fields:
+                if field in data:
+                    setattr(prefs, field, data[field])
+            
+            prefs.save()
+            return JsonResponse({'success': True, 'message': 'Preferences updated'})
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+# ============================================================================
+# NOTIFICATIONS API
+# ============================================================================
+
+@login_required
+@require_http_methods(['GET', 'POST'])
+def api_notifications(request):
+    """Notifications API endpoint"""
+    from .models import Notification
+    
+    if request.method == 'GET':
+        notifications = Notification.objects.filter(user=request.user).values(
+            'notification_id', 'type', 'title', 'message', 'link', 'is_read', 'created_at'
+        )[:50]  # Limit to last 50
+        
+        unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+        
+        return JsonResponse({
+            'success': True,
+            'notifications': list(notifications),
+            'unread_count': unread_count
+        })
+    
+    elif request.method == 'POST':
+        # Mark notifications as read
+        try:
+            data = json.loads(request.body)
+            action = data.get('action')
+            
+            if action == 'mark_read':
+                notification_ids = data.get('ids', [])
+                Notification.objects.filter(
+                    user=request.user,
+                    notification_id__in=notification_ids
+                ).update(is_read=True)
+                return JsonResponse({'success': True, 'message': 'Marked as read'})
+            
+            elif action == 'mark_all_read':
+                Notification.objects.filter(user=request.user).update(is_read=True)
+                return JsonResponse({'success': True, 'message': 'All marked as read'})
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)

@@ -28,7 +28,13 @@
             {% for goal in active_goals %}
             <div class="goal-card {% if goal.progress >= 100 %}completed{% endif %}" data-goal-id="{{ goal.id }}">
                 <div class="goal-header">
-                    <span class="goal-icon">{{ goal.icon|default:"🎯" }}</span>
+                    <span class="goal-icon">{{ goal.icon|default:'<svg width="20" height="20" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <circle cx="12" cy="12" r="6"></circle>
+                            <circle cx="12" cy="12" r="2"></circle>
+                        </svg>'|safe }}</span>
                     <div class="goal-info">
                         <h4 class="goal-title">{{ goal.name }}</h4>
                         <span class="goal-tracker">{{ goal.tracker_name }}</span>
@@ -67,7 +73,14 @@
             </div>
             {% empty %}
             <div class="empty-state">
-                <div class="empty-state-icon">🎯</div>
+                <div class="empty-state-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <circle cx="12" cy="12" r="6"></circle>
+                        <circle cx="12" cy="12" r="2"></circle>
+                    </svg>
+                </div>
                 <h3>No Active Goals</h3>
                 <p>Set a goal to stay motivated and track your progress.</p>
                 <button class="btn btn-primary" data-action="open-modal" data-modal="add-goal">Create Goal</button>
@@ -83,12 +96,30 @@
         <div class="completed-goals-list">
             {% for goal in completed_goals %}
             <div class="completed-goal-item">
-                <span class="goal-icon">{{ goal.icon|default:"✓" }}</span>
+                <span class="goal-icon">{{ goal.icon|default:'<svg width="20" height="20" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>'|safe }}</span>
                 <div class="goal-info">
                     <span class="goal-name">{{ goal.name }}</span>
                     <span class="goal-completed-date">Completed {{ goal.completed_at|timesince }} ago</span>
                 </div>
-                <span class="goal-celebration">🎉</span>
+                <span class="goal-celebration">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5.8 11.3 2 22l10.7-3.79"></path>
+                        <path d="M4 3h.01"></path>
+                        <path d="M22 8h.01"></path>
+                        <path d="M15 2h.01"></path>
+                        <path d="M22 20h.01"></path>
+                        <path
+                            d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12v0c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10">
+                        </path>
+                        <path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11v0c-.11.7-.72 1.22-1.43 1.22H17"></path>
+                        <path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98v0C9.52 4.9 9 5.52 9 6.23V7"></path>
+                    </svg>
+                </span>
             </div>
             {% endfor %}
         </div>
@@ -100,17 +131,37 @@
         <h3 class="section-title">Goal Types</h3>
         <div class="goal-types-grid">
             <div class="goal-type-card">
-                <span class="goal-type-icon">📊</span>
+                <span class="goal-type-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="20" x2="12" y2="10"></line>
+                        <line x1="18" y1="20" x2="18" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="16"></line>
+                    </svg>
+                </span>
                 <h4>Complete X Tasks</h4>
                 <p>Complete a specific number of tasks within a timeframe.</p>
             </div>
             <div class="goal-type-card">
-                <span class="goal-type-icon">🔥</span>
+                <span class="goal-type-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.5-3.3.3-1.1 1-2.2 2.5-3.2.5 1 1.5 2 2 3z">
+                        </path>
+                    </svg>
+                </span>
                 <h4>Streak Goal</h4>
                 <p>Maintain a streak for a set number of consecutive days.</p>
             </div>
             <div class="goal-type-card">
-                <span class="goal-type-icon">📈</span>
+                <span class="goal-type-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                        <polyline points="17 6 23 6 23 12"></polyline>
+                    </svg>
+                </span>
                 <h4>Completion Rate</h4>
                 <p>Achieve a target completion percentage over time.</p>
             </div>

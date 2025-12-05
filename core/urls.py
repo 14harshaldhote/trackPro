@@ -1,5 +1,4 @@
 from django.urls import path
-from . import views
 from . import views_auth
 from . import views_api
 from . import views_spa
@@ -27,6 +26,13 @@ urlpatterns = [
     path('panels/templates/', views_spa.panel_templates, name='panel_templates'),
     path('panels/settings/', views_spa.panel_settings, name='panel_settings'),
     path('panels/settings/<str:section>/', views_spa.panel_settings, name='panel_settings_section'),
+    
+    # Modals
+    path('modals/<str:modal_name>/', views_spa.modal_view, name='modal_view'),
+    
+    # Error panels
+    path('panels/error/404/', views_spa.panel_error_404, name='panel_error_404'),
+    path('panels/error/500/', views_spa.panel_error_500, name='panel_error_500'),
     
     # =========================================================================
     # LEGACY ROUTES - Redirect to SPA
@@ -65,6 +71,21 @@ urlpatterns = [
     path('api/undo/', views_api.api_undo, name='api_undo'),
     path('api/validate/', views_api.api_validate_field, name='api_validate_field'),
     
+    # Analytics & Insights API (NEW)
+    path('api/insights/', views_api.api_insights, name='api_insights'),
+    path('api/insights/<str:tracker_id>/', views_api.api_insights, name='api_insights_tracker'),
+    path('api/chart-data/', views_api.api_chart_data, name='api_chart_data'),
+    path('api/heatmap/', views_api.api_heatmap_data, name='api_heatmap_data'),
+    
+    # Bulk update and maintenance API (moved from legacy views.py)
+    path('api/tasks/bulk-update/', views_api.api_bulk_status_update, name='api_bulk_update'),
+    path('api/tracker/<str:tracker_id>/mark-overdue/', views_api.api_mark_overdue_missed, name='api_mark_overdue'),
+    
+    # Goals, Preferences, Notifications API (NEW)
+    path('api/goals/', views_api.api_goals, name='api_goals'),
+    path('api/preferences/', views_api.api_preferences, name='api_preferences'),
+    path('api/notifications/', views_api.api_notifications, name='api_notifications'),
+    
     # =========================================================================
     # AUTHENTICATION
     # =========================================================================
@@ -79,10 +100,5 @@ urlpatterns = [
     path('signup/', views_auth.signup_page, name='account_signup'),
     path('forgot-password/', views_auth.forgot_password, name='forgot_password'),
     path('logout/', views_auth.api_logout, name='logout'),
-    
-    # =========================================================================
-    # LEGACY API (kept for backwards compatibility)
-    # =========================================================================
-    path('api/tasks/bulk-update/', views.api_bulk_status_update, name='api_bulk_update'),
-    path('api/tracker/<str:tracker_id>/mark-overdue/', views.api_mark_overdue_missed, name='api_mark_overdue'),
 ]
+

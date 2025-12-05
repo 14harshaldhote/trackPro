@@ -1,99 +1,172 @@
-import uuid
-from datetime import date
-from core.repositories import base_repository as crud
-from core.utils import time_utils
-from core.models import TrackerInstance, TaskInstance
+"""
+Instance Service (ORM-Based)
 
-def ensure_tracker_instance(tracker_id, reference_date=None):
+Manages TrackerInstance and TaskInstance creation with proper ORM usage.
+Includes user isolation and efficient bulk operations.
+"""
+import uuid
+from datetime import date, timedelta
+from django.db import transaction
+from django.db.models import Q
+
+from core.models import TrackerDefinition, TrackerInstance, TaskInstance, TaskTemplate
+from core.utils import time_utils
+
+
+def ensure_tracker_instance(tracker_id: str, reference_date: date = None, user=None):
     """
     Ensures a TrackerInstance exists for the given tracker and date.
-    If not, creates it and its tasks.
+    Uses Django ORM for efficient database operations.
+    
+    Args:
+        tracker_id: The tracker's UUID
+        reference_date: Date to create instance for (default: today)
+        user: Optional user for access validation
+    
+    Returns:
+        TrackerInstance object or dict for compatibility
     """
     if reference_date is None:
         reference_date = date.today()
-        
-    # 1. Get Tracker Definition
-    trackers = crud.get_all_tracker_definitions()
-    tracker_def = next((t for t in trackers if t['tracker_id'] == tracker_id), None)
     
-    if not tracker_def:
-        print(f"Tracker {tracker_id} not found.")
+    # Get tracker definition using ORM
+    try:
+        tracker_query = TrackerDefinition.objects.filter(tracker_id=tracker_id)
+        if user:
+            tracker_query = tracker_query.filter(user=user)
+        tracker = tracker_query.select_related('user').first()
+    except TrackerDefinition.DoesNotExist:
         return None
+    
+    if not tracker:
+        return None
+    
+    # Calculate period dates
+    start_date, end_date = time_utils.get_period_dates(tracker.time_mode, reference_date)
+    
+    # Check if instance already exists using ORM
+    existing_instance = TrackerInstance.objects.filter(
+        tracker=tracker,
+        period_start=start_date,
+        period_end=end_date
+    ).first()
+    
+    if existing_instance:
+        # Return as dict for compatibility
+        return {
+            'instance_id': existing_instance.instance_id,
+            'tracker_id': tracker_id,
+            'period_start': existing_instance.period_start,
+            'period_end': existing_instance.period_end,
+            'status': existing_instance.status
+        }
+    
+    # Create new instance using transaction
+    with transaction.atomic():
+        new_instance = TrackerInstance.objects.create(
+            instance_id=str(uuid.uuid4()),
+            tracker=tracker,
+            tracking_date=reference_date,
+            period_start=start_date,
+            period_end=end_date,
+            status='active'
+        )
         
-    # 2. Calculate Period
-    start_date, end_date = time_utils.get_period_dates(tracker_def['time_mode'], reference_date)
-    
-    # 3. Check if Instance Exists
-    # We need a way to query by date/tracker. 
-    # Current CRUD `get_tracker_instances` returns all for a tracker.
-    # We can filter in memory for now (Phase 1 scale).
-    existing_instances = crud.get_tracker_instances(tracker_id)
-    
-    # Check for overlap or exact match. 
-    # For simplicity, we check if an instance covers the reference_date.
-    # Actually, we should check if an instance exists for this specific calculated period.
-    
-    current_instance = None
-    for inst in existing_instances:
-        # Parse dates if they are strings (ExcelDB might return strings)
-        p_start = inst['period_start']
-        p_end = inst['period_end']
-        if isinstance(p_start, str): p_start = date.fromisoformat(p_start)
-        if isinstance(p_end, str): p_end = date.fromisoformat(p_end)
-            
-        if p_start == start_date and p_end == end_date:
-            current_instance = inst
-            break
-            
-    if current_instance:
-        return current_instance
+        # Create tasks from templates using bulk_create for efficiency
+        templates = TaskTemplate.objects.filter(
+            tracker=tracker
+        ).exclude(
+            description__startswith='[DELETED]'
+        )
         
-    # 4. Create New Instance
-    print(f"Creating new instance for {tracker_def['name']} ({start_date} to {end_date})")
-    new_instance_data = {
-        "instance_id": str(uuid.uuid4()),
-        "tracker_id": tracker_id,
-        "tracking_date": reference_date,  # Primary date for the instance
-        "period_start": start_date,
-        "period_end": end_date,
-       "status": "active"
+        tasks_to_create = []
+        for template in templates:
+            tasks_to_create.append(TaskInstance(
+                task_instance_id=str(uuid.uuid4()),
+                tracker_instance=new_instance,
+                template=template,
+                status='TODO',
+                order=template.order
+            ))
+        
+        if tasks_to_create:
+            TaskInstance.objects.bulk_create(tasks_to_create)
+    
+    return {
+        'instance_id': new_instance.instance_id,
+        'tracker_id': tracker_id,
+        'period_start': new_instance.period_start,
+        'period_end': new_instance.period_end,
+        'status': new_instance.status
     }
-    current_instance = crud.create_tracker_instance(new_instance_data)
-    
-    # 5. Create Tasks from Templates
-    templates = crud.get_task_templates_for_tracker(tracker_id)
-    for tmpl in templates:
-        # Skip deleted templates
-        if tmpl.get('description', '').startswith("[DELETED]"):
-            continue
-            
-        # For daily trackers, task date is the period date.
-        # For weekly/monthly, we might want to set it to start_date or leave it generic.
-        # Let's set it to start_date for now.
-        crud.create_task_instance({
-            "task_instance_id": str(uuid.uuid4()),
-            "tracker_instance_id": current_instance['instance_id'],
-            "template_id": tmpl['template_id'],
-            "description": tmpl['description'],
-            "status": "TODO",
-            "date": start_date, # Default to start of period
-            "notes": "",
-            "metadata": {}
-        })
-        
-    # 6. Carry-over Logic (Optional - Basic Implementation)
-    # Find previous instance
-    # This requires sorting instances. 
-    # Let's skip complex carry-over for this exact step, as per plan "Implement carry-over rules" is a task.
-    # We will add it in a refinement step.
-    
-    return current_instance
 
-def check_all_trackers(reference_date=None):
-    """Checks all trackers and ensures instances exist for the reference date."""
+
+def check_all_trackers(reference_date: date = None, user=None):
+    """
+    Checks all trackers and ensures instances exist for the reference date.
+    Uses ORM with user isolation.
+    
+    Args:
+        reference_date: Date to check (default: today)
+        user: Optional user to filter trackers
+    """
     if reference_date is None:
         reference_date = date.today()
-        
-    trackers = crud.get_all_tracker_definitions()
-    for tracker in trackers:
-        ensure_tracker_instance(tracker['tracker_id'], reference_date)
+    
+    tracker_query = TrackerDefinition.objects.filter(status='active')
+    if user:
+        tracker_query = tracker_query.filter(user=user)
+    
+    for tracker in tracker_query:
+        ensure_tracker_instance(tracker.tracker_id, reference_date, user)
+
+
+def get_instance_for_date(tracker_id: str, target_date: date, user=None) -> TrackerInstance:
+    """
+    Get or create a TrackerInstance for a specific date.
+    
+    Args:
+        tracker_id: The tracker's UUID
+        target_date: The target date
+        user: Optional user for access validation
+    
+    Returns:
+        TrackerInstance object
+    """
+    base_query = TrackerInstance.objects.filter(
+        tracker__tracker_id=tracker_id,
+        period_start__lte=target_date,
+        period_end__gte=target_date
+    ).select_related('tracker')
+    
+    if user:
+        base_query = base_query.filter(tracker__user=user)
+    
+    instance = base_query.first()
+    
+    if not instance:
+        ensure_tracker_instance(tracker_id, target_date, user)
+        instance = base_query.first()
+    
+    return instance
+
+
+def get_tasks_for_instance(instance_id: str, user=None):
+    """
+    Get all tasks for a tracker instance with prefetching.
+    
+    Args:
+        instance_id: The instance UUID
+        user: Optional user for access validation
+    
+    Returns:
+        QuerySet of TaskInstance objects
+    """
+    query = TaskInstance.objects.filter(
+        tracker_instance__instance_id=instance_id
+    ).select_related('template', 'tracker_instance__tracker')
+    
+    if user:
+        query = query.filter(tracker_instance__tracker__user=user)
+    
+    return query.order_by('order')
