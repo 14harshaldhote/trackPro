@@ -97,7 +97,7 @@ App.handleAction = function (action, element, event) {
             break;
         case 'edit':
             const editId = element.closest('[data-task-id]')?.dataset.taskId;
-            if (editId) this.loadModal(`/api/task/${editId}/edit/`);
+            if (editId) this.loadModal(`/modals/edit_task/?task_id=${editId}`);
             break;
         case 'delete':
             const deleteId = element.closest('[data-task-id]')?.dataset.taskId;
@@ -111,6 +111,15 @@ App.handleAction = function (action, element, event) {
             break;
         case 'close-modal':
             this.closeModal();
+            break;
+        case 'use-template':
+            event.preventDefault();
+            const templateName = element.dataset.template;
+            this.useTemplate(templateName);
+            break;
+        case 'create-template':
+            event.preventDefault();
+            this.openModal('add-tracker');
             break;
         default:
             console.log('Unknown action:', action);
@@ -284,6 +293,7 @@ App.renderPanel = function (html, url, pushState) {
     if (panelContent) {
         panelContent.innerHTML = html;
         this.bindPanelEvents();
+        this.executeScripts(panelContent);
     }
 
     if (pushState) {
@@ -323,6 +333,8 @@ App.markActiveNav = function (url = window.location.pathname) {
 App.bindPanelEvents = function () {
     this.bindTaskToggles();
     this.bindForms();
+    this.initTrackerListFilters();
+    this.initTemplateCategoryFilters();
 };
 
 // ============================================================================
@@ -570,14 +582,21 @@ App.loadModal = async function (url) {
     container.innerHTML = '<div class="modal-dialog"><div class="modal-body" style="text-align:center;padding:3rem"><div class="loading-spinner loading-spinner-lg"></div></div></div>';
     overlay.classList.add('active');
 
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
     try {
         console.log('[Modal] 🌐 Fetching modal content from:', url);
         const response = await fetch(url, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRFToken': this.getCsrfToken()
-            }
+            },
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         console.log('[Modal] 📥 Response received:', {
             ok: response.ok,
@@ -585,7 +604,18 @@ App.loadModal = async function (url) {
             statusText: response.statusText
         });
 
-        if (!response.ok) throw new Error(`Failed to load modal: ${response.status} ${response.statusText}`);
+        if (!response.ok) {
+            // Handle specific error codes with user-friendly messages
+            let errorMsg = 'Failed to load modal';
+            if (response.status === 403) {
+                errorMsg = 'Session expired. Please refresh the page.';
+            } else if (response.status === 404) {
+                errorMsg = 'Modal not found';
+            } else if (response.status === 500) {
+                errorMsg = 'Server error. Please try again.';
+            }
+            throw new Error(errorMsg);
+        }
 
         const html = await response.text();
         console.log('[Modal] 📄 HTML content received, length:', html.length);
@@ -599,13 +629,99 @@ App.loadModal = async function (url) {
         document.body.style.overflow = 'hidden';
 
         this.bindForms(container);
+        this.executeScripts(container);
         console.log('[Modal] ✅ Modal fully loaded and ready');
 
     } catch (error) {
+        clearTimeout(timeoutId);
         console.error('[Modal] ❌ Modal load error:', error);
-        this.showToast('error', 'Failed to load', error.message);
-        this.closeModal();
+
+        // Check if it was a timeout or network error
+        let errorTitle = 'Failed to load';
+        let errorMessage = error.message;
+
+        if (error.name === 'AbortError') {
+            errorTitle = 'Request timed out';
+            errorMessage = 'The server took too long to respond.';
+        } else if (!navigator.onLine) {
+            errorTitle = 'No connection';
+            errorMessage = 'Check your internet connection.';
+        }
+
+        // Show error in modal with retry button
+        container.innerHTML = `
+            <div class="modal-dialog" role="document">
+                <div class="modal-header">
+                    <h3 class="modal-title">${errorTitle}</h3>
+                    <button type="button" class="modal-close" data-action="close-modal" aria-label="Close">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body" style="text-align:center;padding:2rem">
+                    <p style="color:var(--color-text-secondary);margin-bottom:1.5rem">${errorMessage}</p>
+                    <button class="btn btn-primary" onclick="window.App.loadModal('${url}')">Try Again</button>
+                </div>
+            </div>
+        `;
+
+        this.showToast('error', errorTitle, errorMessage);
     }
+};
+
+App.executeScripts = function (container) {
+    const scripts = container.querySelectorAll('script');
+    console.log('[App] 📜 Executing', scripts.length, 'scripts from container');
+
+    scripts.forEach(oldScript => {
+        const newScript = document.createElement('script');
+        Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+};
+
+App.confirmAction = function (options) {
+    const { title, message, confirmText, confirmType, onConfirm } = options;
+
+    // Load generic confirm modal
+    // Fix: Pass only the URL to loadModal, then handle binding in a callback/after-await
+    this.loadModal('/modals/confirm_delete/').then(() => {
+        setTimeout(() => {
+            const titleEl = document.getElementById('confirm-title');
+            const messageEl = document.getElementById('confirm-message');
+            const confirmBtn = document.getElementById('confirm-action-btn');
+
+            if (titleEl) titleEl.textContent = title || 'Confirm Action';
+            if (messageEl) messageEl.innerHTML = message || 'Are you sure?';
+
+            if (confirmBtn) {
+                confirmBtn.textContent = confirmText || 'Confirm';
+                confirmBtn.className = `btn btn-${confirmType || 'primary'}`;
+
+                // Remove old listeners to prevent multiple firings by cloning
+                const newBtn = confirmBtn.cloneNode(true);
+                confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+
+                newBtn.onclick = async () => {
+                    newBtn.disabled = true;
+                    newBtn.innerHTML = '<span class="loading-spinner"></span> Processing...';
+
+                    try {
+                        await onConfirm();
+                        this.closeModal();
+                    } catch (error) {
+                        console.error('Action failed:', error);
+                        this.showToast('error', 'Action Failed', error.message);
+                        newBtn.disabled = false;
+                        newBtn.textContent = confirmText || 'Confirm';
+                    }
+                };
+            }
+        }, 100);
+    });
 };
 
 App.closeModal = function () {
@@ -1110,22 +1226,48 @@ App.toggleTask = async function (taskId, rowElement) {
 // FORM HANDLING
 // ============================================================================
 App.bindForms = function (container = document) {
-    container.querySelectorAll('form[data-ajax]').forEach(form => {
-        form.addEventListener('submit', async (e) => {
+    console.log('[Forms] 🔧 bindForms() called on container:', container.id || 'document');
+
+    const forms = container.querySelectorAll('form[data-ajax]');
+    console.log('[Forms] Found', forms.length, 'forms with data-ajax attribute');
+
+    forms.forEach(form => {
+        console.log('[Forms] Binding form:', form.id || 'unnamed form', 'action:', form.action);
+
+        // Remove any existing listeners by cloning
+        const newForm = form.cloneNode(true);
+        form.parentNode.replaceChild(newForm, form);
+
+        newForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            await this.submitForm(form);
+            console.log('[Forms] 📤 Form submit event triggered:', newForm.id || 'unnamed form');
+            await this.submitForm(newForm);
         });
+
+        // Also bind click handler on submit button as backup
+        const submitBtn = newForm.querySelector('[type="submit"]');
+        if (submitBtn) {
+            console.log('[Forms] Found submit button:', submitBtn.id || submitBtn.textContent.trim());
+            submitBtn.addEventListener('click', (e) => {
+                console.log('[Forms] 🖱️ Submit button clicked');
+                // Form's submit event should handle it, but click confirms binding
+            });
+        }
     });
 };
 
 App.submitForm = async function (form) {
     const submitBtn = form.querySelector('[type="submit"]');
+    console.log('[Forms] 🚀 submitForm() called');
+    console.log('[Forms] Form action:', form.action);
+    console.log('[Forms] Form method:', form.method);
 
     try {
         this.setButtonLoading(submitBtn, true);
 
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
+        console.log('[Forms] 📦 Form data:', data);
 
         const response = await fetch(form.action, {
             method: form.method || 'POST',
@@ -1136,7 +1278,9 @@ App.submitForm = async function (form) {
             body: JSON.stringify(data)
         });
 
+        console.log('[Forms] 📥 Response status:', response.status, response.statusText);
         const result = await response.json();
+        console.log('[Forms] 📥 Response data:', result);
 
         if (response.ok && result.success) {
             this.showToast('success', result.message || 'Saved successfully');
@@ -1144,16 +1288,18 @@ App.submitForm = async function (form) {
 
             // Invalidate cache and refresh
             if (result.refresh) {
+                console.log('[Forms] 🔄 Refreshing panel:', window.location.pathname);
                 this.cache.panels.delete(window.location.pathname);
                 this.loadPanel(window.location.pathname, false);
             }
         } else {
+            console.log('[Forms] ❌ Validation errors:', result.errors);
             this.showFormErrors(form, result.errors || {});
-            this.showToast('error', 'Validation failed', 'Please check the form');
+            this.showToast('error', 'Validation failed', result.error || 'Please check the form');
         }
 
     } catch (error) {
-        console.error('Form submit error:', error);
+        console.error('[Forms] ❌ Form submit error:', error);
         this.showToast('error', 'Failed to save', error.message);
     } finally {
         this.setButtonLoading(submitBtn, false);
@@ -1241,6 +1387,394 @@ App.invalidateCache = function (url) {
     } else {
         this.cache.panels.clear();
     }
+};
+
+// ============================================================================
+// TEMPLATE FUNCTIONS
+// ============================================================================
+App.useTemplate = function (templateName) {
+    console.log('[Templates] Using template:', templateName);
+
+    // Template definitions with tasks
+    const templates = {
+        'morning': {
+            name: 'Morning Routine',
+            tasks: ['Wake up early', 'Meditate 10 min', 'Exercise 30 min', 'Healthy breakfast', 'Plan day', 'Review goals', 'Personal growth reading', 'Journal']
+        },
+        'fitness': {
+            name: 'Fitness Tracker',
+            tasks: ['Warm up', 'Main workout', 'Cool down', 'Track nutrition', 'Hydration check', 'Recovery stretches']
+        },
+        'study': {
+            name: 'Study Plan',
+            tasks: ['Review previous notes', 'Read new material', 'Practice exercises', 'Take notes', 'Self-quiz']
+        },
+        'work': {
+            name: 'Work Productivity',
+            tasks: ['Check emails', 'Priority task 1', 'Priority task 2', 'Priority task 3', 'Deep work block', 'Team sync', 'End of day review']
+        },
+        'mindfulness': {
+            name: 'Mindfulness',
+            tasks: ['Morning meditation', 'Gratitude journal', 'Mindful break', 'Evening reflection']
+        },
+        'evening': {
+            name: 'Evening Wind Down',
+            tasks: ['Review day', 'Prepare tomorrow', 'Light stretching', 'No screens', 'Relaxation time']
+        },
+        'weekly-review': {
+            name: 'Weekly Review',
+            tasks: ['Review goals', 'Celebrate wins', 'Identify challenges', 'Plan next week', 'Clear inbox', 'Update trackers']
+        },
+        'language': {
+            name: 'Language Learning',
+            tasks: ['Vocabulary practice', 'Grammar exercise', 'Speaking practice', 'Listening practice', 'Immersion activity']
+        }
+    };
+
+    const template = templates[templateName];
+    if (!template) {
+        this.showToast('error', 'Template not found');
+        return;
+    }
+
+    // Show confirmation and create tracker
+    this.showToast('info', `Creating "${template.name}" tracker...`);
+
+    // Create the tracker via API
+    fetch('/api/tracker/create/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': this.getCsrfToken()
+        },
+        body: JSON.stringify({
+            name: template.name,
+            description: `Created from ${template.name} template`,
+            time_period: templateName === 'weekly-review' ? 'weekly' : 'daily',
+            tasks: template.tasks  // Backend will create task templates
+        })
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                this.showToast('success', `${template.name} tracker created!`);
+                // Navigate to the new tracker
+                if (data.redirect) {
+                    this.loadPanel(data.redirect, true);
+                } else {
+                    this.loadPanel('/trackers/', true);
+                }
+            } else {
+                this.showToast('error', data.error || 'Failed to create tracker');
+            }
+        })
+        .catch(err => {
+            console.error('[Templates] Error:', err);
+            this.showToast('error', 'Failed to create tracker');
+        });
+};
+
+// ============================================================================
+// CRUD ACTIONS & CONFIRMATION
+// ============================================================================
+
+// App.confirmAction is defined in the MODAL SYSTEM section above
+// Reusing that implementation to ensure consistency
+
+
+App.handleTrackerAction = function (action, trackerId) {
+    if (!trackerId) return;
+
+    if (action === 'archive') {
+        this.confirmAction({
+            title: 'Archive Tracker',
+            message: 'Are you sure you want to archive this tracker? It will be hidden from your active list.',
+            confirmText: 'Archive',
+            confirmType: 'warning',
+            onConfirm: async () => {
+                const response = await fetch(`/api/tracker/${trackerId}/update/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCsrfToken()
+                    },
+                    body: JSON.stringify({ status: 'archived' })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    this.showToast('success', 'Tracker Archived');
+                    // Refresh current panel
+                    this.cache.panels.clear();
+                    this.loadPanel(window.location.pathname, false);
+                } else {
+                    throw new Error(result.error);
+                }
+            }
+        });
+    } else if (action === 'delete') {
+        this.confirmAction({
+            title: 'Delete Tracker',
+            message: 'Are you sure you want to delete this tracker? <strong>This action cannot be undone</strong> and will delete all associated tasks and history.',
+            confirmText: 'Delete Forever',
+            confirmType: 'danger',
+            onConfirm: async () => {
+                const response = await fetch(`/api/tracker/${trackerId}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': this.getCsrfToken()
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    this.showToast('success', 'Tracker Deleted');
+                    this.cache.panels.clear();
+
+                    // If we are on the tracker detail page, go back to list
+                    if (window.location.pathname.includes(`/tracker/${trackerId}`)) {
+                        window.history.pushState({}, '', '/trackers/');
+                        this.loadPanel('/trackers/', true);
+                    } else {
+                        this.loadPanel(window.location.pathname, false);
+                    }
+                } else {
+                    throw new Error(result.error);
+                }
+            }
+        });
+    } else if (action === 'unarchive') {
+        // Unarchive: set status back to active
+        this.confirmAction({
+            title: 'Unarchive Tracker',
+            message: 'Restore this tracker to your active list?',
+            confirmText: 'Unarchive',
+            confirmType: 'primary',
+            onConfirm: async () => {
+                const response = await fetch(`/api/tracker/${trackerId}/update/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCsrfToken()
+                    },
+                    body: JSON.stringify({ status: 'active' })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    this.showToast('success', 'Tracker Restored');
+                    this.cache.panels.clear();
+                    this.loadPanel(window.location.pathname, false);
+                } else {
+                    throw new Error(result.error);
+                }
+            }
+        });
+    } else if (action === 'duplicate') {
+        // Implement duplicate if needed, or show toast
+        this.showToast('info', 'Duplicate', 'Feature coming soon!');
+    }
+};
+
+App.handleTaskAction = function (action, taskId) {
+    if (!taskId) return;
+
+    if (action === 'delete') {
+        this.confirmAction({
+            title: 'Delete Task',
+            message: 'Are you sure you want to permanently delete this task?',
+            confirmText: 'Delete',
+            confirmType: 'danger',
+            onConfirm: async () => {
+                const response = await fetch(`/api/task/${taskId}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': this.getCsrfToken()
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    this.showToast('success', 'Task Deleted');
+                    // Remove element from DOM immediately for better UX
+                    const taskEl = document.querySelector(`[data-task-id="${taskId}"]`);
+                    if (taskEl) taskEl.remove();
+
+                    // Refresh stats if needed (optional, or rely on full reload)
+                    // For now, simple removal is enough
+                } else {
+                    throw new Error(result.error);
+                }
+            }
+        });
+    }
+};
+
+// Global Listener for Delete Task
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="delete-task"]');
+    if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const taskRow = btn.closest('[data-task-id]');
+        if (taskRow) {
+            App.handleTaskAction('delete', taskRow.dataset.taskId);
+        }
+    }
+});
+
+
+// ============================================================================
+// TRACKER LIST FILTERING 
+// ============================================================================
+App.initTrackerListFilters = function () {
+    const container = document.getElementById('trackers-container');
+    if (!container) return;
+
+    console.log('[Filters] Initializing tracker list filters');
+
+    // View toggle
+    document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const view = btn.dataset.view;
+            document.querySelectorAll('.view-toggle-btn').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
+            btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
+            container.dataset.view = view;
+        });
+    });
+
+    // Filter checkboxes
+    document.querySelectorAll('.filter-option input').forEach(checkbox => {
+        checkbox.addEventListener('change', () => this.applyTrackerFilters());
+    });
+
+    // Clear filters
+    const clearBtn = document.getElementById('clear-filters');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-option input').forEach(cb => cb.checked = true);
+            this.applyTrackerFilters();
+        });
+    }
+
+    // Sort buttons
+    document.querySelectorAll('[data-sort]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sortType = btn.dataset.sort;
+            document.getElementById('current-sort').textContent = btn.textContent.trim();
+            this.sortTrackers(sortType);
+        });
+    });
+
+    // Search
+    const searchInput = document.getElementById('tracker-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', this.debounce(() => {
+            this.filterTrackersBySearch(searchInput.value.toLowerCase().trim());
+        }, 300));
+    }
+};
+
+App.applyTrackerFilters = function () {
+    const statusFilters = Array.from(document.querySelectorAll('input[name="filter-status"]:checked')).map(cb => cb.value);
+    const periodFilters = Array.from(document.querySelectorAll('input[name="filter-period"]:checked')).map(cb => cb.value);
+
+    // Update filter count badge
+    const totalFilters = 6; // 3 statuses + 3 periods
+    const activeFilters = totalFilters - (statusFilters.length + periodFilters.length);
+    const filterCount = document.getElementById('filter-count');
+    if (filterCount) {
+        if (activeFilters > 0) {
+            filterCount.textContent = activeFilters;
+            filterCount.style.display = 'inline';
+        } else {
+            filterCount.style.display = 'none';
+        }
+    }
+
+    // Apply filters
+    document.querySelectorAll('.tracker-item').forEach(item => {
+        const status = item.dataset.status || 'active';
+        const period = item.querySelector('.tracker-period-badge')?.textContent?.toLowerCase() || 'daily';
+
+        const statusMatch = statusFilters.length === 0 || statusFilters.includes(status);
+        const periodMatch = periodFilters.length === 0 || periodFilters.includes(period);
+
+        item.style.display = (statusMatch && periodMatch) ? '' : 'none';
+    });
+};
+
+App.sortTrackers = function (sortType) {
+    const container = document.getElementById('trackers-container');
+    if (!container) return;
+
+    const items = Array.from(container.querySelectorAll('.tracker-item'));
+
+    items.sort((a, b) => {
+        switch (sortType) {
+            case 'name':
+                const nameA = a.querySelector('.tracker-name')?.textContent || '';
+                const nameB = b.querySelector('.tracker-name')?.textContent || '';
+                return nameA.localeCompare(nameB);
+            case 'progress':
+                const progressA = parseInt(a.querySelector('.progress-fill')?.style.width) || 0;
+                const progressB = parseInt(b.querySelector('.progress-fill')?.style.width) || 0;
+                return progressB - progressA;
+            case 'tasks':
+                const tasksA = parseInt(a.querySelector('.tracker-task-count')?.textContent) || 0;
+                const tasksB = parseInt(b.querySelector('.tracker-task-count')?.textContent) || 0;
+                return tasksB - tasksA;
+            case 'recent':
+            default:
+                // Keep original order (by updated_at from server)
+                return 0;
+        }
+    });
+
+    // Re-append sorted items
+    items.forEach(item => container.appendChild(item));
+};
+
+App.filterTrackersBySearch = function (query) {
+    document.querySelectorAll('.tracker-item').forEach(item => {
+        const name = item.querySelector('.tracker-name')?.textContent?.toLowerCase() || '';
+        const desc = item.querySelector('.tracker-description')?.textContent?.toLowerCase() || '';
+
+        const matches = !query || name.includes(query) || desc.includes(query);
+        item.style.display = matches ? '' : 'none';
+    });
+};
+
+// ============================================================================
+// TEMPLATE CATEGORY FILTERING
+// ============================================================================
+App.initTemplateCategoryFilters = function () {
+    const categoryBtns = document.querySelectorAll('.category-btn');
+    if (!categoryBtns.length) return;
+
+    console.log('[Templates] Initializing category filters');
+
+    categoryBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Update active state
+            categoryBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Filter cards
+            const category = btn.dataset.category;
+            document.querySelectorAll('.template-card').forEach(card => {
+                if (category === 'all' || card.dataset.category === category) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    });
 };
 
 // Export for debugging

@@ -55,6 +55,8 @@ urlpatterns = [
     # Task API
     path('api/task/<str:task_id>/toggle/', views_api.api_task_toggle, name='api_toggle_task'),
     path('api/task/<str:task_id>/status/', views_api.api_task_status, name='api_task_status'),
+    path('api/task/<str:task_id>/edit/', views_api.api_task_edit, name='api_task_edit'),
+    path('api/task/<str:task_id>/delete/', views_api.api_task_delete, name='api_task_delete'),
     path('api/tasks/bulk/', views_api.api_tasks_bulk, name='api_tasks_bulk'),
     
     # Tracker API
@@ -62,6 +64,7 @@ urlpatterns = [
     path('api/tracker/<str:tracker_id>/reorder/', views_api.api_tracker_reorder, name='api_tracker_reorder'),
     path('api/tracker/create/', views_api.api_tracker_create, name='api_tracker_create'),
     path('api/tracker/<str:tracker_id>/delete/', views_api.api_tracker_delete, name='api_tracker_delete'),
+    path('api/tracker/<str:tracker_id>/update/', views_api.api_tracker_update, name='api_tracker_update'),
     path('api/tracker/<str:tracker_id>/share/', views_api.api_share_tracker, name='api_share_tracker'),
     path('api/tracker/<str:tracker_id>/export/', views_api.api_export, name='api_export'),
     

@@ -9,7 +9,7 @@
         <div class="panel-actions">
             <!-- Month Navigation -->
             <div class="date-nav">
-                <a href="/month/?date={{ prev_month|date:'Y-m-d' }}" class="btn btn-icon" data-nav
+                <a href="/panels/month/?date={{ prev_month|date:'Y-m-d' }}" class="btn btn-icon" data-nav
                     title="Previous month">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="15 18 9 12 15 6"></polyline>
@@ -18,7 +18,8 @@
                 <button class="btn btn-ghost" id="month-picker-toggle">
                     {{ current_month|date:"M Y" }}
                 </button>
-                <a href="/month/?date={{ next_month|date:'Y-m-d' }}" class="btn btn-icon" data-nav title="Next month">
+                <a href="/panels/month/?date={{ next_month|date:'Y-m-d' }}" class="btn btn-icon" data-nav
+                    title="Next month">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="9 18 15 12 9 6"></polyline>
                     </svg>
@@ -26,7 +27,7 @@
             </div>
 
             {% if not is_current_month %}
-            <a href="/month/" class="btn btn-ghost btn-sm" data-nav>Current Month</a>
+            <a href="/panels/month/" class="btn btn-ghost btn-sm" data-nav>Current Month</a>
             {% endif %}
         </div>
     </div>

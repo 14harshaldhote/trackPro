@@ -1,0 +1,151 @@
+<!-- Edit Tracker Modal -->
+<div class="modal-dialog" role="document">
+    <div class="modal-header">
+        <h3 class="modal-title">Edit Tracker</h3>
+        <button type="button" class="modal-close" data-action="close-modal" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+
+    {% if tracker %}
+    <form id="edit-tracker-form" method="POST" action="/api/tracker/{{ tracker.tracker_id }}/update/" data-ajax>
+        {% csrf_token %}
+        <input type="hidden" name="tracker_id" value="{{ tracker.tracker_id }}">
+
+        <div class="modal-body">
+            <!-- Tracker Name -->
+            <div class="form-group">
+                <label for="tracker-name" class="form-label">Tracker Name *</label>
+                <input type="text" id="tracker-name" name="name" class="form-input" value="{{ tracker.name }}" required
+                    maxlength="200" autofocus>
+                <div class="field-error" id="name-error"></div>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group">
+                <label for="tracker-description" class="form-label">Description</label>
+                <textarea id="tracker-description" name="description" class="form-input" rows="3"
+                    placeholder="What is this tracker for?">{{ tracker.description }}</textarea>
+            </div>
+
+            <!-- Time Mode -->
+            <div class="form-group">
+                <label for="tracker-time-mode" class="form-label">Time Period</label>
+                <select id="tracker-time-mode" name="time_mode" class="form-select">
+                    <option value="daily" {% if tracker.time_mode == 'daily' %}selected{% endif %}>📅 Daily</option>
+                    <option value="weekly" {% if tracker.time_mode == 'weekly' %}selected{% endif %}>📆 Weekly</option>
+                    <option value="monthly" {% if tracker.time_mode == 'monthly' %}selected{% endif %}>🗓️ Monthly
+                    </option>
+                </select>
+            </div>
+
+            <!-- Status -->
+            <div class="form-group">
+                <label for="tracker-status" class="form-label">Status</label>
+                <select id="tracker-status" name="status" class="form-select">
+                    <option value="active" {% if tracker.status == 'active' %}selected{% endif %}>✅ Active</option>
+                    <option value="paused" {% if tracker.status == 'paused' %}selected{% endif %}>⏸️ Paused</option>
+                    <option value="completed" {% if tracker.status == 'completed' %}selected{% endif %}>🏆 Completed
+                    </option>
+                    <option value="archived" {% if tracker.status == 'archived' %}selected{% endif %}>📦 Archived</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="save-tracker-btn">
+                Save Changes
+            </button>
+        </div>
+    </form>
+    {% else %}
+    <div class="modal-body">
+        <div class="empty-state">
+            <p>Tracker not found or you don't have permission to edit it.</p>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-action="close-modal">Close</button>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    (function () {
+        const form = document.getElementById('edit-tracker-form');
+        const submitBtn = document.getElementById('save-tracker-btn');
+
+        if (!form) {
+            console.warn('[EditTrackerModal] Form not found - tracker may not exist');
+            return;
+        }
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const formData = new FormData(form);
+            const trackerId = formData.get('tracker_id');
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="loading-spinner" style="width:16px;height:16px;border-width:2px;"></span> Saving...';
+            }
+
+            try {
+                const data = {
+                    name: formData.get('name'),
+                    description: formData.get('description') || '',
+                    time_mode: formData.get('time_mode'),
+                    status: formData.get('status')
+                };
+
+                const csrfToken = formData.get('csrfmiddlewaretoken') ||
+                    document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                    (window.App ? window.App.getCsrfToken() : '');
+
+                const response = await fetch(`/api/tracker/${trackerId}/update/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    if (window.App) {
+                        window.App.showToast('success', 'Tracker Updated', result.message || 'Changes saved successfully');
+                        window.App.closeModal();
+                        window.App.cache.panels.clear();
+                        window.App.loadPanel(window.location.pathname, false);
+                    } else {
+                        alert('Tracker updated successfully!');
+                        window.location.reload();
+                    }
+                } else {
+                    throw new Error(result.error || 'Failed to update tracker');
+                }
+            } catch (error) {
+                console.error('[EditTrackerModal] Submit error:', error);
+                if (window.App) {
+                    window.App.showToast('error', 'Error', error.message);
+                } else {
+                    alert('Error: ' + error.message);
+                }
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Save Changes';
+                }
+            }
+        });
+
+        console.log('[EditTrackerModal] Form handler initialized');
+    })();
+</script>

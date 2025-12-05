@@ -10,6 +10,7 @@
             </div>
 
             <form id="preferences-form">
+                {% csrf_token %}
                 <!-- Theme -->
                 <div class="settings-section">
                     <h3>Appearance</h3>
@@ -18,14 +19,15 @@
                         <div class="theme-grid" id="theme-selector">
                             {% for theme in themes %}
                             <label class="theme-option">
-                                <input type="radio" name="theme" value="{{ theme.id }}" {% if theme.id==current_theme
-                                    %}checked{% endif %}>
+                                <input type="radio" name="theme" value="{{ theme.id }}" {% if preferences.theme == theme.id %}checked{% endif %}>
                                 <div class="theme-preview"
-                                    style="background: {{ theme.bg }}; border-color: {{ theme.primary }};">
-                                    <div class="theme-primary" style="background: {{ theme.primary }};"></div>
+                                    style="background: {{ theme.bg }}; border-color: {{ theme.color }};">
+                                    <div class="theme-primary" style="background: {{ theme.color }};"></div>
                                 </div>
                                 <span class="theme-name">{{ theme.name }}</span>
                             </label>
+                            {% empty %}
+                            <p>No themes available</p>
                             {% endfor %}
                         </div>
                     </div>
@@ -41,7 +43,7 @@
                                 <span class="toggle-hint">Play a sound when you complete a task</span>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" name="sound_complete" checked>
+                                <input type="checkbox" name="sound_complete" {% if preferences.sound_complete %}checked{% endif %}>
                                 <span class="toggle-slider"></span>
                             </label>
                         </label>
@@ -51,14 +53,15 @@
                                 <span class="toggle-hint">Play a sound for notifications</span>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" name="sound_notify" checked>
+                                <input type="checkbox" name="sound_notify" {% if preferences.sound_notify %}checked{% endif %}>
                                 <span class="toggle-slider"></span>
                             </label>
                         </label>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Sound Volume</label>
-                        <input type="range" name="sound_volume" min="0" max="100" value="70" class="form-range">
+                        <input type="range" name="sound_volume" min="0" max="100"
+                            value="{{ preferences.sound_volume|default:70 }}" class="form-range">
                     </div>
                 </div>
 
@@ -72,7 +75,7 @@
                                 <span class="toggle-hint">Receive browser notifications</span>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" name="push_enabled" id="push-toggle">
+                                <input type="checkbox" name="push_enabled" id="push-toggle" {% if preferences.push_enabled %}checked{% endif %}>
                                 <span class="toggle-slider"></span>
                             </label>
                         </label>
@@ -82,17 +85,7 @@
                                 <span class="toggle-hint">Get reminded about pending tasks</span>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" name="daily_reminder" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </label>
-                        <label class="toggle-option">
-                            <div class="toggle-info">
-                                <span class="toggle-label">Weekly Summary</span>
-                                <span class="toggle-hint">Receive weekly progress reports</span>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" name="weekly_summary" checked>
+                                <input type="checkbox" name="daily_reminder_enabled" {% if preferences.daily_reminder_enabled %}checked{% endif %}>
                                 <span class="toggle-slider"></span>
                             </label>
                         </label>
@@ -109,7 +102,7 @@
                                 <span class="toggle-hint">Show more content with less spacing</span>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" name="compact_mode">
+                                <input type="checkbox" name="compact_mode" {% if preferences.compact_mode %}checked{% endif %}>
                                 <span class="toggle-slider"></span>
                             </label>
                         </label>
@@ -119,7 +112,7 @@
                                 <span class="toggle-hint">Enable smooth transitions</span>
                             </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" name="animations" checked>
+                                <input type="checkbox" name="animations" {% if preferences.animations %}checked{% endif %}>
                                 <span class="toggle-slider"></span>
                             </label>
                         </label>
@@ -127,9 +120,91 @@
                 </div>
 
                 <div class="settings-actions">
-                    <button type="submit" class="btn btn-primary">Save Preferences</button>
+                    <button type="submit" class="btn btn-primary" id="save-prefs-btn">Save Preferences</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        const form = document.getElementById('preferences-form');
+        const saveBtn = document.getElementById('save-prefs-btn');
+
+        if (!form) return;
+
+        // Handle theme changes immediately
+        const themeInputs = document.querySelectorAll('input[name="theme"]');
+        themeInputs.forEach(input => {
+            input.addEventListener('change', function () {
+                if (window.App) {
+                    window.App.setTheme(this.value);
+                } else {
+                    document.documentElement.setAttribute('data-theme', this.value);
+                    localStorage.setItem('tracker-theme', this.value);
+                }
+            });
+        });
+
+        // Handle form submission
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<span class="loading-spinner" style="width:16px;height:16px;border-width:2px;"></span> Saving...';
+            }
+
+            try {
+                const formData = new FormData(form);
+                const data = {
+                    theme: formData.get('theme'),
+                    sound_complete: formData.has('sound_complete'),
+                    sound_notify: formData.has('sound_notify'),
+                    sound_volume: parseInt(formData.get('sound_volume')) || 70,
+                    push_enabled: formData.has('push_enabled'),
+                    daily_reminder_enabled: formData.has('daily_reminder_enabled'),
+                    compact_mode: formData.has('compact_mode'),
+                    animations: formData.has('animations')
+                };
+
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                    (window.App ? window.App.getCsrfToken() : '');
+
+                const response = await fetch('/api/preferences/', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    if (window.App) {
+                        window.App.showToast('success', 'Saved', 'Preferences updated successfully');
+                    } else {
+                        alert('Preferences saved!');
+                    }
+                } else {
+                    throw new Error(result.error || 'Failed to save preferences');
+                }
+            } catch (error) {
+                console.error('[Preferences] Save error:', error);
+                if (window.App) {
+                    window.App.showToast('error', 'Error', error.message);
+                } else {
+                    alert('Error: ' + error.message);
+                }
+            } finally {
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = 'Save Preferences';
+                }
+            }
+        });
+    })();
+</script>

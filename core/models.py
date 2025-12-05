@@ -77,6 +77,11 @@ class TrackerDefinition(models.Model):
             return 0
         done = self.completed_count
         return int((done / total) * 100)
+    
+    @property
+    def is_active(self):
+        """Check if tracker status is active."""
+        return self.status == 'active'
 
 
 class TaskTemplate(models.Model):

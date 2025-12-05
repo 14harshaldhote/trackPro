@@ -85,8 +85,7 @@ def ensure_tracker_instance(tracker_id: str, reference_date: date = None, user=N
                 task_instance_id=str(uuid.uuid4()),
                 tracker_instance=new_instance,
                 template=template,
-                status='TODO',
-                order=template.order
+                status='TODO'
             ))
         
         if tasks_to_create:
@@ -169,4 +168,4 @@ def get_tasks_for_instance(instance_id: str, user=None):
     if user:
         query = query.filter(tracker_instance__tracker__user=user)
     
-    return query.order_by('order')
+    return query.order_by('-template__weight', 'template__time_of_day', 'created_at')

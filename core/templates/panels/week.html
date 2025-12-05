@@ -9,7 +9,8 @@
         <div class="panel-actions">
             <!-- Week Navigation -->
             <div class="date-nav">
-                <a href="/week/?date={{ prev_week|date:'Y-m-d' }}" class="btn btn-icon" data-nav title="Previous week">
+                <a href="/panels/week/?date={{ prev_week|date:'Y-m-d' }}" class="btn btn-icon" data-nav
+                    title="Previous week">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="15 18 9 12 15 6"></polyline>
                     </svg>
@@ -22,7 +23,8 @@
                     </svg>
                     Week {{ week_number }}
                 </button>
-                <a href="/week/?date={{ next_week|date:'Y-m-d' }}" class="btn btn-icon" data-nav title="Next week">
+                <a href="/panels/week/?date={{ next_week|date:'Y-m-d' }}" class="btn btn-icon" data-nav
+                    title="Next week">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="9 18 15 12 9 6"></polyline>
                     </svg>
@@ -30,7 +32,7 @@
             </div>
 
             {% if not is_current_week %}
-            <a href="/week/" class="btn btn-ghost btn-sm" data-nav>Current Week</a>
+            <a href="/panels/week/" class="btn btn-ghost btn-sm" data-nav>Current Week</a>
             {% endif %}
         </div>
     </div>

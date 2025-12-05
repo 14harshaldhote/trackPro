@@ -297,8 +297,11 @@ App.handleContextAction = function (action, id, element) {
             this.updateTaskStatus(id, 'SKIPPED');
             break;
         case 'edit':
-            const type = element.dataset.taskId ? 'task' : 'tracker';
-            this.loadModal(`/api/${type}/${id}/edit/`);
+            if (element.dataset.taskId) {
+                this.loadModal(`/modals/edit_task/?task_id=${id}`);
+            } else {
+                this.loadModal(`/modals/edit_tracker/?tracker_id=${id}`);
+            }
             break;
         case 'duplicate':
             this.duplicateItem(id, element);

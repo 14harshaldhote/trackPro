@@ -11,7 +11,8 @@
             <h1 class="panel-title">My Trackers</h1>
         </div>
         <div class="panel-actions">
-            <button class="btn btn-primary" data-action="open-modal" data-modal="add-tracker">
+            <button class="btn btn-primary" data-action="open-modal" data-modal="add-tracker"
+                data-modal-url="/modals/add_tracker/">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -158,11 +159,43 @@
             <h3 class="empty-state-title">No Trackers Yet</h3>
             <p class="empty-state-description">Create your first tracker to start building habits and achieving goals.
             </p>
-            <button class="btn btn-primary" data-action="open-modal" data-modal="add-tracker">Create First
+            <button class="btn btn-primary" data-action="open-modal" data-modal="add-tracker"
+                data-modal-url="/modals/add_tracker/">Create First
                 Tracker</button>
         </div>
         {% endfor %}
     </div>
+
+    <!-- Archived Trackers Section -->
+    {% if archived_trackers %}
+    <div class="archived-section" id="archived-section">
+        <button class="section-toggle" onclick="this.parentElement.classList.toggle('expanded')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                <rect x="1" y="3" width="22" height="5"></rect>
+            </svg>
+            Archived Trackers ({{ archived_trackers|length }})
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        </button>
+        <div class="archived-items">
+            {% for tracker in archived_trackers %}
+            <div class="tracker-item archived" data-tracker-id="{{ tracker.id }}" data-status="archived">
+                <div class="tracker-card-compact">
+                    <span class="tracker-name">{{ tracker.name }}</span>
+                    <span class="tracker-period-badge">{{ tracker.time_period }}</span>
+                    <button class="btn btn-sm btn-ghost"
+                        onclick="App.handleTrackerAction('unarchive', '{{ tracker.id }}')">Unarchive</button>
+                    <button class="btn btn-sm btn-ghost text-danger"
+                        onclick="App.handleTrackerAction('delete', '{{ tracker.id }}')">Delete</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Pagination -->
     {% if has_more %}
@@ -208,3 +241,250 @@
         Delete
     </button>
 </div>
+
+<script>
+    (function () {
+        const container = document.querySelector('.trackers-panel');
+        if (!container) return;
+
+        // ===== DROPDOWN TOGGLE =====
+        // Bind dropdown toggles directly for this panel
+        container.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+            toggle.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const dropdown = this.closest('.dropdown');
+                const isOpen = dropdown.classList.contains('open');
+
+                // Close all other dropdowns
+                container.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
+
+                if (!isOpen) {
+                    dropdown.classList.add('open');
+                }
+            });
+        });
+
+        // Close dropdowns on outside click
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.dropdown')) {
+                container.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
+            }
+        });
+
+        const trackerItems = container.querySelectorAll('.tracker-item');
+        const searchInput = container.querySelector('#tracker-search');
+        const sortItems = container.querySelectorAll('[data-sort]');
+        const currentSortEl = container.querySelector('#current-sort');
+        const filterCheckboxes = container.querySelectorAll('[name^="filter-"]');
+        const clearFiltersBtn = container.querySelector('#clear-filters');
+        const filterCountEl = container.querySelector('#filter-count');
+        const viewToggleBtns = container.querySelectorAll('.view-toggle-btn');
+        const trackersContainer = container.querySelector('#trackers-container');
+
+        let currentSort = 'recent';
+        let currentFilters = {
+            status: ['active'],
+            period: ['daily']
+        };
+
+        // Search functionality
+        if (searchInput) {
+            searchInput.addEventListener('input', debounce(function (e) {
+                const query = e.target.value.toLowerCase().trim();
+                filterTrackers(query);
+            }, 250));
+        }
+
+        // Sort functionality
+        sortItems.forEach(item => {
+            item.addEventListener('click', function () {
+                currentSort = this.dataset.sort;
+                if (currentSortEl) {
+                    const sortLabels = { recent: 'Recent', name: 'Name A-Z', progress: 'Progress', tasks: 'Task Count' };
+                    currentSortEl.textContent = sortLabels[currentSort] || 'Recent';
+                }
+                sortTrackers();
+            });
+        });
+
+        // Filter functionality
+        filterCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function () {
+                updateFilters();
+                filterTrackers(searchInput?.value || '');
+            });
+        });
+
+        // Clear filters
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', function () {
+                filterCheckboxes.forEach(cb => cb.checked = false);
+                updateFilters();
+                filterTrackers('');
+            });
+        }
+
+        // View toggle (grid/list)
+        viewToggleBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                viewToggleBtns.forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-pressed', 'false');
+                });
+                this.classList.add('active');
+                this.setAttribute('aria-pressed', 'true');
+                if (trackersContainer) {
+                    trackersContainer.dataset.view = this.dataset.view;
+                }
+            });
+        });
+
+        function updateFilters() {
+            currentFilters.status = [];
+            currentFilters.period = [];
+
+            filterCheckboxes.forEach(cb => {
+                if (cb.checked) {
+                    if (cb.name === 'filter-status') {
+                        currentFilters.status.push(cb.value);
+                    } else if (cb.name === 'filter-period') {
+                        currentFilters.period.push(cb.value);
+                    }
+                }
+            });
+
+            // Update filter count badge
+            const totalFilters = currentFilters.status.length + currentFilters.period.length;
+            if (filterCountEl) {
+                filterCountEl.textContent = totalFilters;
+                filterCountEl.style.display = totalFilters > 0 ? 'inline' : 'none';
+            }
+        }
+
+        function filterTrackers(searchQuery) {
+            trackerItems.forEach(item => {
+                const card = item.querySelector('.tracker-card');
+                if (!card) return;
+
+                const name = card.querySelector('.tracker-name')?.textContent.toLowerCase() || '';
+                const description = card.querySelector('.tracker-description')?.textContent.toLowerCase() || '';
+                const status = item.dataset.status?.toLowerCase() || 'active';
+                const period = card.querySelector('.tracker-period-badge')?.textContent.toLowerCase() || 'daily';
+
+                // Check search match
+                const matchesSearch = !searchQuery ||
+                    name.includes(searchQuery) ||
+                    description.includes(searchQuery);
+
+                // Check filter match (empty array means show all)
+                const matchesStatus = currentFilters.status.length === 0 ||
+                    currentFilters.status.includes(status);
+                const matchesPeriod = currentFilters.period.length === 0 ||
+                    currentFilters.period.includes(period);
+
+                item.style.display = (matchesSearch && matchesStatus && matchesPeriod) ? '' : 'none';
+            });
+        }
+
+        function sortTrackers() {
+            const itemsArray = Array.from(trackerItems);
+
+            itemsArray.sort((a, b) => {
+                const cardA = a.querySelector('.tracker-card');
+                const cardB = b.querySelector('.tracker-card');
+
+                switch (currentSort) {
+                    case 'name':
+                        const nameA = cardA?.querySelector('.tracker-name')?.textContent || '';
+                        const nameB = cardB?.querySelector('.tracker-name')?.textContent || '';
+                        return nameA.localeCompare(nameB);
+
+                    case 'progress':
+                        const progressA = parseInt(cardA?.querySelector('.progress-text')?.textContent) || 0;
+                        const progressB = parseInt(cardB?.querySelector('.progress-text')?.textContent) || 0;
+                        return progressB - progressA; // Descending
+
+                    case 'tasks':
+                        const tasksA = parseInt(cardA?.querySelector('.tracker-task-count')?.textContent) || 0;
+                        const tasksB = parseInt(cardB?.querySelector('.tracker-task-count')?.textContent) || 0;
+                        return tasksB - tasksA; // Descending
+
+                    case 'recent':
+                    default:
+                        // Keep original order (server-side sorted by updated_at)
+                        return 0;
+                }
+            });
+
+            // Re-append in sorted order
+            if (trackersContainer) {
+                itemsArray.forEach(item => trackersContainer.appendChild(item));
+            }
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        // Context Menu Logic
+        const contextMenu = document.getElementById('tracker-context-menu');
+        let activeTrackerId = null;
+
+        if (contextMenu) {
+            // Close menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!contextMenu.contains(e.target) && !e.target.closest('[data-action="context-menu"]')) {
+                    contextMenu.style.display = 'none';
+                }
+            });
+
+            // Handle Menu Trigger
+            container.addEventListener('click', (e) => {
+                const trigger = e.target.closest('[data-action="context-menu"]');
+                if (trigger) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const trackerItem = trigger.closest('.tracker-item');
+                    activeTrackerId = trackerItem.dataset.trackerId;
+
+                    // Position menu
+                    const rect = trigger.getBoundingClientRect();
+                    contextMenu.style.display = 'block';
+                    contextMenu.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+                    contextMenu.style.left = (rect.right - contextMenu.offsetWidth) + 'px';
+                }
+            });
+
+            // Handle Menu Actions
+            contextMenu.addEventListener('click', (e) => {
+                const actionBtn = e.target.closest('[data-action]');
+                if (!actionBtn) return;
+
+                const action = actionBtn.dataset.action;
+                contextMenu.style.display = 'none';
+
+                if (window.App && activeTrackerId) {
+                    if (action === 'edit') {
+                        // For edit, use the centralized modal loader with correct URL
+                        window.App.loadModal(`/modals/edit_tracker/?tracker_id=${activeTrackerId}`);
+                    } else {
+                        // For archive/delete, use the handler
+                        if (typeof window.App.handleTrackerAction === 'function') {
+                            window.App.handleTrackerAction(action, activeTrackerId);
+                        } else {
+                            console.error('App.handleTrackerAction not found');
+                        }
+                    }
+                }
+            });
+        }
+
+        console.log('[TrackerList] Context menu and filter/sort handlers initialized');
+    })();
+</script>

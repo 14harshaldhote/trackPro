@@ -11,6 +11,7 @@
     </div>
 
     <form id="add-goal-form" method="POST" data-ajax>
+        {% csrf_token %}
         <div class="modal-body">
             <!-- Goal Title -->
             <div class="form-group">
@@ -51,3 +52,81 @@
         </div>
     </form>
 </div>
+
+<script>
+    (function () {
+        const form = document.getElementById('add-goal-form');
+        const submitBtn = document.getElementById('create-goal-btn');
+
+        if (!form) {
+            console.warn('[AddGoalModal] Form not found');
+            return;
+        }
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const formData = new FormData(form);
+
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="loading-spinner" style="width:16px;height:16px;border-width:2px;"></span> Creating...';
+            }
+
+            try {
+                const data = {
+                    title: formData.get('title'),
+                    description: formData.get('description') || '',
+                    target_date: formData.get('target_date'),
+                    goal_type: formData.get('goal_type') || 'habit'
+                };
+
+                const csrfToken = formData.get('csrfmiddlewaretoken') ||
+                    document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                    (window.App ? window.App.getCsrfToken() : '');
+
+                const response = await fetch('/api/goals/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    if (window.App) {
+                        window.App.showToast('success', 'Goal Created', result.message || 'Your goal has been set!');
+                        window.App.closeModal();
+                        // Refresh goals panel if on goals page
+                        if (window.location.pathname.includes('goals')) {
+                            window.App.cache.panels.delete(window.location.pathname);
+                            window.App.loadPanel(window.location.pathname, false);
+                        }
+                    } else {
+                        alert('Goal created successfully!');
+                        window.location.reload();
+                    }
+                } else {
+                    throw new Error(result.error || 'Failed to create goal');
+                }
+            } catch (error) {
+                console.error('[AddGoalModal] Submit error:', error);
+                if (window.App) {
+                    window.App.showToast('error', 'Error', error.message);
+                } else {
+                    alert('Error: ' + error.message);
+                }
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Set Goal';
+                }
+            }
+        });
+
+        console.log('[AddGoalModal] Form handler initialized');
+    })();
+</script>

@@ -20,10 +20,11 @@ from core import analytics
 # ============================================================================
 
 @login_required
-def spa_shell(request):
+def spa_shell(request, **kwargs):
     """
     Main SPA entry point. Renders the shell with sidebar.
     All content is loaded via AJAX into the main area.
+    Accepts **kwargs to handle legacy routes that pass tracker_id, etc.
     """
     user_trackers = TrackerDefinition.objects.filter(user=request.user).order_by('name')
     
@@ -40,12 +41,35 @@ def spa_shell(request):
 
 @login_required
 def panel_dashboard(request):
-    """Dashboard panel with quick stats"""
+    """Dashboard panel with quick stats and filtering"""
     from datetime import datetime
+    import calendar
+    
     today = date.today()
     now = datetime.now()
     user_trackers = TrackerDefinition.objects.filter(user=request.user, status='active')
     
+    # Get filter period
+    period = request.GET.get('period', 'daily')
+    
+    # Determine date range based on period
+    start_date = today
+    end_date = today
+    period_title = "Today's Tasks"
+    
+    if period == 'weekly':
+        start_date = today - timedelta(days=today.weekday()) # Monday
+        end_date = start_date + timedelta(days=6) # Sunday
+        period_title = "This Week's Tasks"
+    elif period == 'monthly':
+        start_date = today.replace(day=1)
+        end_date = today.replace(day=calendar.monthrange(today.year, today.month)[1])
+        period_title = "This Month's Tasks"
+    elif period == 'all':
+        start_date = today - timedelta(days=365) # Sort of arbitrary "all" for performance
+        end_date = today + timedelta(days=365)
+        period_title = "All Active Tasks"
+
     # Determine time of day for greeting
     hour = now.hour
     if hour < 12:
@@ -55,73 +79,103 @@ def panel_dashboard(request):
     else:
         time_of_day = 'evening'
     
-    # Ensure instances exist for today
-    for tracker in user_trackers:
-        services.ensure_tracker_instance(tracker.tracker_id, today)
+    # Ensure instances exist for current period (at least today)
+    if period == 'daily':
+        for tracker in user_trackers:
+            services.ensure_tracker_instance(tracker.tracker_id, today)
     
-    # Get today's tasks across all trackers
-    today_tasks = []
-    completed_today = 0
-    pending_today = 0
+    # Get tasks across all trackers for the period
+    dashboard_tasks = []
+    completed_count = 0
+    pending_count = 0
     
     for tracker in user_trackers:
         try:
-            instance = TrackerInstance.objects.filter(
+            # Get instances overlapping the period
+            instances = TrackerInstance.objects.filter(
                 tracker=tracker,
-                period_start__lte=today,
-                period_end__gte=today
-            ).first()
+                period_start__lte=end_date,
+                period_end__gte=start_date
+            )
             
-            if instance:
+            for instance in instances:
                 tasks = TaskInstance.objects.filter(tracker_instance=instance).select_related('template')
+                
+                # Filter tasks if needed (e.g. for weekly view, check they fall in the week)
+                # But simplified: if tracker instance overlaps, include its tasks
+                
                 for task in tasks:
-                    today_tasks.append({
+                    # Deduplicate if necessary or just list all
+                    dashboard_tasks.append({
                         'id': task.task_instance_id,
                         'status': task.status,
                         'description': task.template.description,
                         'category': task.template.category,
                         'tracker_name': tracker.name,
+                        'weight': task.template.weight,
+                        'created_at': task.created_at
                     })
+                    
                     if task.status == 'DONE':
-                        completed_today += 1
+                        completed_count += 1
                     elif task.status in ['TODO', 'IN_PROGRESS']:
-                        pending_today += 1
+                        pending_count += 1
         except Exception:
             pass
+    
+    # Sort tasks: Weight desc, then creation
+    dashboard_tasks.sort(key=lambda x: (-x.get('weight', 0), x.get('created_at')))
     
     # Compute streak
     streak = analytics.compute_user_streak(request.user) if hasattr(analytics, 'compute_user_streak') else 0
     
     # Build stats object
-    total = completed_today + pending_today
-    completion_rate = int(completed_today / total * 100) if total > 0 else 0
+    total = completed_count + pending_count
+    completion_rate = int(completed_count / total * 100) if total > 0 else 0
     
     stats = {
-        'completed_today': completed_today,
-        'pending_today': pending_today,
+        'completed_today': completed_count, # Label might stay 'today' or be dynamic
+        'pending_today': pending_count,
         'current_streak': streak,
         'active_trackers': user_trackers.count(),
         'completion_rate': completion_rate,
     }
     
-    # Active trackers  - using model properties for progress/counts
+    # Active trackers - calculate stats based on current period filter
     active_trackers = []
-    for tracker in user_trackers[:6]:  # Limit to 6 for dashboard
+    for tracker in user_trackers[:6]:
+        # Get tracker instances for the period
+        tracker_instances = TrackerInstance.objects.filter(
+            tracker=tracker,
+            period_start__lte=end_date,
+            period_end__gte=start_date
+        )
+        
+        # Calculate period-specific stats
+        period_tasks = TaskInstance.objects.filter(
+            tracker_instance__in=tracker_instances
+        )
+        period_total = period_tasks.count()
+        period_completed = period_tasks.filter(status='DONE').count()
+        period_progress = int(period_completed / period_total * 100) if period_total > 0 else 0
+        
         active_trackers.append({
             'id': tracker.tracker_id,
             'name': tracker.name,
             'time_period': tracker.time_period,
-            'progress': tracker.progress,
-            'completed_count': tracker.completed_count,
-            'task_count': tracker.task_count,
+            'progress': period_progress,
+            'completed_count': period_completed,
+            'task_count': period_total,
         })
     
     context = {
         'time_of_day': time_of_day,
         'today': today,
         'stats': stats,
-        'today_tasks': today_tasks[:10],  # Limit for dashboard
+        'today_tasks': dashboard_tasks[:50], # Limit to avoid overload
         'active_trackers': active_trackers,
+        'current_period': period,
+        'period_title': period_title,
     }
     
     return render(request, 'panels/dashboard.html', context)
@@ -138,28 +192,72 @@ def panel_today(request):
         except:
             pass
     
-    user_trackers = TrackerDefinition.objects.filter(user=request.user)
+    user_trackers = TrackerDefinition.objects.filter(user=request.user).exclude(status='archived')
     
-    all_tasks = []
+    task_groups = []
+    total_count = 0
+    completed_count = 0
+    pending_count = 0
+    missed_count = 0
+    
     for tracker in user_trackers:
         instance = services.ensure_tracker_instance(tracker.tracker_id, today)
+        tasks = []
         if instance:
-            tasks = crud.get_instance_tasks(instance.instance_id)
-            for task in tasks:
-                task['tracker_name'] = tracker.name
-                task['tracker_id'] = tracker.tracker_id
-            all_tasks.extend(tasks)
-    
-    # Sort by time_of_day
-    time_order = {'morning': 0, 'afternoon': 1, 'evening': 2, 'anytime': 3}
-    all_tasks.sort(key=lambda t: time_order.get(t.get('time_of_day', 'anytime'), 3))
+            instance_id = instance.get('instance_id') if isinstance(instance, dict) else instance.instance_id
+            if instance_id:
+                # get_instance_tasks usually returns a list of dictionaries or model instances
+                # We need to standardize on what the template expects
+                raw_tasks = crud.get_instance_tasks(instance_id)
+                # Convert to list if queryset
+                if hasattr(raw_tasks, 'all'):
+                    raw_tasks = list(raw_tasks)
+                
+                # Filter/process tasks
+                for task in raw_tasks:
+                    # Handle both object and dict access
+                    status = getattr(task, 'status', None) or task.get('status') if isinstance(task, dict) else None
+                    if not status: continue
+                    
+                    tasks.append(task)
+                    
+                    # Update counts
+                    total_count += 1
+                    if status == 'DONE':
+                        completed_count += 1
+                    elif status in ['TODO', 'IN_PROGRESS']:
+                        pending_count += 1
+                    elif status in ['MISSED', 'SKIPPED', 'BLOCKED']:
+                        missed_count += 1
+
+        if tasks:
+            # Sort by time of day
+            time_order = {'morning': 0, 'afternoon': 1, 'evening': 2, 'anytime': 3}
+            tasks.sort(key=lambda t: time_order.get((getattr(t, 'template', None) and getattr(t.template, 'time_of_day', 'anytime')) if hasattr(t, 'template') else (t.get('time_of_day', 'anytime') if isinstance(t, dict) else 'anytime'), 3))
+            
+            group_completed = sum(1 for t in tasks if (getattr(t, 'status', '') == 'DONE' or (isinstance(t, dict) and t.get('status') == 'DONE')))
+            
+            task_groups.append({
+                'tracker': tracker,
+                'tasks': tasks,
+                'total': len(tasks),
+                'completed': group_completed
+            })
+            
+    progress = int(completed_count / total_count * 100) if total_count > 0 else 0
     
     context = {
         'today': today,
-        'tasks': all_tasks,
+        'task_groups': task_groups,
         'is_today': today == date.today(),
-        'prev_date': (today - timedelta(days=1)).isoformat(),
-        'next_date': (today + timedelta(days=1)).isoformat(),
+        'prev_day': today - timedelta(days=1),
+        'next_day': today + timedelta(days=1),
+        'total_count': total_count,
+        'completed_count': completed_count,
+        'pending_count': pending_count,
+        'missed_count': missed_count,
+        'progress': progress,
+        'day_note': '', # Placeholder until DayNote model is clarified or generic note is implemented
     }
     
     return render(request, 'panels/today.html', context)
@@ -168,44 +266,56 @@ def panel_today(request):
 @login_required
 def panel_trackers_list(request):
     """Trackers list panel with pagination and complete tracker data"""
-    PAGE_SIZE = 20
+    PAGE_SIZE = 6
     
     page = int(request.GET.get('page', 1))
     offset = (page - 1) * PAGE_SIZE
     
-    # Get all user trackers ordered by most recent activity
-    all_trackers = TrackerDefinition.objects.filter(user=request.user).order_by('-updated_at', 'name')
-    total_count = all_trackers.count()
+    # Get non-archived user trackers ordered by most recent activity
+    active_trackers_qs = TrackerDefinition.objects.filter(
+        user=request.user
+    ).exclude(status='archived').order_by('-updated_at', 'name')
     
-    # Paginate
-    paginated_trackers = all_trackers[offset:offset + PAGE_SIZE]
+    # Get archived trackers separately
+    archived_trackers_qs = TrackerDefinition.objects.filter(
+        user=request.user, status='archived'
+    ).order_by('-updated_at')
+    
+    total_count = active_trackers_qs.count()
+    
+    # Paginate active trackers only
+    paginated_trackers = active_trackers_qs[offset:offset + PAGE_SIZE]
     has_more = total_count > (offset + PAGE_SIZE)
     next_page = page + 1 if has_more else None
     
     # Build tracker data with stats
     trackers = []
     for tracker in paginated_trackers:
-        stats = analytics.compute_tracker_stats(tracker.tracker_id)
-        
-        # Calculate progress
-        done = stats.get('done_count', 0)
-        total = stats.get('total_count', 0)
-        progress = int(done / total * 100) if total else 0
-        
         trackers.append({
             'id': tracker.tracker_id,
             'tracker_id': tracker.tracker_id,
             'name': tracker.name,
             'description': tracker.description or '',
-            'time_period': tracker.time_mode,
-            'status': 'active' if tracker.is_active else 'paused',
-            'progress': progress,
-            'task_count': total,
+            'time_period': tracker.time_period,
+            'status': tracker.status,
+            'progress': tracker.progress,
+            'task_count': tracker.task_count,
+            'completed_count': tracker.completed_count,
             'updated_at': tracker.updated_at,
+        })
+    
+    # Build archived tracker data
+    archived_trackers = []
+    for tracker in archived_trackers_qs:
+        archived_trackers.append({
+            'id': tracker.tracker_id,
+            'name': tracker.name,
+            'time_period': tracker.time_period,
         })
     
     context = {
         'trackers': trackers,
+        'archived_trackers': archived_trackers,
         'total_count': total_count,
         'has_more': has_more,
         'next_page': next_page,
@@ -231,12 +341,12 @@ def panel_tracker_detail(request, tracker_id):
     # Ensure today's instance exists
     instance = services.ensure_tracker_instance(tracker_id, today, request.user)
     
-    # Get today's tasks
+    # Get today's tasks - order by template weight (higher weight = more important)
     today_tasks = TaskInstance.objects.filter(
         tracker_instance__tracker=tracker,
         tracker_instance__period_start__lte=today,
         tracker_instance__period_end__gte=today
-    ).select_related('template').order_by('order')
+    ).select_related('template').order_by('-template__weight', 'template__time_of_day', 'created_at')
     
     # Get historical tasks (last 30 days) with pagination
     thirty_days_ago = today - timedelta(days=30)
@@ -292,6 +402,15 @@ def panel_tracker_detail(request, tracker_id):
         'time_distribution': time_distribution,
         'today': today,
         'group_by': group_by,
+        # Variables used by template
+        'tasks': today_tasks,  # Alias for template iteration
+        'task_count': today_tasks.count(),
+        'completed_count': today_tasks.filter(status='DONE').count(),
+        'pending_count': today_tasks.exclude(status__in=['DONE', 'SKIPPED', 'MISSED', 'BLOCKED']).count(),
+        'skipped_count': today_tasks.filter(status__in=['SKIPPED', 'MISSED', 'BLOCKED']).count(),
+        'progress': int((today_tasks.filter(status='DONE').count() / today_tasks.count() * 100)) if today_tasks.count() > 0 else 0,
+        'has_more_tasks': page_obj.has_next() if hasattr(page_obj, 'has_next') else False,
+        'next_page': page_obj.next_page_number() if hasattr(page_obj, 'has_next') and page_obj.has_next() else None,
     }
     
     return render(request, 'panels/tracker_detail.html', context)
@@ -807,6 +926,8 @@ def panel_insights(request):
 @login_required
 def panel_settings(request, section='general'):
     """Settings panels"""
+    from .models import UserPreferences
+    
     template_map = {
         'general': 'settings/general.html',
         'preferences': 'settings/preferences.html',
@@ -817,9 +938,25 @@ def panel_settings(request, section='general'):
     
     template = template_map.get(section, 'settings/general.html')
     
+    # Get or create user preferences
+    prefs, created = UserPreferences.objects.get_or_create(user=request.user)
+    
+    # Define available themes
+    themes = [
+        {'id': 'working-hard', 'name': 'Working Hard', 'color': '#0277bd', 'bg': '#0c1929'},
+        {'id': 'forest-focus', 'name': 'Forest Focus', 'color': '#2e7d32', 'bg': '#0a1f0c'},
+        {'id': 'sunset-glow', 'name': 'Sunset Glow', 'color': '#e65100', 'bg': '#1f0c0a'},
+        {'id': 'ocean-calm', 'name': 'Ocean Calm', 'color': '#00838f', 'bg': '#0a1a1f'},
+        {'id': 'purple-haze', 'name': 'Purple Haze', 'color': '#6a1b9a', 'bg': '#150a1f'},
+        {'id': 'midnight-dark', 'name': 'Midnight Dark', 'color': '#424242', 'bg': '#121212'},
+        {'id': 'light-mode', 'name': 'Light Mode', 'color': '#1976d2', 'bg': '#ffffff'},
+    ]
+    
     context = {
         'user': request.user,
         'active': section,
+        'preferences': prefs,
+        'themes': themes,
     }
     
     return render(request, template, context)
@@ -854,6 +991,27 @@ def modal_view(request, modal_name):
     if modal_name == 'add_task':
         # Get user's trackers for the dropdown
         context['trackers'] = TrackerDefinition.objects.filter(user=request.user)
+    
+    elif modal_name == 'edit_task':
+        task_id = request.GET.get('task_id')
+        if task_id:
+            task = TaskInstance.objects.filter(
+                task_instance_id=task_id,
+                tracker_instance__tracker__user=request.user
+            ).select_related('template', 'tracker_instance__tracker').first()
+            if task:
+                context['task'] = task
+                context['trackers'] = TrackerDefinition.objects.filter(user=request.user)
+    
+    elif modal_name == 'edit_tracker':
+        tracker_id = request.GET.get('tracker_id')
+        if tracker_id:
+            tracker = TrackerDefinition.objects.filter(
+                tracker_id=tracker_id,
+                user=request.user
+            ).first()
+            if tracker:
+                context['tracker'] = tracker
         
     return render(request, template_name, context)
 

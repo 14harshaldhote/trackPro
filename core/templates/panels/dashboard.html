@@ -8,7 +8,7 @@
         </div>
         <div class="panel-actions">
             <button class="btn btn-primary" data-action="open-modal" data-modal="add-tracker"
-                data-modal-url="/modals/add_tracker/">
+                data-modal-url="{% url 'modal_view' 'add_tracker' %}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -16,6 +16,12 @@
                 New Tracker
             </button>
         </div>
+    </div>
+
+    <!-- Period Filter Toolbar (GLOBAL - at top) -->
+    <div class="panel-toolbar" id="dashboard-filters">
+
+        <a href="{% url 'panel_trackers' %}" class="btn btn-ghost btn-sm" data-nav>View All Trackers</a>
     </div>
 
     <!-- Stats Grid -->
@@ -90,8 +96,8 @@
     <!-- Today's Tasks Section -->
     <section class="dashboard-section">
         <div class="section-header">
-            <h2 class="section-title">Today's Tasks</h2>
-            <a href="/today/" class="btn btn-ghost btn-sm" data-nav>View All</a>
+            <h2 class="section-title">{{ period_title|default:"Today's Tasks" }}</h2>
+            <a href="{% url 'today_view' %}" class="btn btn-ghost btn-sm" data-nav>View All</a>
         </div>
 
         {% if today_tasks %}
@@ -113,11 +119,20 @@
                     <span class="task-tracker">{{ task.tracker_name }}</span>
                 </div>
                 <div class="task-actions">
-                    <button class="btn btn-icon btn-sm" data-action="edit" title="Edit">
+                    <button class="btn btn-icon btn-sm" data-action="open-modal" data-modal="edit-task"
+                        data-modal-url="{% url 'modal_view' 'edit_task' %}?task_id={{ task.id }}" title="Edit">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="btn btn-icon btn-sm text-danger" data-action="delete-task" title="Delete">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                            </path>
                         </svg>
                     </button>
                 </div>
@@ -127,7 +142,7 @@
         {% else %}
         <div class="empty-state-sm">
             <p>No tasks for today. <a href="#" data-action="open-modal" data-modal="add-task"
-                    data-modal-url="/modals/add_task/">Add one?</a></p>
+                    data-modal-url="{% url 'modal_view' 'add_task' %}">Add one?</a></p>
         </div>
         {% endif %}
     </section>
@@ -136,12 +151,12 @@
     <section class="dashboard-section">
         <div class="section-header">
             <h2 class="section-title">Active Trackers</h2>
-            <a href="/trackers/" class="btn btn-ghost btn-sm" data-nav>View All</a>
         </div>
 
-        <div class="trackers-grid">
+        <div class="trackers-grid" id="dashboard-trackers">
             {% for tracker in active_trackers %}
-            <a href="/tracker/{{ tracker.id }}/" class="tracker-card" data-nav>
+            <a href="{% url 'tracker_detail' tracker.id %}" class="tracker-card" data-nav
+                data-period="{{ tracker.time_period }}">
                 <div class="tracker-card-header">
                     <span class="tracker-name">{{ tracker.name }}</span>
                     <span class="tracker-period">{{ tracker.time_period }}</span>
@@ -159,7 +174,7 @@
             {% empty %}
             <div class="empty-state-sm" style="grid-column: 1/-1;">
                 <p>No active trackers. <a href="#" data-action="open-modal" data-modal="add-tracker"
-                        data-modal-url="/modals/add_tracker/">Create one?</a></p>
+                        data-modal-url="{% url 'modal_view' 'add_tracker' %}">Create one?</a></p>
             </div>
             {% endfor %}
         </div>
@@ -172,7 +187,7 @@
         </div>
         <div class="quick-actions">
             <button class="quick-action" data-action="open-modal" data-modal="add-tracker"
-                data-modal-url="/modals/add_tracker/">
+                data-modal-url="{% url 'modal_view' 'add_tracker' %}">
                 <div class="quick-action-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -184,7 +199,7 @@
                 <span>New Tracker</span>
             </button>
             <button class="quick-action" data-action="open-modal" data-modal="add-task"
-                data-modal-url="/modals/add_task/">
+                data-modal-url="{% url 'modal_view' 'add_task' %}">
                 <div class="quick-action-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -194,7 +209,7 @@
                 <span>Add Task</span>
             </button>
             <button class="quick-action" data-action="open-modal" data-modal="add-goal"
-                data-modal-url="/modals/add_goal/">
+                data-modal-url="{% url 'modal_view' 'add_goal' %}">
                 <div class="quick-action-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -205,7 +220,7 @@
                 </div>
                 <span>Set Goal</span>
             </button>
-            <a href="/analytics/" class="quick-action" data-nav>
+            <a href="{% url 'analytics_dashboard' %}" class="quick-action" data-nav>
                 <div class="quick-action-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -218,3 +233,34 @@
         </div>
     </section>
 </div>
+
+<script>
+    // Dashboard filter initialization
+    (function initDashboardFilters() {
+        'use strict';
+
+        const filterGroup = document.getElementById('period-filter-group');
+        if (!filterGroup) return;
+
+        // Get App reference - check multiple locations
+        const getApp = () => window.App || (window.parent && window.parent.App) || null;
+
+        // Bind click handlers to filter buttons
+        filterGroup.querySelectorAll('.btn').forEach(btn => {
+            btn.onclick = function (e) {
+                e.preventDefault();
+                const filter = this.dataset.dashboardFilter;
+                console.log('[Dashboard] Switching to filter:', filter);
+
+                const App = getApp();
+                if (App && App.loadPanel) {
+                    App.loadPanel(`$/{filter}`);
+                } else {
+                    // Fallback: use regular navigation
+                    console.warn('[Dashboard] App not found, using regular navigation');
+                    window.location.href = `/${filter}`;
+                }
+            };
+        });
+    })();
+</script>

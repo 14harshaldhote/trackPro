@@ -1,5 +1,5 @@
 <!-- Tracker Detail Panel -->
-<div class="panel tracker-detail-panel fade-in" data-tracker-id="{{ tracker.id }}">
+<div class="panel tracker-detail-panel fade-in" data-tracker-id="{{ tracker.tracker_id }}">
     <!-- Header -->
     <div class="panel-header">
         <div>
@@ -17,7 +17,7 @@
         </div>
         <div class="panel-actions">
             <button class="btn btn-ghost" data-action="open-modal"
-                data-modal-url="/modal/tracker/{{ tracker.id }}/edit/">
+                data-modal-url="/modals/edit_tracker/?tracker_id={{ tracker.tracker_id }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"></circle>
                     <path
@@ -25,6 +25,22 @@
                     </path>
                 </svg>
                 Settings
+            </button>
+            <button class="btn btn-ghost" onclick="App.handleTrackerAction('archive', '{{ tracker.tracker_id }}')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                    <rect x="1" y="3" width="22" height="5"></rect>
+                    <line x1="10" y1="12" x2="14" y2="12"></line>
+                </svg>
+                Archive
+            </button>
+            <button class="btn btn-ghost text-danger"
+                onclick="App.handleTrackerAction('delete', '{{ tracker.tracker_id }}')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Delete
             </button>
             <button class="btn btn-primary" data-action="open-modal" data-modal="add-task">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -100,6 +116,9 @@
                 <button class="filter-tab active" data-filter="all">All ({{ task_count }})</button>
                 <button class="filter-tab" data-filter="pending">Pending ({{ pending_count }})</button>
                 <button class="filter-tab" data-filter="done">Done ({{ completed_count }})</button>
+                {% if skipped_count > 0 %}
+                <button class="filter-tab" data-filter="skipped">Skipped ({{ skipped_count }})</button>
+                {% endif %}
             </div>
         </div>
         <div class="toolbar-right">
@@ -117,10 +136,10 @@
     </div>
 
     <!-- Task List -->
-    <div class="task-list sortable" id="task-list" data-tracker-id="{{ tracker.id }}">
+    <div class="task-list sortable" id="task-list" data-tracker-id="{{ tracker.tracker_id }}">
         {% for task in tasks %}
-        <div class="task-row" data-task-id="{{ task.id }}" data-status="{{ task.status }}"
-            data-category="{{ task.category|default:'uncategorized' }}" draggable="true">
+        <div class="task-row" data-task-id="{{ task.task_instance_id }}" data-status="{{ task.status }}"
+            data-category="{{ task.template.category|default:'uncategorized' }}" draggable="true">
 
             <!-- Drag Handle -->
             <div class="drag-handle" title="Drag to reorder">
@@ -136,7 +155,7 @@
 
             <!-- Selection Checkbox -->
             <label class="task-checkbox">
-                <input type="checkbox" class="bulk-select" data-task-id="{{ task.id }}">
+                <input type="checkbox" class="bulk-select" data-task-id="{{ task.task_instance_id }}">
             </label>
 
             <!-- Status Toggle -->
@@ -147,22 +166,22 @@
             <!-- Task Content -->
             <div class="task-content">
                 <span class="task-description {% if task.status == 'DONE' %}completed{% endif %}">
-                    {{ task.description }}
+                    {{ task.template.description }}
                 </span>
                 <div class="task-tags">
-                    {% if task.category %}
-                    <span class="task-tag">{{ task.category }}</span>
+                    {% if task.template.category %}
+                    <span class="task-tag">{{ task.template.category }}</span>
                     {% endif %}
-                    {% if task.weight > 1 %}
-                    <span class="task-tag task-weight">×{{ task.weight }}</span>
+                    {% if task.template.weight > 1 %}
+                    <span class="task-tag task-weight">×{{ task.template.weight }}</span>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Task Meta -->
             <div class="task-meta">
-                {% if task.time_of_day %}
-                <span class="task-time">{{ task.time_of_day }}</span>
+                {% if task.template.time_of_day and task.template.time_of_day != 'anytime' %}
+                <span class="task-time">{{ task.template.time_of_day }}</span>
                 {% endif %}
             </div>
 
@@ -253,3 +272,194 @@
         Delete
     </button>
 </div>
+
+<script>
+    (function () {
+        const container = document.querySelector('.tracker-detail-panel');
+        if (!container) return;
+
+        // ===== SELECT ALL & BULK SELECTION =====
+        const selectAllCheckbox = container.querySelector('#select-all');
+        const bulkToolbar = container.querySelector('#bulk-toolbar');
+        const bulkCountEl = container.querySelector('#bulk-count');
+        const bulkCancelBtn = container.querySelector('#bulk-cancel');
+
+        function updateBulkToolbar() {
+            const selected = container.querySelectorAll('.bulk-select:checked');
+            const count = selected.length;
+
+            if (count > 0) {
+                bulkToolbar.style.display = 'flex';
+                bulkCountEl.textContent = count;
+            } else {
+                bulkToolbar.style.display = 'none';
+            }
+
+            // Update select all checkbox state
+            const allCheckboxes = container.querySelectorAll('.bulk-select');
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = count > 0 && count === allCheckboxes.length;
+                selectAllCheckbox.indeterminate = count > 0 && count < allCheckboxes.length;
+            }
+        }
+
+        // Select All handler
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function () {
+                const checkboxes = container.querySelectorAll('.bulk-select');
+                checkboxes.forEach(cb => cb.checked = this.checked);
+                updateBulkToolbar();
+            });
+        }
+
+        // Individual checkbox handlers
+        container.addEventListener('change', function (e) {
+            if (e.target.classList.contains('bulk-select')) {
+                updateBulkToolbar();
+            }
+        });
+
+        // Cancel bulk selection
+        if (bulkCancelBtn) {
+            bulkCancelBtn.addEventListener('click', function () {
+                container.querySelectorAll('.bulk-select').forEach(cb => cb.checked = false);
+                if (selectAllCheckbox) selectAllCheckbox.checked = false;
+                updateBulkToolbar();
+            });
+        }
+
+        // ===== FILTER TABS =====
+        const filterTabs = container.querySelectorAll('.filter-tab');
+        filterTabs.forEach(tab => {
+            tab.addEventListener('click', function () {
+                filterTabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+
+                const filter = this.dataset.filter;
+                const taskRows = container.querySelectorAll('.task-row');
+
+                taskRows.forEach(row => {
+                    const status = row.dataset.status?.toUpperCase();
+                    if (filter === 'all') {
+                        row.style.display = '';
+                    } else if (filter === 'pending') {
+                        row.style.display = (status === 'TODO' || status === 'IN_PROGRESS') ? '' : 'none';
+                    } else if (filter === 'done') {
+                        row.style.display = (status === 'DONE') ? '' : 'none';
+                    } else if (filter === 'skipped') {
+                        row.style.display = (status === 'SKIPPED' || status === 'MISSED' || status === 'BLOCKED') ? '' : 'none';
+                    }
+                });
+            });
+        });
+
+        // ===== DROPDOWN TOGGLE =====
+        container.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+            toggle.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const dropdown = this.closest('.dropdown');
+                const isOpen = dropdown.classList.contains('open');
+
+                container.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
+
+                if (!isOpen) {
+                    dropdown.classList.add('open');
+                }
+            });
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.dropdown')) {
+                container.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
+            }
+        });
+
+        // ===== EDIT BUTTON HANDLER =====
+        container.addEventListener('click', function (e) {
+            const editBtn = e.target.closest('[data-action="edit"]');
+            if (editBtn && !e.target.closest('.context-menu')) {
+                e.preventDefault();
+                const taskRow = editBtn.closest('.task-row');
+                if (taskRow && window.App) {
+                    const taskId = taskRow.dataset.taskId;
+                    window.App.loadModal(`/modals/edit_task/?task_id=${taskId}`);
+                }
+            }
+        });
+
+        // ===== CONTEXT MENU LOGIC =====
+        const contextMenu = document.getElementById('task-context-menu');
+        let activeTaskId = null;
+
+        if (contextMenu) {
+            document.addEventListener('click', (e) => {
+                if (!contextMenu.contains(e.target) && !e.target.closest('[data-action="context-menu"]')) {
+                    contextMenu.style.display = 'none';
+                }
+            });
+
+            container.addEventListener('click', (e) => {
+                const trigger = e.target.closest('[data-action="context-menu"]');
+                if (trigger) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const taskRow = trigger.closest('.task-row');
+                    activeTaskId = taskRow.dataset.taskId;
+
+                    const rect = trigger.getBoundingClientRect();
+                    contextMenu.style.display = 'block';
+                    contextMenu.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+                    contextMenu.style.left = (rect.right - contextMenu.offsetWidth) + 'px';
+                }
+            });
+
+            contextMenu.addEventListener('click', (e) => {
+                const actionBtn = e.target.closest('[data-action]');
+                if (!actionBtn) return;
+
+                const action = actionBtn.dataset.action;
+                contextMenu.style.display = 'none';
+
+                if (window.App && activeTaskId) {
+                    if (action === 'edit') {
+                        window.App.loadModal(`/modals/edit_task/?task_id=${activeTaskId}`);
+                    } else if (action === 'delete') {
+                        window.App.handleTaskAction('delete', activeTaskId);
+                    } else if (action === 'complete') {
+                        fetch(`/api/task/${activeTaskId}/status/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': window.App.getCsrfToken()
+                            },
+                            body: JSON.stringify({ status: 'DONE' })
+                        }).then(r => r.json()).then(data => {
+                            if (data.success) {
+                                window.App.showToast('success', 'Task Completed');
+                                window.App.loadPanel(window.location.pathname, false);
+                            }
+                        });
+                    } else if (action === 'skip') {
+                        fetch(`/api/task/${activeTaskId}/status/`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': window.App.getCsrfToken()
+                            },
+                            body: JSON.stringify({ status: 'SKIPPED' })
+                        }).then(r => r.json()).then(data => {
+                            if (data.success) {
+                                window.App.showToast('info', 'Task Skipped');
+                                window.App.loadPanel(window.location.pathname, false);
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        console.log('[TrackerDetail] All handlers initialized');
+    })();
+</script>

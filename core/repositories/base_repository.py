@@ -202,7 +202,20 @@ def get_task_instances_for_tracker_instance(instance_id):
         tasks = TaskInstance.objects.filter(
             tracker_instance_id=instance_id
         ).select_related('template').order_by('template__description')
-        return [model_to_dict(t) for t in tasks]
+        
+        result = []
+        for task in tasks:
+            task_dict = model_to_dict(task)
+            # Include template fields at top level for convenience
+            if task.template:
+                task_dict['description'] = task.template.description
+                task_dict['category'] = task.template.category
+                task_dict['weight'] = task.template.weight
+                task_dict['time_of_day'] = task.template.time_of_day
+                task_dict['is_recurring'] = task.template.is_recurring
+            result.append(task_dict)
+        
+        return result
     except Exception as e:
         logger.error(f"Error fetching task instances: {e}")
         return []
@@ -550,3 +563,7 @@ def update_task_instance(task_instance_id, updates):
     except Exception as e:
         logger.error(f"Error updating task instance: {e}")
         raise
+
+
+# Alias for backward compatibility and shorter name
+get_instance_tasks = get_task_instances_for_tracker_instance
