@@ -3,9 +3,13 @@ Helper functions for multi-user authentication.
 
 Provides utilities to ensure users can only access their own data.
 """
+import logging
 from django.shortcuts import get_object_or_404
+from django.http import Http404
 from django.core.exceptions import PermissionDenied
 from core.models import TrackerDefinition
+
+logger = logging.getLogger(__name__)
 
 
 def get_user_tracker_or_404(tracker_id, user):
@@ -29,20 +33,29 @@ def check_tracker_permission(tracker_id, user):
     """
     Check if user has permission to access a tracker.
     
+    Security: Uses 404 for both "not found" and "not authorized" to prevent
+    leaking information about tracker existence.
+    
     Args:
         tracker_id: Tracker ID
         user: User object (request.user)
         
     Raises:
-        PermissionDenied: If user doesn't own the tracker
+        Http404: If user doesn't own the tracker OR tracker doesn't exist
     """
     tracker = TrackerDefinition.objects.filter(tracker_id=tracker_id).first()
     
     if not tracker:
-        raise PermissionDenied("Tracker not found")
+        raise Http404("Tracker not found")
     
     if tracker.user != user:
-        raise PermissionDenied("You don't have permission to access this tracker")
+        # Log for security monitoring (but don't reveal in response)
+        logger.warning(
+            f"Permission denied: user {user.id} attempted to access tracker {tracker_id} "
+            f"owned by user {tracker.user_id}"
+        )
+        # Use 404 to avoid leaking tracker existence
+        raise Http404("Tracker not found")
 
 
 def get_user_trackers(user):

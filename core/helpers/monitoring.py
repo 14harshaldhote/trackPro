@@ -177,18 +177,21 @@ def log_slow_queries(threshold_ms: float = 100):
 
 
 # Metrics collection
+import threading
+
 class MetricsCollector:
     """
-    Simple in-memory metrics collector.
-    Stores recent performance data for analysis.
+    Thread-safe in-memory metrics collector.
+    Uses locking for safe access in WSGI multi-threaded environments.
     """
     
     _metrics = []
     _max_size = 1000
+    _lock = threading.Lock()
     
     @classmethod
     def record(cls, metric_type: str, value: float, metadata: dict = None):
-        """Record a metric"""
+        """Record a metric (thread-safe)"""
         entry = {
             'type': metric_type,
             'value': value,
@@ -196,19 +199,21 @@ class MetricsCollector:
             'metadata': metadata or {}
         }
         
-        cls._metrics.append(entry)
-        
-        # Keep only recent metrics
-        if len(cls._metrics) > cls._max_size:
-            cls._metrics = cls._metrics[-cls._max_size:]
+        with cls._lock:
+            cls._metrics.append(entry)
+            
+            # Keep only recent metrics
+            if len(cls._metrics) > cls._max_size:
+                cls._metrics = cls._metrics[-cls._max_size:]
     
     @classmethod
     def get_stats(cls, metric_type: str = None) -> dict:
-        """Get statistics for a metric type"""
-        if metric_type:
-            values = [m['value'] for m in cls._metrics if m['type'] == metric_type]
-        else:
-            values = [m['value'] for m in cls._metrics]
+        """Get statistics for a metric type (thread-safe)"""
+        with cls._lock:
+            if metric_type:
+                values = [m['value'] for m in cls._metrics if m['type'] == metric_type]
+            else:
+                values = [m['value'] for m in cls._metrics]
         
         if not values:
             return {'count': 0}
@@ -224,5 +229,6 @@ class MetricsCollector:
     
     @classmethod
     def clear(cls):
-        """Clear all metrics"""
-        cls._metrics = []
+        """Clear all metrics (thread-safe)"""
+        with cls._lock:
+            cls._metrics = []

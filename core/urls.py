@@ -1,7 +1,8 @@
-from django.urls import path
+from django.urls import path, include
 from . import views_auth
 from . import views_api
 from . import views_spa
+from . import urls_api_v1
 
 urlpatterns = [
     # =========================================================================
@@ -94,6 +95,9 @@ urlpatterns = [
     path('api/tasks/infinite/', views_api.api_tasks_infinite, name='api_tasks_infinite'),
     path('api/suggestions/', views_api.api_smart_suggestions, name='api_smart_suggestions'),
     path('api/sync/', views_api.api_sync, name='api_sync'),
+    
+    # Health Check (no auth required)
+    path('api/health/', views_api.api_health, name='api_health'),
 
     
     # =========================================================================
@@ -110,5 +114,10 @@ urlpatterns = [
     path('signup/', views_auth.signup_page, name='account_signup'),
     path('forgot-password/', views_auth.forgot_password, name='forgot_password'),
     path('logout/', views_auth.api_logout, name='logout'),
+    
+    # =========================================================================
+    # VERSIONED API (for iOS backward compatibility)
+    # =========================================================================
+    path('api/v1/', include((urls_api_v1.urlpatterns, 'api_v1'), namespace='api_v1')),
 ]
 

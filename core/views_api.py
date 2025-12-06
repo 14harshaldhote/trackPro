@@ -1355,3 +1355,64 @@ def api_sync(request):
             'error': str(e),
             'retry_after': 5  # Seconds to wait before retry
         }, status=500)
+
+
+# ============================================================================
+# HEALTH CHECK ENDPOINT (Load Balancer Integration)
+# ============================================================================
+
+@require_GET
+def api_health(request):
+    """
+    Health check endpoint for load balancers and monitoring.
+    
+    GET /api/health/
+    
+    Returns 200 if healthy, 503 if unhealthy.
+    Does not require authentication.
+    """
+    from django.db import connection
+    from django.conf import settings
+    import time
+    
+    health_status = {
+        'status': 'healthy',
+        'timestamp': timezone.now().isoformat(),
+        'version': getattr(settings, 'APP_VERSION', '1.0.0'),
+        'checks': {}
+    }
+    
+    # Database check
+    db_start = time.time()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+        health_status['checks']['database'] = {
+            'status': 'ok',
+            'latency_ms': round((time.time() - db_start) * 1000, 2)
+        }
+    except Exception as e:
+        health_status['status'] = 'unhealthy'
+        health_status['checks']['database'] = {
+            'status': 'error',
+            'error': str(e)
+        }
+    
+    # Cache check (optional, if enabled)
+    try:
+        from django.core.cache import cache
+        cache_start = time.time()
+        cache.set('health_check', 'ok', 10)
+        cache_result = cache.get('health_check')
+        if cache_result == 'ok':
+            health_status['checks']['cache'] = {
+                'status': 'ok',
+                'latency_ms': round((time.time() - cache_start) * 1000, 2)
+            }
+        else:
+            health_status['checks']['cache'] = {'status': 'degraded'}
+    except Exception:
+        health_status['checks']['cache'] = {'status': 'unavailable'}
+    
+    status_code = 200 if health_status['status'] == 'healthy' else 503
+    return JsonResponse(health_status, status=status_code)

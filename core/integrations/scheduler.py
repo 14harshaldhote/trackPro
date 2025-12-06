@@ -10,6 +10,8 @@ Handles periodic background tasks using APScheduler:
 Author: Tracker Pro Team 
 """
 from apscheduler.schedulers.background import BackgroundScheduler
+from django.core.cache import cache
+from functools import wraps
 import atexit
 import logging
 from datetime import datetime
@@ -21,6 +23,48 @@ from core.integrations import integrity
 logger = logging.getLogger(__name__)
 
 
+# ============================================================================
+# JOB LOCKING
+# ============================================================================
+
+def with_lock(lock_name: str, lock_timeout: int = 3600):
+    """
+    Decorator to prevent duplicate job execution using cache-based locking.
+    
+    Args:
+        lock_name: Unique name for the lock
+        lock_timeout: Lock timeout in seconds (default: 1 hour)
+        
+    This prevents the same job from running concurrently in multi-process
+    deployments (e.g., gunicorn with multiple workers).
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            lock_key = f"scheduler_lock:{lock_name}"
+            
+            # Try to acquire lock
+            acquired = cache.add(lock_key, "locked", lock_timeout)
+            
+            if not acquired:
+                logger.warning(f"Job '{lock_name}' is already running, skipping...")
+                return None
+            
+            try:
+                return func(*args, **kwargs)
+            finally:
+                # Release lock
+                cache.delete(lock_key)
+        
+        return wrapper
+    return decorator
+
+
+# ============================================================================
+# SCHEDULED JOBS
+# ============================================================================
+
+@with_lock('nightly_analytics', lock_timeout=7200)  # 2 hour lock
 def precompute_analytics():
     """
     Nightly job to precompute analytics for all trackers.
@@ -39,7 +83,7 @@ def precompute_analytics():
     logger.info("🌙 Starting nightly analytics precomputation...")
     start_time = datetime.now()
     
-    trackers = TrackerDefinition.objects.all()
+    trackers = TrackerDefinition.objects.filter(deleted_at__isnull=True)
     success_count = 0
     error_count = 0
     
@@ -54,7 +98,6 @@ def precompute_analytics():
             analytics.compute_balance_score(tracker_id)
             analytics.compute_effort_index(tracker_id)
             analytics.analyze_notes_sentiment(tracker_id)
-            analytics.analyze_trends(tracker_id)
             
             # Generate insights
             get_insights(tracker_id)
@@ -72,6 +115,19 @@ def precompute_analytics():
     )
 
 
+@with_lock('hourly_tracker_check', lock_timeout=3600)
+def check_trackers_locked():
+    """Wrapper to add locking to instance checks."""
+    return instance_service.check_all_trackers()
+
+
+@with_lock('integrity_check', lock_timeout=3600)
+def run_integrity_locked():
+    """Wrapper to add locking to integrity checks."""
+    svc = integrity.IntegrityService()
+    return svc.run_integrity_check()
+
+
 def start_scheduler():
     """
     Start the background scheduler for automated tasks.
@@ -83,39 +139,42 @@ def start_scheduler():
     """
     scheduler = BackgroundScheduler()
     
-    # Run check_all_trackers every hour
+    # Run check_all_trackers every hour with locking
     scheduler.add_job(
-        instance_service.check_all_trackers, 
+        check_trackers_locked, 
         'interval', 
         minutes=60, 
         id='check_trackers_hourly', 
-        replace_existing=True
+        replace_existing=True,
+        misfire_grace_time=600  # 10 min grace period
     )
 
-    # Run integrity check every 24 hours (midnight)
-    integrity_svc = integrity.IntegrityService()
+    # Run integrity check every 24 hours (midnight) with locking
     scheduler.add_job(
-        integrity_svc.run_integrity_check, 
+        run_integrity_locked, 
         'cron', 
         hour=0, 
         minute=0, 
         id='integrity_check_daily', 
-        replace_existing=True
+        replace_existing=True,
+        misfire_grace_time=3600  # 1 hour grace period
     )
     
-    # Run nightly analytics precomputation at 2 AM
+    # Run nightly analytics precomputation at 2 AM with locking
     scheduler.add_job(
         precompute_analytics,
         'cron',
         hour=2,
         minute=0,
         id='nightly_analytics_precompute',
-        replace_existing=True
+        replace_existing=True,
+        misfire_grace_time=3600  # 1 hour grace period
     )
     
     scheduler.start()
-    logger.info("⏰ Scheduler started with 3 jobs: hourly checks, nightly integrity, nightly analytics")
+    logger.info("⏰ Scheduler started with 3 locked jobs: hourly checks, nightly integrity, nightly analytics")
     print("⏰ Scheduler started!")
     
     atexit.register(lambda: scheduler.shutdown())
+
 

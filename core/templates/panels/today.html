@@ -119,10 +119,11 @@
         {% endfor %}
     </div>
 
-    <!-- Day Note -->
+    <!-- Day Note with Sync Status -->
     <div class="day-note-section">
         <div class="section-header">
             <h3 class="section-title">Day Note</h3>
+            <span id="note-sync-status" class="sync-status" style="font-size:0.85rem;color:var(--text-muted);"></span>
         </div>
         <textarea id="day-note" class="form-textarea" placeholder="Add a note about your day..." rows="3"
             data-date="{{ today|date:'Y-m-d' }}">{{ day_note }}</textarea>
@@ -313,15 +314,57 @@
             });
         }
 
-        // Handle Day Note saving
+        // Handle Day Note saving with API v1
         const saveNoteBtn = document.getElementById('save-note');
         const noteTextarea = document.getElementById('day-note');
+        const syncStatus = document.getElementById('note-sync-status');
 
         if (saveNoteBtn && noteTextarea) {
-            saveNoteBtn.addEventListener('click', () => {
-                // Since API implementation for global day note is pending, we'll confirm action for now
-                if (window.App) {
-                    window.App.showToast('success', 'Note saved (Placeholder)');
+            saveNoteBtn.addEventListener('click', async () => {
+                const noteDate = noteTextarea.dataset.date;
+                const noteContent = noteTextarea.value.trim();
+
+                // Show saving status
+                if (syncStatus) {
+                    syncStatus.textContent = '💾 Saving...';
+                }
+                saveNoteBtn.disabled = true;
+
+                try {
+                    // Use new API client with automatic request ID
+                    await window.api.post('/day-notes/', {
+                        date: noteDate,
+                        content: noteContent
+                    });
+
+                    // Success
+                    if (syncStatus) {
+                        syncStatus.textContent = '✓ Saved';
+                        syncStatus.style.color = 'var(--success)';
+                        setTimeout(() => {
+                            syncStatus.textContent = '';
+                        }, 3000);
+                    }
+
+                    if (window.App && window.App.showToast) {
+                        window.App.showToast('success', 'Note saved');
+                    }
+                } catch (error) {
+                    // Error handling
+                    console.error('[TodayPanel] Failed to save note:', error);
+
+                    if (syncStatus) {
+                        syncStatus.textContent = '✗ Failed to save';
+                        syncStatus.style.color = 'var(--danger)';
+                    }
+
+                    if (error.showToast) {
+                        error.showToast();
+                    } else if (window.App && window.App.showToast) {
+                        window.App.showToast('error', 'Failed to save note');
+                    }
+                } finally {
+                    saveNoteBtn.disabled = false;
                 }
             });
         }

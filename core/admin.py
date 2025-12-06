@@ -4,20 +4,33 @@ from core.models import TrackerDefinition, TaskTemplate, TrackerInstance, TaskIn
 
 @admin.register(TrackerDefinition)
 class TrackerDefinitionAdmin(admin.ModelAdmin):
-    list_display = ['name', 'time_mode', 'created_at']
-    list_filter = ['time_mode', 'created_at']
+    list_display = ['name', 'user', 'time_mode', 'created_at']
+    list_filter = ['time_mode', 'created_at', 'user']
     search_fields = ['name', 'description']
     readonly_fields = ['tracker_id', 'created_at', 'updated_at']
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('tracker_id', 'name', 'description', 'time_mode')
+            'fields': ('tracker_id', 'user', 'name', 'description', 'time_mode')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
+    
+    def get_queryset(self, request):
+        """Filter to show only user's own trackers (unless superuser)"""
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(user=request.user)
+    
+    def save_model(self, request, obj, form, change):
+        """Auto-assign user on create if not set"""
+        if not change and not obj.user_id:
+            obj.user = request.user
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(TaskTemplate)

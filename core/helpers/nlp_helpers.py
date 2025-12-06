@@ -73,16 +73,47 @@ def compute_sentiment(text: str) -> Dict[str, float]:
             'neu': float (0 to 1, neutral),
             'neg': float (0 to 1, negative)
         }
-    """
-    _ensure_nltk()
-    from nltk.sentiment.vader import SentimentIntensityAnalyzer
     
-    if not text:
+    Falls back to neutral sentiment if NLTK unavailable.
+    Results are cached for 1 hour.
+    """
+    if not text or not text.strip():
         return {'compound': 0.0, 'pos': 0.0, 'neu': 1.0, 'neg': 0.0}
     
-    sia = SentimentIntensityAnalyzer()
-    scores = sia.polarity_scores(text)
-    return scores
+    # Check cache first
+    from django.core.cache import cache
+    import hashlib
+    
+    text_hash = hashlib.md5(text.encode()).hexdigest()[:16]
+    cache_key = f"sentiment:{text_hash}"
+    
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+    
+    # Try NLTK VADER
+    try:
+        _ensure_nltk()
+        from nltk.sentiment.vader import SentimentIntensityAnalyzer
+        
+        sia = SentimentIntensityAnalyzer()
+        scores = sia.polarity_scores(text)
+        
+        # Cache for 1 hour
+        cache.set(cache_key, scores, 3600)
+        return scores
+        
+    except Exception as e:
+        # Fallback: return neutral sentiment
+        logger.warning(f"NLTK sentiment analysis failed: {e}, returning neutral")
+        neutral = {'compound': 0.0, 'pos': 0.0, 'neu': 1.0, 'neg': 0.0}
+        return neutral
+
+
+# Alias for backwards compatibility
+def analyze_sentiment(text: str) -> Dict[str, float]:
+    """Alias for compute_sentiment for backwards compatibility."""
+    return compute_sentiment(text)
 
 def extract_keywords(text: str, top_n: int = 10) -> List[Tuple[str, int]]:
     """

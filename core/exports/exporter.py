@@ -1,12 +1,89 @@
 """
 Data export and reporting module.
 Generates professional reports using XlsxWriter and multi-format exports using tablib.
+
+Includes streaming support for large datasets to avoid memory issues.
 """
 import os
+import csv
+from io import StringIO
 from datetime import datetime, date
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Iterator, Generator
 import pandas as pd
 import numpy as np
+
+
+# ============================================================================
+# STREAMING EXPORT (Memory-efficient for large datasets)
+# ============================================================================
+
+class StreamingCSVExporter:
+    """
+    Memory-efficient CSV exporter using generator-based streaming.
+    
+    Usage:
+        exporter = StreamingCSVExporter(['Date', 'Task', 'Status'])
+        response = StreamingHttpResponse(
+            exporter.stream(data_generator()),
+            content_type='text/csv'
+        )
+    """
+    
+    def __init__(self, headers: List[str]):
+        self.headers = headers
+    
+    def stream(self, data_iterator: Iterator) -> Generator[str, None, None]:
+        """
+        Stream CSV data row by row.
+        
+        Args:
+            data_iterator: Iterator yielding rows (as lists or tuples)
+            
+        Yields:
+            CSV-formatted strings, one row at a time
+        """
+        # Yield headers first
+        buffer = StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(self.headers)
+        yield buffer.getvalue()
+        
+        # Stream data rows
+        for row in data_iterator:
+            buffer = StringIO()
+            writer = csv.writer(buffer)
+            writer.writerow(row)
+            yield buffer.getvalue()
+
+
+def stream_tracker_export(tracker_id: str, batch_size: int = 1000) -> Generator:
+    """
+    Stream tracker data for memory-efficient export.
+    
+    Args:
+        tracker_id: Tracker ID to export
+        batch_size: Number of rows per batch
+        
+    Yields:
+        Rows as tuples (date, task_description, status, category)
+    """
+    from core.models import TaskInstance
+    
+    queryset = TaskInstance.objects.filter(
+        tracker_instance__tracker__tracker_id=tracker_id
+    ).select_related(
+        'template', 'tracker_instance'
+    ).order_by('tracker_instance__period_start')
+    
+    # Use iterator() for memory efficiency
+    for task in queryset.iterator(chunk_size=batch_size):
+        yield (
+            str(task.tracker_instance.period_start),
+            task.template.description if task.template else 'Unknown',
+            task.status,
+            task.template.category if task.template else ''
+        )
+
 
 def generate_behavior_summary(tracker_id: str, output_path: str) -> str:
     """

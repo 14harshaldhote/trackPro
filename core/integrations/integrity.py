@@ -18,17 +18,40 @@ from core.utils import constants
 logger = logging.getLogger(__name__)
 
 class IntegrityService:
-    def __init__(self):
+    def __init__(self, dry_run: bool = False):
+        """
+        Initialize IntegrityService.
+        
+        Args:
+            dry_run: If True, report issues without making repairs
+        """
         self.db = crud.db
+        self.dry_run = dry_run
 
-    def run_integrity_check(self):
-        """Main entry point for integrity checks."""
-        logger.info("Starting integrity check...")
+    def run_integrity_check(self, dry_run: bool = None):
+        """
+        Main entry point for integrity checks.
+        
+        Args:
+            dry_run: Override instance dry_run setting
+            
+        Returns:
+            Report dict with scan results
+        """
+        # Allow override at call time
+        if dry_run is not None:
+            self.dry_run = dry_run
+            
+        mode = "[DRY-RUN]" if self.dry_run else ""
+        logger.info(f"{mode} Starting integrity check...")
+        
         report = {
             "scanned": 0,
             "issues_found": 0,
             "repaired": 0,
-            "quarantined": 0
+            "quarantined": 0,
+            "dry_run": self.dry_run,
+            "details": []
         }
 
         # Django ORM handles schema validation automatically
@@ -40,7 +63,7 @@ class IntegrityService:
         # 2. Logical Consistency
         self._check_logical_consistency(report)
 
-        logger.info(f"Integrity check complete. Report: {report}")
+        logger.info(f"{mode} Integrity check complete. Report: {report}")
         return report
 
     def _check_orphans(self, report):
@@ -51,9 +74,17 @@ class IntegrityService:
         tracker_instances_ids = {t['instance_id'] for t in self.db.fetch_all('TrackerInstances')}
         
         for task in tasks:
+            report['scanned'] += 1
             if task.get('tracker_instance_id') not in tracker_instances_ids:
                 report['issues_found'] += 1
-                logger.warning(f"Orphaned TaskInstance: {task.get('task_instance_id')}")
+                issue = {
+                    'type': 'orphan',
+                    'table': 'TaskInstances',
+                    'id': task.get('task_instance_id'),
+                    'message': f"Orphaned TaskInstance: {task.get('task_instance_id')}"
+                }
+                report['details'].append(issue)
+                logger.warning(issue['message'])
                 # With Django ORM, orphans are prevented by CASCADE, but we check anyway
 
         # TaskTemplate -> TrackerDefinition
@@ -61,15 +92,24 @@ class IntegrityService:
         tracker_defs_ids = {t['tracker_id'] for t in self.db.fetch_all('TrackerDefinitions')}
         
         for tmpl in templates:
+            report['scanned'] += 1
             if tmpl.get('tracker_id') not in tracker_defs_ids:
                 report['issues_found'] += 1
-                logger.warning(f"Orphaned TaskTemplate: {tmpl.get('template_id')}")
+                issue = {
+                    'type': 'orphan',
+                    'table': 'TaskTemplates',
+                    'id': tmpl.get('template_id'),
+                    'message': f"Orphaned TaskTemplate: {tmpl.get('template_id')}"
+                }
+                report['details'].append(issue)
+                logger.warning(issue['message'])
 
     def _check_logical_consistency(self, report):
         """Checks business logic rules."""
         # Example: End date before start date
         instances = self.db.fetch_all('TrackerInstances')
         for inst in instances:
+            report['scanned'] += 1
             try:
                 start = inst.get('period_start')
                 end = inst.get('period_end')
@@ -82,11 +122,23 @@ class IntegrityService:
                 
                 if start and end and end < start:
                     report['issues_found'] += 1
-                    # Repair: Set end = start
-                    self.db.update('TrackerInstances', 'instance_id', inst['instance_id'], 
-                                 {'period_end': start.isoformat()})
-                    logger.info(f"Fixed invalid date range for instance {inst['instance_id']}")
-                    report['repaired'] += 1
+                    issue = {
+                        'type': 'invalid_date_range',
+                        'table': 'TrackerInstances',
+                        'id': inst['instance_id'],
+                        'message': f"Invalid date range: end ({end}) < start ({start})"
+                    }
+                    report['details'].append(issue)
+                    
+                    if not self.dry_run:
+                        # Repair: Set end = start
+                        self.db.update('TrackerInstances', 'instance_id', inst['instance_id'], 
+                                     {'period_end': start.isoformat()})
+                        logger.info(f"Fixed invalid date range for instance {inst['instance_id']}")
+                        report['repaired'] += 1
+                    else:
+                        logger.info(f"[DRY-RUN] Would fix date range for instance {inst['instance_id']}")
+                        
             except Exception as e:
                 logger.error(f"Error checking consistency for instance {inst.get('instance_id')}: {e}")
 

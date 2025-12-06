@@ -275,7 +275,7 @@ class SyncService:
         
         # Get updated day notes
         updated_notes = DayNote.objects.filter(
-            user=self.user,
+            tracker__user=self.user,
             updated_at__gt=last_sync_dt,
             deleted_at__isnull=True
         ).values(

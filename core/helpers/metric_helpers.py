@@ -7,6 +7,16 @@ import pandas as pd
 from typing import List, Dict, Tuple
 from datetime import date, timedelta
 
+# Optional scipy imports with fallback
+try:
+    from scipy import stats as scipy_stats
+    from scipy.signal import savgol_filter
+    SCIPY_AVAILABLE = True
+except ImportError:
+    scipy_stats = None
+    savgol_filter = None
+    SCIPY_AVAILABLE = False
+
 def detect_streaks_numpy(completion_series: pd.Series) -> Dict[str, int]:
     """
     Detects current and longest streaks using NumPy run-length encoding.
@@ -258,7 +268,15 @@ def compute_correlation_matrix(data_dict: Dict[str, np.ndarray], method: str = '
             'significant': dict  # True if p < 0.05
         }
     """
-    from scipy import stats
+    if not SCIPY_AVAILABLE:
+        return {
+            'correlation_matrix': {},
+            'p_values': {},
+            'significant': {},
+            'error': 'scipy not available'
+        }
+    
+    stats = scipy_stats
     
     metric_names = list(data_dict.keys())
     n_metrics = len(metric_names)
@@ -330,7 +348,9 @@ def smooth_series(series: pd.Series, method: str = 'savgol', window: int = 7) ->
     Returns:
         Smoothed series
     """
-    from scipy.signal import savgol_filter
+    if not SCIPY_AVAILABLE:
+        # Fallback to simple moving average
+        return series.rolling(window=window, center=True).mean().fillna(series)
     
     if len(series) < window:
         return series

@@ -99,7 +99,7 @@ def export_behavior_samples(
             sentiment = note.sentiment_score
         elif note and note.content:
             # Compute sentiment if not cached
-            sentiment_result = nlp_helpers.analyze_sentiment(note.content)
+            sentiment_result = nlp_helpers.compute_sentiment(note.content)
             sentiment = sentiment_result.get('compound', 0)
         
         # Category balance for the day

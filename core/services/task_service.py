@@ -89,7 +89,10 @@ class TaskService:
             TaskNotFoundError: If task not found
         """
         # Validate using serializer
-        serializer = TaskStatusUpdateSerializer(data={'status': status, 'notes': notes})
+        data = {'status': status}
+        if notes is not None:
+            data['notes'] = notes
+        serializer = TaskStatusUpdateSerializer(data=data)
         if not serializer.is_valid():
             errors = serializer.errors
             first_error = next(iter(errors.items()))

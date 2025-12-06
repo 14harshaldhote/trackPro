@@ -10,8 +10,65 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from rest_framework import serializers
+from functools import wraps
 import json
+import hashlib
+
+
+# ============================================================================
+# RATE LIMITING
+# ============================================================================
+
+def rate_limit(max_requests: int, window_seconds: int, key_prefix: str = 'rate'):
+    """
+    Rate limiting decorator using Django cache.
+    
+    Args:
+        max_requests: Maximum requests allowed in window
+        window_seconds: Time window in seconds
+        key_prefix: Cache key prefix for this endpoint
+        
+    Returns 429 Too Many Requests if limit exceeded.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            # Get client IP
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                ip = x_forwarded_for.split(',')[0].strip()
+            else:
+                ip = request.META.get('REMOTE_ADDR', 'unknown')
+            
+            # Create cache key
+            ip_hash = hashlib.md5(ip.encode()).hexdigest()[:12]
+            cache_key = f"{key_prefix}:{ip_hash}"
+            
+            # Get current count
+            request_count = cache.get(cache_key, 0)
+            
+            if request_count >= max_requests:
+                return JsonResponse({
+                    'success': False,
+                    'errors': {
+                        'non_field_errors': [
+                            f'Too many requests. Please try again in {window_seconds // 60} minutes.'
+                        ]
+                    },
+                    'feedback': {
+                        'type': 'error',
+                        'message': 'Rate limit exceeded'
+                    }
+                }, status=429)
+            
+            # Increment counter
+            cache.set(cache_key, request_count + 1, window_seconds)
+            
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # ============================================================================
@@ -51,6 +108,7 @@ class SignupSerializer(serializers.Serializer):
 # ============================================================================
 
 @require_http_methods(["POST"])
+@rate_limit(max_requests=5, window_seconds=300, key_prefix='login')  # 5 attempts per 5 minutes
 def api_login(request):
     """
     Login via AJAX
@@ -125,6 +183,7 @@ def api_login(request):
 
 
 @require_http_methods(["POST"])
+@rate_limit(max_requests=3, window_seconds=3600, key_prefix='signup')  # 3 signups per hour
 def api_signup(request):
     """
     Signup via AJAX
@@ -241,6 +300,7 @@ def api_check_auth(request):
 
 
 @require_http_methods(["POST"])
+@rate_limit(max_requests=10, window_seconds=60, key_prefix='validate_email')  # 10 per minute
 def api_validate_email(request):
     """
     Check if email is available (for real-time validation)

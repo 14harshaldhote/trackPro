@@ -58,6 +58,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'core.utils.logging_utils.RequestIDMiddleware',  # Request ID for structured logging
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Add whitenoise for static files
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -232,3 +233,20 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 # EMAIL_USE_TLS = True
 # EMAIL_HOST_USER = 'your-email@gmail.com'
 # EMAIL_HOST_PASSWORD = 'your-password'
+
+# =============================================================================
+# APP VERSION (for health check endpoint)
+# =============================================================================
+APP_VERSION = '1.0.0'
+
+# =============================================================================
+# FEATURE FLAGS (for safe rollouts)
+# Configure flags for gradual feature releases
+# =============================================================================
+FEATURE_FLAGS = {
+    'new_sync_api': {'enabled': True, 'rollout_percent': 100},
+    'push_notifications': {'enabled': False, 'rollout_percent': 0},
+    'advanced_analytics': {'enabled': True, 'rollout_percent': 100},
+    'api_v2': {'enabled': False, 'rollout_percent': 0},
+    'streaming_export': {'enabled': True, 'rollout_percent': 100},
+}
