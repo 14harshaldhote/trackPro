@@ -241,3 +241,156 @@ def get_status_display(status: str, entity_type: str = "task") -> str:
 def get_status_emoji(status: str) -> str:
     """Get emoji representation of task status."""
     return TASK_STATUS_EMOJI.get(status, "")
+
+
+# ============================================================================
+# UX CONSTANTS (Following OpusSuggestion.md)
+# ============================================================================
+
+# Haptic Feedback Types (iOS UIImpactFeedbackGenerator)
+HAPTIC_FEEDBACK = {
+    # UINotificationFeedbackGenerator types
+    'task_complete': 'success',          # UINotificationFeedbackGenerator.success
+    'task_skip': 'warning',              # UINotificationFeedbackGenerator.warning
+    'task_delete': 'error',              # UINotificationFeedbackGenerator.error
+    
+    # UIImpactFeedbackGenerator types
+    'button_tap': 'light',               # UIImpactFeedbackGenerator.light
+    'toggle': 'medium',                  # UIImpactFeedbackGenerator.medium
+    'drag_drop': 'rigid',                # UIImpactFeedbackGenerator.rigid
+    'streak_milestone': 'heavy',         # UIImpactFeedbackGenerator.heavy
+    
+    # UISelectionFeedbackGenerator
+    'selection_change': 'selection',     # UISelectionFeedbackGenerator
+}
+
+# Action types that trigger haptics
+HAPTIC_ACTIONS = [
+    'task_toggle',
+    'task_delete',
+    'tracker_create',
+    'goal_achieved',
+    'streak_continued',
+    'quick_add',
+    'bulk_complete',
+]
+
+# Sound Effects
+SOUND_EFFECTS = {
+    'task_complete': 'complete.aiff',
+    'celebration': 'celebration.aiff',
+    'reminder': 'reminder.aiff',
+    'alert': 'alert.aiff',
+    'error': 'error.aiff',
+    'button_tap': 'tap.aiff',
+}
+
+# Animation Types
+ANIMATIONS = {
+    'confetti': {
+        'duration': 2000,  # ms
+        'particles': 50,
+        'colors': ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8']
+    },
+    'fireworks': {
+        'duration': 3000,
+        'bursts': 5
+    },
+    'checkmark': {
+        'duration': 500,
+        'scale': 1.2
+    },
+    'pulse': {
+        'duration': 300,
+        'iterations': 1
+    }
+}
+
+# iOS Swipe Action Colors
+SWIPE_ACTION_COLORS = {
+    'complete': '#22c55e',    # Green
+    'skip': '#f59e0b',        # Amber
+    'delete': '#ef4444',      # Red
+    'edit': '#3b82f6',        # Blue
+    'archive': '#6b7280',     # Gray
+}
+
+# iOS Bottom Sheet Detents
+MODAL_DETENTS = {
+    'small': ['medium'],
+    'medium': ['medium', 'large'],
+    'large': ['large'],
+    'fullscreen': []  # No detents = full screen
+}
+
+MODAL_PRESENTATIONS = {
+    'sheet': 'sheet',              # iOS .sheet()
+    'fullscreen': 'fullscreen',    # iOS .fullScreenCover()
+    'popover': 'popover',          # iOS .popover()
+}
+
+# Touch Target Sizes (Apple HIG)
+TOUCH_TARGETS = {
+    'minimum': 44,        # Apple HIG minimum
+    'comfortable': 48,    # Recommended for primary actions
+    'large': 60,         # For frequently used actions
+}
+
+# Loading & Performance
+CACHE_TIMEOUTS = {
+    'user_dashboard': 30,          # 30 seconds (frequently changes)
+    'user_overview': 120,          # 2 minutes
+    'prefetch_data': 60,           # 1 minute
+    'modal_content': 300,          # 5 minutes (static-ish)
+    'analytics': 600,              # 10 minutes
+    'insights': 1800,              # 30 minutes
+}
+
+SKELETON_DEFAULTS = {
+    'dashboard': 8,        # Number of skeleton items
+    'today': 6,
+    'week': 7,
+    'trackers': 6,
+    'list': 10,
+}
+
+# Pagination
+PAGINATION = {
+    'default_page_size': 20,
+    'max_page_size': 100,
+    'mobile_page_size': 15,       # Smaller for mobile bandwidth
+}
+
+# Notification Settings
+NOTIFICATION_TYPES = {
+    'info': {
+        'icon': 'ℹ️',
+        'color': '#3b82f6',
+        'duration': 3000
+    },
+    'success': {
+        'icon': '✅',
+        'color': '#22c55e',
+        'duration': 3000
+    },
+    'warning': {
+        'icon': '⚠️',
+        'color': '#f59e0b',
+        'duration': 5000
+    },
+    'error': {
+        'icon': '❌',
+        'color': '#ef4444',
+        'duration': 5000
+    },
+    'achievement': {
+        'icon': '🎉',
+        'color': '#8b5cf6',
+        'duration': 4000
+    },
+    'reminder': {
+        'icon': '🔔',
+        'color': '#06b6d4',
+        'duration': 4000
+    }
+}

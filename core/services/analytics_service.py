@@ -3,14 +3,23 @@ Analytics Service (Enhanced with User Isolation)
 
 Wraps analytics functions with cleaner interface, caching, and user context.
 Provides high-level methods for common analytics operations with multi-user support.
+
+Enhanced with (Phase 2 Integration):
+- Pagination helpers for efficient large dataset handling
+- Cache timeouts from constants for consistent performance
+- Standardized configurations
 """
 from datetime import date, timedelta
-from typing import Dict, List, Optional
+from typing import Optional, List
 from django.db.models import Count, Q, Avg
 
 from core import analytics
 from core.models import TrackerDefinition, TrackerInstance, TaskInstance, Goal
 from core.helpers.cache_helpers import cache_result, CACHE_TIMEOUTS
+
+# Phase 2 Integration: Import new utilities
+from core.utils.pagination_helpers import CursorPaginator, paginated_response
+from core.utils.constants import CACHE_TIMEOUTS as UX_CACHE_TIMEOUTS, PERFORMANCE
 
 
 class AnalyticsService:

@@ -558,3 +558,192 @@ def get_top_insight(tracker_id: str) -> Optional[Dict]:
     """
     insights = get_insights(tracker_id)
     return insights[0] if insights else None
+
+
+def generate_smart_suggestions(user) -> List[Dict]:
+    """
+    Generate smart behavioral suggestions based on user patterns.
+    
+    Following OpusSuggestion.md - Analytics & Insights
+    Analyzes historical data to provide personalized productivity insights.
+    
+    Args:
+        user: Django User instance
+    
+    Returns:
+        List of suggestion dictionaries with type, title, description, and action
+    """
+    from core.models import TaskInstance
+    
+    suggestions = []
+    today = date.today()
+    thirty_days_ago = today - timedelta(days=30)
+    
+    # Get user's tasks from the last 30 days
+    tasks = TaskInstance.objects.filter(
+        tracker_instance__tracker__user=user,
+        tracker_instance__period_start__gte=thirty_days_ago
+    ).select_related('template', 'tracker_instance')
+    
+    if not tasks.exists():
+        return []
+    
+    # =========================================================================
+    # Day-of-Week Performance Analysis
+    # =========================================================================
+    
+    day_stats = {i: {'total': 0, 'completed': 0} for i in range(7)}
+    
+    for task in tasks:
+        day = task.tracker_instance.period_start.weekday()
+        day_stats[day]['total'] += 1
+        if task.status == 'DONE':
+            day_stats[day]['completed'] += 1
+    
+    # Find best performing day
+    day_rates = {}
+    for day, stats in day_stats.items():
+        if stats['total'] >= 5:  # Minimum 5 tasks for reliable analysis
+            day_rates[day] = stats['completed'] / stats['total']
+    
+    if day_rates:
+        best_day = max(day_rates, key=day_rates.get)
+        best_rate = day_rates[best_day]
+        
+        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        
+        if best_rate > 0.7:  # 70%+ completion rate
+            suggestions.append({
+                'type': 'best_day',
+                'title': f'You perform best on {day_names[best_day]}s',
+                'description': f'Your completion rate is {best_rate*100:.0f}% on {day_names[best_day]}s, compared to your overall average.',
+                'action': f'Schedule important or challenging tasks for {day_names[best_day]}s to leverage your peak performance.',
+                'evidence': {
+                  'day': day_names[best_day],
+                    'rate': round(best_rate * 100, 1),
+                    'sample_size': day_stats[best_day]['total']
+                }
+            })
+        
+        # Find worst performing day
+        worst_day = min(day_rates, key=day_rates.get)
+        worst_rate = day_rates[worst_day]
+        
+        if worst_rate < 0.4 and day_stats[worst_day]['total'] >= 5:  # 40% or less
+            suggestions.append({
+                'type': 'challenging_day',
+                'title': f'{day_names[worst_day]}s are challenging for you',
+                'description': f'Your completion rate drops to {worst_rate*100:.0f}% on {day_names[worst_day]}s.',
+                'action': f'Consider lighter goals on {day_names[worst_day]}s or identify what makes this day difficult.',
+                'evidence': {
+                    'day': day_names[worst_day],
+                    'rate': round(worst_rate * 100, 1),
+                    'sample_size': day_stats[worst_day]['total']
+                }
+            })
+    
+    # =========================================================================
+    # Time of Day Pattern Analysis
+    # =========================================================================
+    
+    time_stats = {'morning': 0, 'afternoon': 0, 'evening': 0, 'night': 0, 'anytime': 0}
+    time_completed = {'morning': 0, 'afternoon': 0, 'evening': 0, 'night': 0, 'anytime': 0}
+    
+    for task in tasks:
+        time_of_day = task.template.time_of_day
+        if time_of_day in time_stats:
+            time_stats[time_of_day] += 1
+            if task.status == 'DONE':
+                time_completed[time_of_day] += 1
+    
+    # Find best time of day
+    time_rates = {}
+    for time_period, total in time_stats.items():
+        if total >= 5 and time_period != 'anytime':
+            time_rates[time_period] = time_completed[time_period] / total
+    
+    if time_rates:
+        best_time = max(time_rates, key=time_rates.get)
+        best_time_rate = time_rates[best_time]
+        
+        if best_time_rate > 0.75:
+            suggestions.append({
+                'type': 'best_time',
+                'title': f'{best_time.capitalize()} is your most productive time',
+                'description': f'You complete {best_time_rate*100:.0f}% of your {best_time} tasks.',
+                'action': f'Schedule demanding tasks in the {best_time} when your energy is highest.',
+                'evidence': {
+                    'time_period': best_time,
+                    'rate': round(best_time_rate * 100, 1)
+                }
+            })
+    
+    # =========================================================================
+    # Streak Momentum Analysis
+    # =========================================================================
+    
+    # Get recent tasks (last 7 days)
+    seven_days_ago = today - timedelta(days=7)
+    recent_tasks = tasks.filter(tracker_instance__period_start__gte=seven_days_ago)
+    
+    if recent_tasks.exists():
+        recent_completed = recent_tasks.filter(status='DONE').count()
+        recent_total = recent_tasks.count()
+        recent_rate = recent_completed / recent_total if recent_total > 0 else 0
+        
+        if recent_rate >= 0.8:
+            suggestions.append({
+                'type': 'momentum',
+                'title': "You're on a roll!",
+                'description': f"You've completed {recent_rate*100:.0f}% of tasks in the last 7 days.",
+                'action': 'Maintain this momentum! Consider adding a new challenge or goal.',
+                'evidence': {
+                    'completion_rate': round(recent_rate * 100, 1),
+                    'days': 7
+                }
+            })
+        elif recent_rate < 0.5:
+            suggestions.append({
+                'type': 'recovery_needed',
+                'title': 'Time to rebuild momentum',
+                'description': f"Your completion rate has dropped to {recent_rate*100:.0f}% this week.",
+                'action': 'Start with one small win today. Small successes build momentum.',
+                'evidence': {
+                    'completion_rate': round(recent_rate * 100, 1),
+                    'days': 7
+                }
+            })
+    
+    # =========================================================================
+    # Category Balance Analysis
+    # =========================================================================
+    
+    category_stats = {}
+    for task in tasks:
+        category = task.template.category or 'Uncategorized'
+        if category not in category_stats:
+            category_stats[category] = {'total': 0, 'completed': 0}
+        category_stats[category]['total'] += 1
+        if task.status == 'DONE':
+            category_stats[category]['completed'] += 1
+    
+    if len(category_stats) >= 3:
+        # Check for category imbalance
+        total_tasks = sum(cat['total'] for cat in category_stats.values())
+        dominant_category = max(category_stats, key=lambda k: category_stats[k]['total'])
+        dominant_pct = (category_stats[dominant_category]['total'] / total_tasks) * 100
+        
+        if dominant_pct > 60:
+            suggestions.append({
+                'type': 'balance',
+                'title': 'Life balance opportunity',
+                'description': f'{dominant_pct:.0f}% of your tasks are in "{dominant_category}".',
+                'action': 'Consider adding tasks from other life areas for better balance.',
+                'evidence': {
+                    'dominant_category': dominant_category,
+                    'percentage': round(dominant_pct, 1)
+                }
+            })
+    
+    return suggestions
+

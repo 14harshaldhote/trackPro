@@ -1,6 +1,8 @@
 """
 Tracker Pro - SPA API Views
 AJAX endpoints for interactive components
+
+Enhanced with UX optimizations following OpusSuggestion.md
 """
 import json
 from datetime import date, datetime, timedelta
@@ -13,8 +15,12 @@ from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils import timezone
 
-from .models import TrackerDefinition, TrackerInstance, TaskInstance, DayNote, TaskTemplate
+from .models import TrackerDefinition, TrackerInstance, TaskInstance, DayNote, TaskTemplate, Goal, SearchHistory
 from .services import instance_service as services
+from .utils.response_helpers import UXResponse, get_completion_message, generate_feedback_metadata
+from .utils.pagination_helpers import CursorPaginator, paginated_response
+from .services.sync_service import SyncService
+from .services.notification_service import NotificationService
 
 
 # ============================================================================
@@ -24,7 +30,11 @@ from .services import instance_service as services
 @login_required
 @require_POST
 def api_task_toggle(request, task_id):
-    """Toggle task status with optimistic UI support"""
+    """
+    Toggle task status with UX-optimized response.
+    
+    Following OpusSuggestion.md Part 2.1: Enhanced API Responses with Action Metadata
+    """
     try:
         task = get_object_or_404(
             TaskInstance, 
@@ -49,32 +59,70 @@ def api_task_toggle(request, task_id):
         
         # Update completed_at timestamp
         if new_status == 'DONE':
-            from django.utils import timezone
             task.completed_at = timezone.now()
         else:
             task.completed_at = None
             
         task.save()
         
-        return JsonResponse({
-            'success': True,
-            'old_status': old_status,
-            'new_status': new_status,
-            'task_id': task_id,
-            'can_undo': True
-        })
+        # Calculate stats for optimistic update and celebration detection
+        tracker_instance = task.tracker_instance
+        remaining = TaskInstance.objects.filter(
+            tracker_instance=tracker_instance,
+            status__in=['TODO', 'IN_PROGRESS']
+        ).count()
         
+        # Determine feedback type based on completion
+        is_completion = new_status == 'DONE' and old_status != 'DONE'
+        all_complete = remaining == 0 and is_completion
+        
+        feedback = generate_feedback_metadata(
+            action_type='toggle',
+            is_completion=is_completion,
+            all_complete=all_complete
+        )
+        
+        # Return enhanced UXResponse
+        return UXResponse.success(
+            message=get_completion_message(new_status),
+            data={
+                'task_id': task_id,
+                'old_status': old_status,
+                'new_status': new_status,
+                'completed_at': task.completed_at.isoformat() if task.completed_at else None
+            },
+            feedback=feedback,
+            stats_delta={
+                'remaining_tasks': remaining,
+                'all_complete': all_complete
+            },
+            undo=UXResponse.undo_metadata(task_id, old_status, timeout_ms=5000)
+        )
+        
+    except TaskInstance.DoesNotExist:
+        return UXResponse.error(
+            message="Task not found. It may have been deleted.",
+            error_code="TASK_NOT_FOUND",
+            retry=False,
+            status=404
+        )
+    
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
+        return UXResponse.error(
+            message="Unable to update task. Please try again.",
+            error_code="UPDATE_FAILED",
+            retry=True
+        )
 
 
 @login_required
 @require_POST
 def api_task_delete(request, task_id):
-    """Delete a single task instance"""
+    """
+    Delete a task instance.
+    
+    Enhanced with UXResponse following OpusSuggestion.md
+    """
     try:
         task = get_object_or_404(
             TaskInstance,
@@ -82,29 +130,61 @@ def api_task_delete(request, task_id):
             tracker_instance__tracker__user=request.user
         )
         
+        task_description = task.template.description
+        tracker_name = task.tracker_instance.tracker.name
+        old_status = task.status
+        
         task.delete()
         
-        return JsonResponse({
-            'success': True,
-            'message': 'Task deleted successfully',
-            'task_id': task_id
-        })
-        
+        return UXResponse.success(
+            message=f"'{task_description}' deleted",
+            data={
+                'task_id': task_id,
+                'description': task_description,
+                'tracker': tracker_name
+            },
+            feedback={'type': 'toast', 'haptic': 'light'},
+            undo=UXResponse.undo_metadata(
+                task_id,
+                old_status,
+                action='delete',
+                timeout_ms=3000
+            )
+        )
+    except TaskInstance.DoesNotExist:
+        return UXResponse.error(
+            message="Task not found",
+            error_code="TASK_NOT_FOUND",
+            retry=False,
+            status=404
+        )
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
+        return UXResponse.error(
+            message="Failed to delete task",
+            error_code="DELETE_FAILED",
+            retry=True
+        )
 
 
 @login_required
 @require_POST
 def api_task_status(request, task_id):
-    """Set specific task status and update notes"""
+    """
+    Update task status.
+    
+    Enhanced with UXResponse following OpusSuggestion.md
+    """
     try:
         data = json.loads(request.body)
-        status = data.get('status')
-        notes = data.get('notes')
+        new_status = data.get('status')
+        
+        if not new_status:
+            return UXResponse.error(
+                message="Status is required",
+                error_code="MISSING_STATUS",
+                retry=False,
+                status=400
+            )
         
         task = get_object_or_404(
             TaskInstance,
@@ -113,32 +193,45 @@ def api_task_status(request, task_id):
         )
         
         old_status = task.status
+        task.status = new_status
         
-        # Update fields if provided
-        if status:
-            task.status = status
-            if status == 'DONE':
-                task.completed_at = timezone.now()
-            elif old_status == 'DONE' and status != 'DONE':
-                task.completed_at = None
-        
-        if notes is not None:
-            task.notes = notes
-        
+        # Update completed_at timestamp based on new status
+        if new_status == 'DONE':
+            task.completed_at = timezone.now()
+        elif old_status == 'DONE' and new_status != 'DONE':
+            task.completed_at = None
+            
         task.save()
         
-        return JsonResponse({
-            'success': True,
-            'old_status': old_status,
-            'new_status': task.status,
-            'message': 'Task updated successfully'
-        })
+        # Determine feedback based on new status
+        feedback_messages = {
+            'DONE': '✓ Completed!',
+            'SKIPPED': 'Task skipped',
+            'MISSED': 'Marked as missed',
+            'TODO': 'Reset to TODO',
+            'IN_PROGRESS': 'In progress',
+            'BLOCKED': 'Marked as blocked'
+        }
         
+        return UXResponse.success(
+            message=feedback_messages.get(new_status, 'Status updated'),
+            data={'task_id': task_id, 'old_status': old_status, 'new_status': new_status},
+            feedback={'type': 'toast', 'haptic': 'light'},
+            undo=UXResponse.undo_metadata(task_id, old_status, timeout_ms=5000)
+        )
+    except TaskInstance.DoesNotExist:
+        return UXResponse.error(
+            message="Task not found",
+            error_code="TASK_NOT_FOUND",
+            retry=False,
+            status=404
+        )
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
+        return UXResponse.error(
+            message="Failed to update status",
+            error_code="STATUS_UPDATE_FAILED",
+            retry=True
+        )
 
 
 @login_required
@@ -194,16 +287,22 @@ def api_tasks_bulk(request):
 @login_required
 @require_POST
 def api_task_add(request, tracker_id):
-    """Quick add task to tracker"""
+    """
+    Quick add task to tracker.
+    
+    Enhanced with UXResponse following OpusSuggestion.md
+    """
     try:
         data = json.loads(request.body)
         description = data.get('description', '').strip()
         
         if not description:
-            return JsonResponse({
-                'success': False,
-                'error': 'Description is required'
-            }, status=400)
+            return UXResponse.error(
+                message="Task description is required",
+                error_code="MISSING_DESCRIPTION",
+                retry=False,
+                status=400
+            )
         
         tracker = get_object_or_404(
             TrackerDefinition,
@@ -216,22 +315,22 @@ def api_task_add(request, tracker_id):
         tracker_instance = services.ensure_tracker_instance(tracker.tracker_id, today, request.user)
         
         if isinstance(tracker_instance, dict):
-            # If returned as dict, fetch object
             tracker_instance = TrackerInstance.objects.get(instance_id=tracker_instance['instance_id'])
         elif not tracker_instance:
-             return JsonResponse({
-                'success': False,
-                'error': 'Could not create tracker instance'
-            }, status=400)
-            
-        # Create a one-off task template
+            return UXResponse.error(
+                message="Could not create tracker instance",
+                error_code="INSTANCE_CREATE_FAILED",
+                retry=True
+            )
+        
+        # Create task template
         template = TaskTemplate.objects.create(
             tracker=tracker,
             description=description,
             category=data.get('category', ''),
             weight=data.get('weight', 1),
             time_of_day=data.get('time_of_day', 'anytime'),
-            is_recurring=False  # Quick added tasks are one-off by default
+            is_recurring=False
         )
         
         # Create task instance
@@ -241,22 +340,31 @@ def api_task_add(request, tracker_id):
             status='TODO'
         )
         
-        return JsonResponse({
-            'success': True,
-            'task': {
-                'id': task.task_instance_id,
+        return UXResponse.success(
+            message=f"✓ '{description}' added to {tracker.name}",
+            data={
+                'task_id': task.task_instance_id,
                 'description': template.description,
                 'status': task.status,
-                'category': template.category
+                'category': template.category,
+                'tracker_name': tracker.name
             },
-            'message': 'Task added'
-        })
-        
+            feedback={'type': 'toast', 'haptic': 'light'}
+        )
+    
+    except TrackerDefinition.DoesNotExist:
+        return UXResponse.error(
+            message="Tracker not found",
+            error_code="TRACKER_NOT_FOUND",
+            retry=False,
+            status=404
+        )
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
+        return UXResponse.error(
+            message="Failed to add task",
+            error_code="TASK_ADD_FAILED",
+            retry=True
+        )
 
 
 @login_required
@@ -374,23 +482,29 @@ def api_tracker_reorder(request, tracker_id):
 @login_required
 @require_POST
 def api_tracker_create(request):
-    """Create new tracker via AJAX"""
+    """
+    Create new tracker via AJAX.
     
+    Enhanced with UXResponse following OpusSuggestion.md
+    """
     try:
         data = json.loads(request.body)
         
         name = data.get('name', '').strip()
         if not name:
-            return JsonResponse({
-                'success': False,
-                'errors': {'name': 'Name is required'}
-            }, status=400)
+            return UXResponse.error(
+                message="Tracker name is required",
+                error_code="MISSING_NAME",
+                retry=False,
+                status=400
+           )
         
         # Map time_period to valid time_mode values
         time_period = data.get('time_period', 'daily').lower()
         time_mode_map = {'daily': 'daily', 'weekly': 'weekly', 'monthly': 'monthly'}
         time_mode = time_mode_map.get(time_period, 'daily')
         
+        # Create tracker
         tracker = TrackerDefinition.objects.create(
             user=request.user,
             name=name,
@@ -399,32 +513,38 @@ def api_tracker_create(request):
             status='active'
         )
         
-        # Create task templates if tasks are provided (for template-based creation)
+        # Create task templates if provided
         tasks = data.get('tasks', [])
+        task_count = 0
         for i, task_desc in enumerate(tasks):
-            TaskTemplate.objects.create(
-                tracker=tracker,
-                description=task_desc,
-                is_recurring=True,
-                weight=len(tasks) - i,  # Higher weight for earlier tasks
-                time_of_day='anytime'
-            )
+            if task_desc.strip():
+                TaskTemplate.objects.create(
+                    tracker=tracker,
+                    description=task_desc,
+                    is_recurring=True,
+                    weight=len(tasks) - i,
+                    time_of_day='anytime'
+                )
+                task_count += 1
         
-        return JsonResponse({
-            'success': True,
-            'tracker': {
-                'id': str(tracker.tracker_id),
-                'name': tracker.name
+        return UXResponse.success(
+            message=f"🎉 Tracker '{name}' created!",
+            data={
+                'tracker_id': str(tracker.tracker_id),
+                'name': tracker.name,
+                'time_mode': tracker.time_mode,
+                'task_count': task_count,
+                'redirect': f'/tracker/{tracker.tracker_id}/'
             },
-            'redirect': f'/tracker/{tracker.tracker_id}/',
-            'message': 'Tracker created successfully'
-        })
-        
+            feedback={'type': 'celebration', 'haptic': 'medium'}
+        )
+    
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
+        return UXResponse.error(
+            message="Failed to create tracker",
+            error_code="TRACKER_CREATE_FAILED",
+            retry=True
+        )
 
 
 @login_required
@@ -510,64 +630,188 @@ def api_tracker_update(request, tracker_id):
 
 
 # ============================================================================
-# SEARCH ENDPOINT
+# SEARCH ENDPOINT (Enhanced - sonnetSuggestion.md Phase 6)
 # ============================================================================
+
+def calculate_relevance_score(query: str, text: str) -> float:
+    """
+    Calculate simple relevance score for search ranking.
+    
+    Args:
+        query: Search query string
+        text: Text to match against
+    
+    Returns:
+        Relevance score (0-100)
+    """
+    query_lower = query.lower()
+    text_lower = text.lower()
+    
+    # Exact match
+    if query_lower == text_lower:
+        return 100.0
+    
+    # Starts with query
+    if text_lower.startswith(query_lower):
+        return 80.0
+    
+    # Contains query
+    if query_lower in text_lower:
+        return 60.0
+    
+    # Word match
+    query_words = set(query_lower.split())
+    text_words = set(text_lower.split())
+    overlap = len(query_words & text_words)
+    
+    if overlap > 0:
+        return 40.0 + (overlap / len(query_words)) * 20
+    
+    return 0.0
+
 
 @login_required
 @require_GET
 def api_search(request):
-    """Global search across trackers and tasks"""
-    try:
-        query = request.GET.get('q', '').strip()
+    """
+    Enhanced global search with history and suggestions.
+    
+    Features (sonnetSuggestion.md Phase 6):
+    - Type-ahead suggestions
+    - Recent searches from SearchHistory
+    - Command palette support (Cmd+K)
+    - Result ranking by relevance
+    - Search across trackers, tasks, AND goals
+    
+    UX Target: Cmd/Ctrl+K, search suggestions
+    """
+    query = request.GET.get('q', '').strip()
+    save_history = request.GET.get('save', 'true') == 'true'
+    
+    # Empty or short query - return suggestions
+    if len(query) < 2:
+        recent = list(SearchHistory.objects.filter(
+            user=request.user
+        ).order_by('-created_at')[:5].values_list('query', flat=True))
         
-        if len(query) < 2:
-            return JsonResponse({
-                'trackers': [],
-                'tasks': []
-            })
-        
-        # Search trackers
-        trackers = TrackerDefinition.objects.filter(
+        return JsonResponse({
+            'suggestions': {
+                'recent': list(set(recent)),  # Deduplicate
+                'popular': ['Daily Habits', 'Goals', 'This Week'],
+                'commands': [
+                    {'label': 'New Tracker', 'shortcut': 'Ctrl+N', 'action': 'create_tracker'},
+                    {'label': 'Go to Today', 'shortcut': 'T', 'action': 'goto_today'},
+                    {'label': 'Week View', 'shortcut': 'W', 'action': 'goto_week'},
+                    {'label': 'Settings', 'shortcut': 'Ctrl+,', 'action': 'goto_settings'},
+                ]
+            }
+        })
+    
+    # Perform search across entities
+    results = {
+        'trackers': [],
+        'tasks': [],
+        'goals': [],
+        'commands': []
+    }
+    
+    # Search trackers
+    trackers = TrackerDefinition.objects.filter(
+        user=request.user,
+        name__icontains=query
+    )[:5]
+    
+    results['trackers'] = [{
+        'id': str(t.tracker_id),
+        'type': 'tracker',
+        'title': t.name,
+        'subtitle': f'{t.time_period} • {t.task_count} tasks',
+        'icon': '📊',
+        'score': calculate_relevance_score(query, t.name),
+        'action': {
+            'type': 'navigate',
+            'url': f'/tracker/{t.tracker_id}/'
+        }
+    } for t in trackers]
+    
+    # Search tasks (via templates)
+    tasks = TaskTemplate.objects.filter(
+        tracker__user=request.user,
+        description__icontains=query
+    ).select_related('tracker')[:5]
+    
+    results['tasks'] = [{
+        'id': str(t.template_id),
+        'type': 'task',
+        'title': t.description,
+        'subtitle': t.tracker.name,
+        'icon': '✅',
+        'score': calculate_relevance_score(query, t.description),
+        'action': {
+            'type': 'navigate',
+            'url': f'/tracker/{t.tracker.tracker_id}/'
+        }
+    } for t in tasks]
+    
+    # Search goals
+    goals = Goal.objects.filter(
+        user=request.user,
+        title__icontains=query
+    )[:5]
+    
+    results['goals'] = [{
+        'id': str(g.goal_id),
+        'type': 'goal',
+        'title': g.title,
+        'subtitle': f'{int(g.progress)}% complete',
+        'icon': g.icon or '🎯',
+        'score': calculate_relevance_score(query, g.title),
+        'action': {
+            'type': 'navigate',
+            'url': '/goals/'
+        }
+    } for g in goals]
+    
+    # Command matching
+    commands = [
+        {'title': 'New Tracker', 'shortcut': 'Ctrl+N', 'action': 'create_tracker'},
+        {'title': 'New Task', 'shortcut': 'Ctrl+T', 'action': 'quick_add_task'},
+        {'title': 'Today View', 'shortcut': 'T', 'action': 'goto_today'},
+        {'title': 'Week View', 'shortcut': 'W', 'action': 'goto_week'},
+        {'title': 'Settings', 'shortcut': 'Ctrl+,', 'action': 'goto_settings'},
+    ]
+    
+    results['commands'] = [
+        {
+            'type': 'command',
+            **cmd,
+            'score': calculate_relevance_score(query, cmd['title'])
+        }
+        for cmd in commands
+        if query.lower() in cmd['title'].lower()
+    ]
+    
+    # Flatten and sort by score
+    all_results = []
+    for result_type, items in results.items():
+        all_results.extend(items)
+    
+    all_results.sort(key=lambda x: x.get('score', 0), reverse=True)
+    
+    # Save to history (only meaningful searches)
+    if save_history and len(all_results) > 0:
+        SearchHistory.objects.create(
             user=request.user,
-            name__icontains=query
-        )[:5]
-        
-        # Search tasks
-        tasks = TrackerInstance.objects.filter(
-            tracker_definition__user=request.user,
-            description__icontains=query
-        ).select_related('tracker_definition')[:10]
-        
-        return JsonResponse({
-            'trackers': [
-                {
-                    'id': str(t.id),
-                    'name': t.name,
-                    'task_count': TrackerInstance.objects.filter(
-                        tracker_definition=t,
-                        date=date.today()
-                    ).count()
-                }
-                for t in trackers
-            ],
-            'tasks': [
-                {
-                    'id': str(t.id),
-                    'description': t.description,
-                    'tracker_id': str(t.tracker_definition.id),
-                    'tracker_name': t.tracker_definition.name,
-                    'category': t.category or ''
-                }
-                for t in tasks
-            ]
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'error': str(e),
-            'trackers': [],
-            'tasks': []
-        })
+            query=query,
+            result_count=len(all_results)
+        )
+    
+    return JsonResponse({
+        'query': query,
+        'results': all_results[:10],  # Top 10 overall
+        'grouped': results,
+        'total': len(all_results)
+    })
 
 
 # ============================================================================
@@ -1314,3 +1558,404 @@ def api_notifications(request):
                 
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+# ============================================================================
+# NEW UX-OPTIMIZED ENDPOINTS (Following OpusSuggestion.md)
+# ============================================================================
+
+@login_required
+@require_GET
+def api_prefetch(request):
+    """
+    Prefetch lightweight data for likely next navigations.
+    
+    Following OpusSuggestion.md Part 1.3: Prefetch API for SPA Navigation
+    UX Target: Instant panel transitions via client-side caching
+    """
+    try:
+        current_panel = request.GET.get('current', 'dashboard')
+        
+        # Define navigation probabilities
+        likely_next = {
+            'dashboard': ['today', 'trackers'],
+            'today': ['tracker_detail', 'week'],
+            'week': ['today', 'month'],
+            'trackers': ['tracker_detail'],
+        }
+        
+        prefetch_data = {}
+        
+        for panel in likely_next.get(current_panel, []):
+            prefetch_data[panel] = _get_lightweight_panel_data(request.user, panel)
+        
+        return JsonResponse({
+            'prefetch': prefetch_data,
+            'ttl': 60,  # Cache for 60 seconds
+            'timestamp': timezone.now().isoformat()
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'prefetch': {}
+        }, status=500)
+
+
+def _get_lightweight_panel_data(user, panel):
+    """Return minimal data for skeleton rendering"""
+    if panel == 'today':
+        count = TaskInstance.objects.filter(
+            tracker_instance__tracker__user=user,
+            status__in=['TODO', 'IN_PROGRESS']
+        ).count()
+        return {'task_count': count, 'skeleton_items': min(count, 10)}
+    
+    elif panel == 'trackers':
+        count = TrackerDefinition.objects.filter(user=user).exclude(status='archived').count()
+        return {'tracker_count': count, 'skeleton_items': min(count, 6)}
+    
+    elif panel == 'week':
+        # Get week overview
+        return {'days': 7, 'skeleton_items': 7}
+    
+    return {}
+
+
+@login_required
+@require_GET
+def api_tasks_infinite(request):
+    """
+    Infinite scroll endpoint for task lists.
+    
+    Following OpusSuggestion.md Part 4.1: Infinite Scroll for Task Lists
+    UX Target: Infinite scroll, mobile performance, 3G/4G optimized
+    """
+    try:
+        cursor = request.GET.get('cursor')
+        limit = min(int(request.GET.get('limit', 20)), 50)
+        status = request.GET.get('status')
+        tracker_id = request.GET.get('tracker_id')
+        
+        # Build queryset
+        qs = TaskInstance.objects.filter(
+            tracker_instance__tracker__user=request.user
+        ).select_related('template', 'tracker_instance__tracker')
+        
+        if status:
+            qs = qs.filter(status=status)
+        
+        if tracker_id:
+            qs = qs.filter(tracker_instance__tracker__tracker_id=tracker_id)
+        
+        # Paginate
+        paginator = CursorPaginator(
+            queryset=qs,
+            cursor_field='created_at',
+            page_size=limit
+        )
+        
+        result = paginator.paginate(cursor)
+        
+        # Serialize items
+        def serialize_task(task):
+            from .utils.constants import SWIPE_ACTION_COLORS, TOUCH_TARGETS
+            
+            return {
+                'id': task.task_instance_id,
+                'description': task.template.description,
+                'status': task.status,
+                'category': task.template.category,
+                'tracker_name': task.tracker_instance.tracker.name,
+                'tracker_id': task.tracker_instance.tracker.tracker_id,
+                'time_of_day': task.template.time_of_day,
+                'weight': task.template.weight,
+                'created_at': task.created_at.isoformat(),
+                # iOS swipe actions
+                'swipe_actions': {
+                    'leading': [
+                        {
+                            'id': 'complete',
+                            'title': '✓',
+                            'color': SWIPE_ACTION_COLORS['complete'],
+                            'endpoint': f'/api/task/{task.task_instance_id}/toggle/',
+                            'minWidth': TOUCH_TARGETS['minimum']
+                        }
+                    ] if task.status != 'DONE' else [],
+                    'trailing': [
+                        {
+                            'id': 'skip',
+                            'title': 'Skip',
+                            'color': SWIPE_ACTION_COLORS['skip'],
+                            'endpoint': f'/api/task/{task.task_instance_id}/status/',
+                            'payload': {'status': 'SKIPPED'},
+                            'minWidth': TOUCH_TARGETS['comfortable']
+                        },
+                        {
+                            'id': 'delete',
+                            'title': 'Delete',
+                            'color': SWIPE_ACTION_COLORS['delete'],
+                            'destructive': True,
+                            'endpoint': f'/api/task/{task.task_instance_id}/delete/',
+                            'minWidth': TOUCH_TARGETS['comfortable']
+                        }
+                    ]
+                }
+            }
+        
+        return paginated_response(
+            items=result['items'],
+            serializer_func=serialize_task,
+            has_more=result['pagination']['has_more'],
+            next_cursor=result['pagination']['next_cursor']
+        )
+    
+    except Exception as e:
+        return JsonResponse({
+            'error': str(e),
+            'data': [],
+            'pagination': {'has_more': False, 'next_cursor': None}
+        }, status=500)
+
+
+@login_required
+@require_POST
+def api_sync(request):
+    """
+    Bidirectional sync endpoint for offline-first mobile apps.
+    
+    Following OpusSuggestion.md Part 4.2: Offline Data Sync Endpoint
+    UX Target: Offline experience, background sync, cache data locally
+    """
+    try:
+        data = json.loads(request.body)
+        sync_service = SyncService(request.user)
+        result = sync_service.process_sync_request(data)
+        
+        return JsonResponse(result)
+    
+    except Exception as e:
+        return JsonResponse({
+            'sync_status': 'failed',
+            'error': str(e),
+            'retry_after': 5  # seconds
+        }, status=500)
+
+
+@login_required
+@require_GET
+def api_notifications_enhanced(request):
+    """
+    Enhanced notifications endpoint with badge counts and grouping.
+    
+    Following OpusSuggestion.md Part 5.1: Notification System Backend
+    """
+    try:
+        service = NotificationService(request.user)
+        notifications = service.get_recent_notifications(limit=50)
+        badge_count = service.get_badge_count()
+        
+        # Group notifications by type for better UX
+        from .utils.constants import NOTIFICATION_TYPES
+        
+        grouped = {}
+        for notif in notifications:
+            notif_type = notif['type']
+            if notif_type not in grouped:
+                grouped[notif_type] = {
+                    'type': notif_type,
+                    'icon': NOTIFICATION_TYPES.get(notif_type, {}).get('icon', '📬'),
+                    'color': NOTIFICATION_TYPES.get(notif_type, {}).get('color', '#3b82f6'),
+                    'items': []
+                }
+            grouped[notif_type]['items'].append(notif)
+        
+        return JsonResponse({
+            'success': True,
+            'notifications': notifications,
+            'grouped': list(grouped.values()),
+            'badge': {
+                'count': badge_count,
+                'visible': badge_count > 0,
+                'display': str(badge_count) if badge_count < 100 else '99+'
+            }
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'notifications': [],
+            'badge': {'count': 0, 'visible': False}
+        }, status=500)
+
+
+@login_required
+@require_POST
+def api_notifications_mark_read(request):
+    """
+    Mark notifications as read.
+    
+    Following OpusSuggestion.md Part 5.1: Notification System Backend
+    """
+    try:
+        data = json.loads(request.body)
+        service = NotificationService(request.user)
+        
+        if data.get('all'):
+            count = service.mark_as_read()
+            message = f'All notifications marked as read'
+        elif data.get('ids'):
+            count = service.mark_as_read(notification_ids=data['ids'])
+            message = f'{count} notification(s) marked as read'
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Must specify "all" or "ids"'
+            }, status=400)
+        
+        new_badge_count = service.get_badge_count()
+        
+        return UXResponse.success(
+            message=message,
+            data={'count': count},
+            stats_delta={'new_badge_count': new_badge_count}
+        )
+    
+    except Exception as e:
+        return UXResponse.error(
+            message='Failed to mark notifications as read',
+            error_code='MARK_READ_FAILED',
+            retry=True
+        )
+
+
+@login_required
+@require_GET
+def api_smart_suggestions(request):
+    """
+    Smart behavioral suggestions based on user patterns.
+    
+    Following OpusSuggestion.md - Analytics & Insights
+    UX Target: Smart suggestions, productivity insights
+    """
+    try:
+        from core.behavioral.insights_engine import generate_smart_suggestions
+        
+        suggestions = generate_smart_suggestions(request.user)
+        
+        return JsonResponse({
+            'success': True,
+            'suggestions': suggestions,
+            'count': len(suggestions),
+            'generated_at': timezone.now().isoformat()
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'suggestions': []
+        }, status=500)
+
+
+@login_required
+@require_GET
+def api_action_metadata(request):
+    """
+    Get metadata for destructive actions (confirmation dialogs).
+    
+    Following OpusSuggestion.md - Part 2: Native iOS Patterns
+    Provides confirmation dialog configuration for destructive actions.
+    """
+    action_type = request.GET.get('action')
+    resource_type = request.GET.get('resource_type', 'task')
+    resource_id = request.GET.get('resource_id')
+    
+    # Define confirmation metadata for different actions
+    metadata = {
+        'delete_task': {
+            'title': 'Delete Task?',
+            'message': 'This task will be permanently deleted. This action cannot be undone.',
+            'confirm_text': 'Delete',
+            'confirm_style': 'destructive',  # iOS UIAlertAction.Style.destructive
+            'cancel_text': 'Cancel',
+            'icon': '\u26a0\ufe0f',
+            'confirm_action': {
+                'method': 'DELETE',
+                'endpoint': f'/api/task/{resource_id}/delete/'
+            }
+        },
+        'delete_tracker': {
+            'title': 'Delete Tracker?',
+            'message': 'This will delete the tracker and all its tasks. This action cannot be undone.',
+            'confirm_text': 'Delete Tracker',
+            'confirm_style': 'destructive',
+            'cancel_text': 'Cancel',
+            'icon': '\u26a0\ufe0f',
+            'confirm_action': {
+                'method': 'DELETE',
+                'endpoint': f'/api/tracker/{resource_id}/delete/'
+            }
+        },
+        'skip_task': {
+            'title': 'Skip Task?',
+            'message': 'Mark this task as skipped for today?',
+            'confirm_text': 'Skip',
+            'confirm_style': 'default',
+            'cancel_text': 'Cancel',
+            'icon': '\u23ed\ufe0f',
+            'confirm_action': {
+                'method': 'POST',
+                'endpoint': f'/api/task/{resource_id}/status/',
+                'payload': {'status': 'SKIPPED'}
+            }
+        },
+        'archive_tracker': {
+            'title': 'Archive Tracker?',
+            'message': 'Archived trackers can be restored later.',
+            'confirm_text': 'Archive',
+            'confirm_style': 'default',
+            'cancel_text': 'Cancel',
+            'icon': '\ud83d\udce6',
+            'confirm_action': {
+                'method': 'POST',
+                'endpoint': f'/api/tracker/{resource_id}/update/',
+                'payload': {'status': 'archived'}
+            }
+        },
+        'clear_all': {
+            'title': 'Clear All Tasks?',
+            'message': 'This will mark all pending tasks as skipped.',
+            'confirm_text': 'Clear All',
+            'confirm_style': 'destructive',
+            'cancel_text': 'Cancel',
+            'icon': '\ud83d\uddd1\ufe0f',
+            'confirm_action': {
+                'method': 'POST',
+                'endpoint': '/api/tasks/bulk-update/',
+                'payload': {'status': 'SKIPPED', 'filter': 'pending'}
+            }
+        }
+    }
+    
+    if action_type and action_type in metadata:
+        return JsonResponse({
+            'success': True,
+            'metadata': metadata[action_type]
+        })
+    
+    # Default  confirmation for unknown actions
+    return JsonResponse({
+        'success': True,
+        'metadata': {
+            'title': 'Confirm Action?',
+            'message': 'Are you sure you want to continue?',
+            'confirm_text': 'Confirm',
+            'confirm_style': 'default',
+            'cancel_text': 'Cancel',
+            'icon': '\u2753'
+        }
+    })
+
+

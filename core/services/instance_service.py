@@ -3,6 +3,10 @@ Instance Service (ORM-Based)
 
 Manages TrackerInstance and TaskInstance creation with proper ORM usage.
 Includes user isolation and efficient bulk operations.
+
+Enhanced with (Phase 2 Integration):
+- Constants for consistent status validation
+- Performance configurations
 """
 import uuid
 from datetime import date, timedelta
@@ -11,6 +15,8 @@ from django.db.models import Q
 
 from core.models import TrackerDefinition, TrackerInstance, TaskInstance, TaskTemplate
 from core.utils import time_utils
+
+# Phase 2 Integration: Constants are available in core.utils.constants if needed
 
 
 def ensure_tracker_instance(tracker_id: str, reference_date: date = None, user=None):

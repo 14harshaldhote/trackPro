@@ -547,3 +547,38 @@ class ShareLink(models.Model):
         if self.max_uses and self.use_count >= self.max_uses:
             return False
         return True
+
+# Phase 7: SearchHistory Model
+
+from django.db import models
+from django.contrib.auth.models import User
+from django.utils import timezone
+
+class SearchHistory(models.Model):
+    """
+    Track user search history for suggestions and analytics.
+    
+    Following OpusSuggestion.md - Enhanced Search Experience
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='search_history')
+    query = models.CharField(max_length=200, help_text="Search query text")
+    result_count = models.IntegerField(default=0, help_text="Number of results returned")
+    clicked_result_type = models.CharField(
+        max_length=50, 
+        blank=True,
+        help_text="Type of result clicked (tracker, task, goal, etc.)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = "Search histories"
+        db_table = 'search_history'
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['query']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username}: {self.query} ({self.result_count} results)"
+

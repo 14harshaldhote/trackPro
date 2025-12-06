@@ -2,6 +2,7 @@ from django.urls import path
 from . import views_auth
 from . import views_api
 from . import views_spa
+from . import views_ios
 
 urlpatterns = [
     # =========================================================================
@@ -88,6 +89,49 @@ urlpatterns = [
     path('api/goals/', views_api.api_goals, name='api_goals'),
     path('api/preferences/', views_api.api_preferences, name='api_preferences'),
     path('api/notifications/', views_api.api_notifications, name='api_notifications'),
+    
+    # =========================================================================
+    # UX-OPTIMIZED ENDPOINTS (Following OpusSuggestion.md)
+    # =========================================================================
+    
+    # SPA Navigation & Performance
+    path('api/prefetch/', views_api.api_prefetch, name='api_prefetch'),
+    path('api/tasks/infinite/', views_api.api_tasks_infinite, name='api_tasks_infinite'),
+    
+    # Offline Sync
+    path('api/sync/', views_api.api_sync, name='api_sync'),
+    
+    # Enhanced Notifications
+    path('api/notifications/enhanced/', views_api.api_notifications_enhanced, name='api_notifications_enhanced'),
+    path('api/notifications/mark-read/', views_api.api_notifications_mark_read, name='api_notifications_mark_read'),
+    
+    # Behavioral Insights
+    path('api/smart-suggestions/', views_api.api_smart_suggestions, name='api_smart_suggestions'),
+    path('api/action-metadata/', views_api.api_action_metadata, name='api_action_metadata'),
+    
+    # =========================================================================
+    # iOS INTEGRATION - Widgets & Siri Shortcuts (UX #35-36)
+    # =========================================================================
+    
+    # Widget Timeline Endpoints
+    path('api/ios/widget/today/', views_ios.widget_today, name='ios_widget_today'),
+    path('api/ios/widget/timeline/', views_ios.widget_timeline, name='ios_widget_timeline'),
+    
+    # Siri Shortcuts Intent Endpoints - Basic
+    path('api/ios/siri/complete-task/', views_ios.siri_complete_task, name='ios_siri_complete_task'),
+    path('api/ios/siri/add-task/', views_ios.siri_add_task, name='ios_siri_add_task'),
+    path('api/ios/siri/today-summary/', views_ios.siri_today_summary, name='ios_siri_today_summary'),
+    path('api/ios/siri/streak/', views_ios.siri_streak, name='ios_siri_streak'),
+    
+    # Siri Shortcuts Intent Endpoints - Extended
+    path('api/ios/siri/tracker-progress/', views_ios.siri_tracker_progress, name='ios_siri_tracker_progress'),
+    path('api/ios/siri/weekly-summary/', views_ios.siri_weekly_summary, name='ios_siri_weekly_summary'),
+    path('api/ios/siri/monthly-summary/', views_ios.siri_monthly_summary, name='ios_siri_monthly_summary'),
+    path('api/ios/siri/completion-rate/', views_ios.siri_completion_rate, name='ios_siri_completion_rate'),
+    path('api/ios/siri/whats-next/', views_ios.siri_whats_next, name='ios_siri_whats_next'),
+    path('api/ios/siri/skip-all-remaining/', views_ios.siri_skip_all_remaining, name='ios_siri_skip_all_remaining'),
+    path('api/ios/siri/my-goals/', views_ios.siri_my_goals, name='ios_siri_my_goals'),
+    path('api/ios/siri/best-day/', views_ios.siri_best_day, name='ios_siri_best_day'),
     
     # =========================================================================
     # AUTHENTICATION

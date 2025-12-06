@@ -3,20 +3,30 @@ Task Management Service
 
 Centralizes all task-related business logic from views.
 Provides clean interface for task operations with proper validation and error handling.
+
+Enhanced with:
+- UXResponse for consistent API responses (Phase 2 integration)
+- Constants for validation and defaults
+- Improved error handling
 """
 from datetime import datetime
 from typing import Dict, List, Optional
-from django.utils import timezone
-from django.db import transaction
 
-from core.repositories import base_repository as crud
-from core.models import TaskInstance
+from django.db import transaction
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+
+from core.models import TaskInstance, TrackerInstance, TaskTemplate
 from core.helpers.cache_helpers import invalidate_tracker_cache
 from core.serializers import TaskTemplateSerializer, TaskStatusUpdateSerializer
 from core.exceptions import (
     TaskNotFoundError, TemplateNotFoundError, InvalidStatusError, 
     ValidationError as AppValidationError
 )
+
+# Phase 2 Integration: Import new utilities
+from core.utils.response_helpers import UXResponse
+from core.utils.constants import TOUCH_TARGETS, TASK_STATUSES
 
 
 class TaskService:

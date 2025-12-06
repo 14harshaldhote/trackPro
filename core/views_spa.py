@@ -1,6 +1,8 @@
 """
 SPA Views - Single Page Application endpoints
 All views render through base_spa.html with AJAX panel loading
+
+Enhanced with skeleton support following OpusSuggestion.md
 """
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
@@ -8,11 +10,60 @@ from django.contrib.auth.decorators import login_required
 from django.template.loader import render_to_string
 from datetime import date, timedelta
 import json
+from functools import wraps
 
 from core.models import TrackerDefinition, TrackerInstance, TaskInstance, Goal
 from core.repositories import base_repository as crud
 from core.services import instance_service as services
 from core import analytics
+from core.utils.skeleton_helpers import generate_panel_skeleton, estimate_load_time
+from core.utils.constants import SWIPE_ACTION_COLORS, TOUCH_TARGETS, MODAL_DETENTS, MODAL_PRESENTATIONS
+from core.utils.skeleton_helpers import generate_panel_skeleton, estimate_load_time
+from core.utils.constants import SWIPE_ACTION_COLORS, TOUCH_TARGETS, MODAL_DETENTS, MODAL_PRESENTATIONS
+
+
+# ============================================================================
+# DECORATORS
+# ============================================================================
+
+def supports_skeleton(default_count=5):
+    """
+    Decorator to add skeleton loading support to panel views.
+    
+    Following OpusSuggestion.md Part 1.2: Enhanced Caching Strategy and Loading States
+    
+    When ?skeleton=true is in the query params, returns skeleton structure
+    instead of full panel, enabling instant perceived loading.
+    
+    Args:
+        default_count: Default number of skeleton items to generate
+    
+    Usage:
+        @supports_skeleton(default_count=8)
+        def panel_dashboard(request):
+            ...
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if request.GET.get('skeleton') == 'true':
+                # Extract panel type from view function name
+                panel_type = view_func.__name__.replace('panel_', '')
+                item_count = int(request.GET.get('count', default_count))
+                
+                skeleton = generate_panel_skeleton(panel_type, item_count)
+                estimated_time = estimate_load_time(item_count, has_complex_data=False)
+               
+                return JsonResponse({
+                    'skeleton': True,
+                    'structure': skeleton,
+                    'estimated_load_time': estimated_time,
+                    'panel_type': panel_type
+                })
+            
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # ============================================================================
@@ -40,8 +91,15 @@ def spa_shell(request, **kwargs):
 # ============================================================================
 
 @login_required
+@supports_skeleton(default_count=8)
 def panel_dashboard(request):
-    """Dashboard panel with quick stats and filtering"""
+    """
+    Dashboard panel with quick stats and filtering.
+    
+    Enhanced with:
+    - Skeleton support for instant loading
+    - Filter state metadata for SPA state management
+    """
     from datetime import datetime
     import calendar
     
@@ -112,8 +170,17 @@ def panel_dashboard(request):
                         'description': task.template.description,
                         'category': task.template.category,
                         'tracker_name': tracker.name,
+                        'tracker_id': tracker.tracker_id,
                         'weight': task.template.weight,
-                        'created_at': task.created_at
+                        'created_at': task.created_at,
+                        # iOS UX enhancements (sonnetSuggestion.md Phase 3)
+                        'ios_context_menu': [
+                            {'title': 'Edit', 'icon': 'pencil', 'action': 'edit'},
+                            {'title': 'Complete', 'icon': 'checkmark.circle', 'action': 'complete'} if task.status != 'DONE' else {'title': 'Reopen', 'icon': 'arrow.uturn.backward', 'action': 'reopen'},
+                            {'title': 'Skip', 'icon': 'forward.fill', 'action': 'skip'},
+                            {'title': 'Add Note', 'icon': 'note.text', 'action': 'note'},
+                            {'title': 'Delete', 'icon': 'trash', 'destructive': True, 'action': 'delete'}
+                        ]
                     })
                     
                     if task.status == 'DONE':
@@ -168,6 +235,39 @@ def panel_dashboard(request):
             'task_count': period_total,
         })
     
+    # Add filter state for SPA state management (OpusSuggestion.md Part 1.1)
+    filter_state = {
+        'current_period': period,
+        'available_periods': ['daily', 'weekly', 'monthly', 'all'],
+        'start_date': start_date.isoformat(),
+        'end_date': end_date.isoformat()
+    }
+    
+    # Add quick stats badges for display
+    quick_stats = {
+        'tasks_today': pending_count + completed_count,
+        'completed_today': completed_count,
+        'streak_days': streak,
+        'completion_pct': completion_rate
+    }
+    
+    # Integrate behavioral insights (OpusSuggestion.md - Smart Suggestions)
+    smart_suggestions = []
+    try:
+        from core.behavioral.insights_engine import generate_smart_suggestions
+        suggestions_data = generate_smart_suggestions(request.user)
+        smart_suggestions = suggestions_data.get('suggestions', [])[:3]  # Top 3 suggestions
+    except Exception:
+        pass  # Gracefully handle if insights engine unavailable
+    
+    # Add insights widget metadata
+    insights_widget = {
+        'enabled': len(smart_suggestions) > 0,
+        'suggestions': smart_suggestions,
+        'cta_text': 'View All Insights',
+        'cta_link': '/analytics/'
+    }
+    
     context = {
         'time_of_day': time_of_day,
         'today': today,
@@ -176,12 +276,19 @@ def panel_dashboard(request):
         'active_trackers': active_trackers,
         'current_period': period,
         'period_title': period_title,
+        # New UX enhancements
+        'filter_state': filter_state,
+        'quick_stats': quick_stats,
+        # Behavioral insights integration (OpusSuggestion.md Part 3.3)
+        'smart_suggestions': smart_suggestions,
+        'insights_widget': insights_widget,
     }
     
     return render(request, 'panels/dashboard.html', context)
 
 
-@login_required  
+@login_required
+@supports_skeleton(default_count=6)
 def panel_today(request):
     """Today's tasks panel"""
     today = date.today()
@@ -219,7 +326,76 @@ def panel_today(request):
                     status = getattr(task, 'status', None) or task.get('status') if isinstance(task, dict) else None
                     if not status: continue
                     
-                    tasks.append(task)
+                    # Get task data for enhanced structure (FinalRefactoringGuide.md lines 196-254)
+                    task_id = task.task_instance_id if hasattr(task, 'task_instance_id') else task.get('task_instance_id')
+                    description = task.template.description if hasattr(task, 'template') else task.get('description', '')
+                    category = task.template.category if hasattr(task, 'template') else task.get('category', '')
+                    time_of_day = task.template.time_of_day if hasattr(task, 'template') else task.get('time_of_day', 'anytime')
+                    weight = task.template.weight if hasattr(task, 'template') else task.get('weight', 1)
+                    
+                    # Convert to enhanced dict with iOS UX metadata
+                    task_data = {
+                        'task_instance_id': task_id,
+                        'status': status,
+                        'description': description,
+                        'category': category,
+                        'time_of_day': time_of_day,
+                        'weight': weight,
+                        
+                        # iOS swipe actions (44pt minimum per Apple HIG) - FinalRefactoringGuide.md
+                        'ios_swipe_actions': {
+                            'leading': [{
+                                'id': 'complete',
+                                'title': '✓',
+                                'style': 'normal',
+                                'backgroundColor': '#22c55e',  # Green
+                                'endpoint': f'/api/task/{task_id}/toggle/',
+                                'haptic': 'success',
+                                'minWidth': 44
+                            }] if status != 'DONE' else [{
+                                'id': 'undo',
+                                'title': '↶',
+                                'style': 'normal',
+                                'backgroundColor': '#64748b',  # Gray
+                                'endpoint': f'/api/task/{task_id}/toggle/',
+                                'haptic': 'light',
+                                'minWidth': 44
+                            }],
+                            
+                            'trailing': [
+                                {
+                                    'id': 'skip',
+                                    'title': 'Skip',
+                                    'style': 'normal',
+                                    'backgroundColor': '#f59e0b',  # Amber
+                                    'endpoint': f'/api/task/{task_id}/status/',
+                                    'payload': {'status': 'SKIPPED'},
+                                    'haptic': 'warning',
+                                    'minWidth': 60
+                                },
+                                {
+                                    'id': 'delete',
+                                    'title': 'Delete',
+                                    'style': 'destructive',
+                                    'backgroundColor': '#ef4444',  # Red
+                                    'confirmRequired': True,
+                                    'endpoint': f'/api/task/{task_id}/delete/',
+                                    'haptic': 'error',
+                                    'minWidth': 70
+                                }
+                            ]
+                        },
+                        
+                        # Long-press context menu - FinalRefactoringGuide.md
+                        'ios_context_menu': [
+                            {'title': 'Edit', 'icon': 'pencil', 'action': 'edit'},
+                            {'title': 'Add Note', 'icon': 'note.text', 'action': 'note'},
+                            {'title': 'Move to Tomorrow', 'icon': 'arrow.forward', 'action': 'reschedule'},
+                            {'title': 'Delete', 'icon': 'trash', 'destructive': True, 'action': 'delete'}
+                        ]
+                    }
+                    
+                    tasks.append(task_data)
                     
                     # Update counts
                     total_count += 1
@@ -231,11 +407,11 @@ def panel_today(request):
                         missed_count += 1
 
         if tasks:
-            # Sort by time of day
+            # Sort by time of day (tasks are now dicts with time_of_day field)
             time_order = {'morning': 0, 'afternoon': 1, 'evening': 2, 'anytime': 3}
-            tasks.sort(key=lambda t: time_order.get((getattr(t, 'template', None) and getattr(t.template, 'time_of_day', 'anytime')) if hasattr(t, 'template') else (t.get('time_of_day', 'anytime') if isinstance(t, dict) else 'anytime'), 3))
+            tasks.sort(key=lambda t: time_order.get(t.get('time_of_day', 'anytime'), 3))
             
-            group_completed = sum(1 for t in tasks if (getattr(t, 'status', '') == 'DONE' or (isinstance(t, dict) and t.get('status') == 'DONE')))
+            group_completed = sum(1 for t in tasks if t.get('status') == 'DONE')
             
             task_groups.append({
                 'tracker': tracker,
@@ -245,6 +421,58 @@ def panel_today(request):
             })
             
     progress = int(completed_count / total_count * 100) if total_count > 0 else 0
+    
+    # Generate iOS swipe actions for all tasks (OpusSuggestion.md Part 2.2)
+    ios_swipe_actions = {}
+    for group in task_groups:
+        for task in group['tasks']:
+            task_id = getattr(task, 'task_instance_id', None) or task.get('id') if isinstance(task, dict) else None
+            status = getattr(task, 'status', None) or task.get('status') if isinstance(task, dict) else None
+            
+            if task_id:
+                # Leading swipe action (complete/uncomplete)
+                leading_actions = []
+                if status != 'DONE':
+                    leading_actions.append({
+                        'id': 'complete',
+                        'title': '✓',
+                        'color': SWIPE_ACTION_COLORS['complete'],
+                        'endpoint': f'/api/task/{task_id}/toggle/',
+                        'minWidth': TOUCH_TARGETS['minimum']
+                    })
+                else:
+                    leading_actions.append({
+                        'id': 'undo',
+                        'title': '↶',
+                        'color': SWIPE_ACTION_COLORS['undo'],
+                        'endpoint': f'/api/task/{task_id}/toggle/',
+                        'minWidth': TOUCH_TARGETS['minimum']
+                    })
+                
+                # Trailing swipe actions (skip/delete)
+                trailing_actions = [
+                    {
+                        'id': 'skip',
+                        'title': 'Skip',
+                        'color': SWIPE_ACTION_COLORS['skip'],
+                        'endpoint': f'/api/task/{task_id}/status/',
+                        'payload': {'status': 'SKIPPED'},
+                        'minWidth': TOUCH_TARGETS['comfortable']
+                    },
+                    {
+                        'id': 'delete',
+                        'title': 'Delete',
+                        'color': SWIPE_ACTION_COLORS['delete'],
+                        'destructive': True,
+                        'endpoint': f'/api/task/{task_id}/delete/',
+                        'minWidth': TOUCH_TARGETS['comfortable']
+                    }
+                ]
+                
+                ios_swipe_actions[task_id] = {
+                    'leading': leading_actions,
+                    'trailing': trailing_actions
+                }
     
     context = {
         'today': today,
@@ -258,6 +486,9 @@ def panel_today(request):
         'missed_count': missed_count,
         'progress': progress,
         'day_note': '', # Placeholder until DayNote model is clarified or generic note is implemented
+        # iOS UX enhancements (OpusSuggestion.md Part 2.2)
+        'ios_swipe_actions': ios_swipe_actions,
+        'touch_targets': TOUCH_TARGETS,  # For template usage
     }
     
     return render(request, 'panels/today.html', context)
@@ -522,12 +753,35 @@ def panel_week(request):
         except Exception:
             pass
     
+    # Enhanced week stats with time-of-day insights
     week_stats = {
         'completed': total_completed,
+        'total': total_tasks,
         'completion_rate': completion_rate,
         'best_day': best_day,
-        'streak': streak
+        'best_day_rate': int(best_day_rate),
+        'streak': streak,
+        # Time distribution across whole week
+        'morning_completion': sum(d['morning_completed'] for d in days),
+        'afternoon_completion': sum(d['afternoon_completed'] for d in days),
+        'evening_completion': sum(d['evening_completed'] for d in days),
+        'morning_total': sum(d['morning_total'] for d in days),
+        'afternoon_total': sum(d['afternoon_total'] for d in days),
+        'evening_total': sum(d['evening_total'] for d in days),
     }
+    
+    # Calculate best time of day
+    time_rates = {}
+    if week_stats['morning_total'] > 0:
+        time_rates['morning'] = week_stats['morning_completion'] / week_stats['morning_total']
+    if week_stats['afternoon_total'] > 0:
+        time_rates['afternoon'] = week_stats['afternoon_completion'] / week_stats['afternoon_total']
+    if week_stats['evening_total'] > 0:
+        time_rates['evening'] = week_stats['evening_completion'] / week_stats['evening_total']
+    
+    best_time = max(time_rates, key=time_rates.get) if time_rates else None
+    week_stats['best_time'] = best_time
+    week_stats['best_time_rate'] = int(time_rates.get(best_time, 0) * 100) if best_time else 0
     
     context = {
         'days': days,
@@ -759,6 +1013,17 @@ def panel_analytics(request):
                   if this_week_total and last_week_total else 0
     }
     
+    # Integrate comprehensive behavioral insights (OpusSuggestion.md Part 3.3)
+    smart_suggestions = []
+    insights_summary = {}
+    try:
+        from core.behavioral.insights_engine import generate_smart_suggestions
+        insights_data = generate_smart_suggestions(request.user)
+        smart_suggestions = insights_data.get('suggestions', [])
+        insights_summary = insights_data.get('summary', {})
+    except Exception:
+        pass
+    
     context = {
         'trackers': user_trackers,
         'overview': overview,
@@ -769,6 +1034,10 @@ def panel_analytics(request):
         'total_completed': overview.get('completed_tasks', 0),
         'total_tasks': overview.get('total_tasks', 0),
         'completion_rate': int(overview.get('completion_rate', 0)),
+        # Behavioral insights integration (OpusSuggestion.md Part 3.3)
+        'smart_suggestions': smart_suggestions,
+        'insights_summary': insights_summary,
+        'show_insights': len(smart_suggestions) > 0,
     }
     
     return render(request, 'panels/analytics.html', context)
@@ -979,6 +1248,8 @@ def modal_view(request, modal_name):
     """
     Generic view to serve modal content.
     Loads templates from core/templates/modals/{modal_name}.html
+    
+    Enhanced with iOS bottom sheet configuration (OpusSuggestion.md Part 2.2)
     """
     template_name = f'modals/{modal_name}.html'
     
@@ -1012,6 +1283,29 @@ def modal_view(request, modal_name):
             ).first()
             if tracker:
                 context['tracker'] = tracker
+    
+    # iOS modal presentation configuration (OpusSuggestion.md Part 2.2)
+    # Define detents (size options) for each modal type
+    modal_detents = {
+        'add_task': MODAL_DETENTS['large'],
+        'edit_task': MODAL_DETENTS['large'],
+        'add_tracker': MODAL_DETENTS['large'],
+        'edit_tracker': MODAL_DETENTS['large'],
+        'add_goal': MODAL_DETENTS['medium'],
+        'task_detail': MODAL_DETENTS['medium'],
+        'confirm_delete': MODAL_DETENTS['small'],
+        'share': MODAL_DETENTS['medium'],
+        'theme_gallery': MODAL_DETENTS['large'],
+    }
+    
+    # Add iOS configuration to context
+    context['ios_modal_config'] = {
+        'presentation': MODAL_PRESENTATIONS['bottom_sheet'],
+        'detents': modal_detents.get(modal_name, MODAL_DETENTS['medium']),
+        'dismissible': True,
+        'show_grabber': True,  # iOS drag handle
+        'corner_radius': 20,
+    }
         
     return render(request, template_name, context)
 
