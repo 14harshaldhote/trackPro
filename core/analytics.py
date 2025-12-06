@@ -63,17 +63,18 @@ def compute_completion_rate(tracker_id: str, start_date: Optional[date] = None, 
     # Build DataFrame - tasks are already prefetched
     data = []
     for inst in instances:
-        inst_date = inst.get('period_start') or inst.get('tracking_date')
+        inst_date = inst.period_start or inst.tracking_date
         if isinstance(inst_date, str):
             inst_date = date.fromisoformat(inst_date)
         
         # Tasks are nested in the instance dict from prefetch
-        tasks = inst.get('tasks', [])
+        # With ORM objects and prefetch_related, utilize .all() which hits cache
+        tasks = inst.tasks.all()
         if not tasks:
             continue
         
         total = len(tasks)
-        completed = sum(1 for t in tasks if t.get('status') == 'DONE')
+        completed = sum(1 for t in tasks if t.status == 'DONE')
         rate = (completed / total) * 100 if total > 0 else 0.0
         
         data.append({
@@ -124,20 +125,20 @@ def detect_streaks(tracker_id: str, task_template_id: Optional[str] = None) -> D
     completion_data = {}
     
     for inst in instances:
-        inst_date = inst.get('period_start') or inst.get('tracking_date')
+        inst_date = inst.period_start or inst.tracking_date
         if isinstance(inst_date, str):
             inst_date = date.fromisoformat(inst_date)
         
         # Tasks already prefetched
-        tasks = inst.get('tasks', [])
+        tasks = inst.tasks.all()
         
         # Filter by template if specified
         if task_template_id:
-            tasks = [t for t in tasks if t.get('template_id') == task_template_id]
+            tasks = [t for t in tasks if str(t.template_id) == str(task_template_id)]
         
         if tasks:
             # Day is completed if any task is DONE
-            completed = any(t.get('status') == 'DONE' for t in tasks)
+            completed = any(t.status == 'DONE' for t in tasks)
             completion_data[inst_date] = completed
     
     if not completion_data:
@@ -187,13 +188,13 @@ def compute_consistency_score(tracker_id: str, window_days: int = 7) -> Dict:
     # Build completion series
     completion_data = {}
     for inst in instances:
-        inst_date = inst.get('period_start') or inst.get('tracking_date')
+        inst_date = inst.period_start or inst.tracking_date
         if isinstance(inst_date, str):
             inst_date = date.fromisoformat(inst_date)
         
         # Tasks already prefetched
-        tasks = inst.get('tasks', [])
-        completed = any(t.get('status') == 'DONE' for t in tasks) if tasks else False
+        tasks = inst.tasks.all()
+        completed = any(t.status == 'DONE' for t in tasks) if tasks else False
         completion_data[inst_date] = completed
     
     if not completion_data:
@@ -247,9 +248,9 @@ def compute_balance_score(tracker_id: str) -> Dict:
     
     for inst in instances:
         # Tasks already prefetched
-        tasks = inst.get('tasks', [])
+        tasks = inst.tasks.all()
         for t in tasks:
-            cat = template_map.get(t.get('template_id'), 'Uncategorized')
+            cat = template_map.get(str(t.template_id), 'Uncategorized')
             category_counts[cat] = category_counts.get(cat, 0) + 1
     
     balance_data = metric_helpers.compute_category_balance(category_counts)
@@ -293,10 +294,10 @@ def compute_effort_index(tracker_id: str, start_date: Optional[date] = None, end
     
     for inst in instances:
         # Tasks already prefetched
-        tasks = inst.get('tasks', [])
+        tasks = inst.tasks.all()
         for t in tasks:
-            if t.get('status') == 'DONE':
-                weight = template_map.get(t.get('template_id'), 1)
+            if t.status == 'DONE':
+                weight = template_map.get(str(t.template_id), 1)
                 total_effort += weight
                 task_count += 1
     
@@ -570,12 +571,12 @@ def generate_streak_timeline(tracker_id):
     completion_data = {}
     
     for inst in instances:
-        inst_date = inst['period_start']
+        inst_date = inst.period_start or inst.tracking_date
         if isinstance(inst_date, str):
             inst_date = date.fromisoformat(inst_date)
         
-        tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
-        completed = any(t.get('status') == 'DONE' for t in tasks) if tasks else False
+        tasks = crud.get_task_instances_for_tracker_instance(inst.instance_id)
+        completed = any(t.status == 'DONE' for t in tasks) if tasks else False
         completion_data[inst_date] = 1 if completed else 0
     
     if not completion_data:
@@ -671,8 +672,8 @@ def compute_correlations(tracker_id: str, metrics: Optional[List[str]] = None) -
         
         daily_effort = []
         for inst in instances:
-            tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
-            day_effort = sum(template_map.get(t.get('template_id'), 1) for t in tasks if t.get('status') == 'DONE')
+            tasks = crud.get_task_instances_for_tracker_instance(inst.instance_id)
+            day_effort = sum(template_map.get(str(t.template_id), 1) for t in tasks if t.status == 'DONE')
             daily_effort.append(day_effort)
         
         if daily_effort:

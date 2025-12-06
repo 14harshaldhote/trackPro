@@ -69,9 +69,12 @@ class GoalProgressService:
         
         # Determine if on track
         on_track = True
+        behind_by = 0
         if goal.target_date and days_left and days_left > 0:
             expected_progress = self._get_expected_progress(goal)
             on_track = progress >= (expected_progress * 0.9)  # 10% buffer
+            if not on_track:
+                behind_by = int(expected_progress - progress)
         
         # Project completion date
         projected_completion = self._project_completion(goal, progress)
@@ -81,8 +84,10 @@ class GoalProgressService:
             'current_value': goal.current_value,
             'target_value': goal.target_value,
             'on_track': on_track,
+            'behind_by': f"{behind_by}%" if behind_by > 0 else '',
             'days_left': days_left,
-            'projected_completion': projected_completion
+            'projected_completion': projected_completion,
+            'tracker_name': goal.tracker.name if goal.tracker else 'No tracker'
         }
     
     def _calculate_habit_progress(self, goal: Goal) -> float:
@@ -156,6 +161,8 @@ class GoalProgressService:
             progress_data['title'] = goal.title
             progress_data['icon'] = goal.icon
             progress_data['status'] = goal.status
+            progress_data['unit'] = goal.unit or 'tasks'
+            progress_data['completed_at'] = goal.updated_at if goal.status == 'achieved' else None
             results.append(progress_data)
         
         return results

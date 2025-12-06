@@ -211,3 +211,75 @@ class CacheInvalidator:
             
             if self.invalidate_dashboard:
                 invalidate_dashboard_cache()
+
+
+# ============================================================================
+# ETAG / CONDITIONAL GET SUPPORT
+# ============================================================================
+
+def get_user_content_hash(user):
+    """
+    Generate a hash based on the latest modification timestamp of user data.
+    Used for ETag generation.
+    """
+    from django.db.models import Max
+    from core.models import TrackerDefinition, TaskInstance
+    
+    # Get latest timestamps from key models
+    timestamps = []
+    
+    try:
+        t1 = TrackerDefinition.objects.filter(user=user).aggregate(m=Max('updated_at'))['m']
+        timestamps.append(t1)
+        
+        t2 = TaskInstance.objects.filter(tracker_instance__tracker__user=user).aggregate(m=Max('updated_at'))['m']
+        timestamps.append(t2)
+    except Exception:
+        pass
+    
+    # Filter out None and get max
+    valid_ts = [t for t in timestamps if t]
+    
+    if not valid_ts:
+        # Fallback if no data or error
+        return f"empty-{user.id}"
+        
+    latest = max(valid_ts)
+    return hashlib.md5(f"{user.id}:{latest.isoformat()}".encode()).hexdigest()
+
+
+def check_etag(func):
+    """
+    Decorator for Conditional GET support using ETags.
+    
+    If data hasn't changed (based on user's max updated_at), returns 304.
+    Otherwise returns 200 with new ETag.
+    """
+    from django.http import HttpResponseNotModified
+    
+    @wraps(func)
+    def wrapper(request, *args, **kwargs):
+        # Only apply to GET requests
+        if request.method != 'GET':
+            return func(request, *args, **kwargs)
+            
+        # Calculate current ETag
+        etag = get_user_content_hash(request.user)
+        
+        # Check If-None-Match header
+        # Handle weak/strong ETag format differences if needed, but for now exact match
+        client_etag = request.headers.get('If-None-Match', '').strip('"')
+        
+        if client_etag == etag:
+            return HttpResponseNotModified()
+            
+        # Execute view
+        response = func(request, *args, **kwargs)
+        
+        # Set ETag on response
+        if hasattr(response, 'headers'):
+            response['ETag'] = f'"{etag}"'
+            response['Cache-Control'] = 'private, max-age=0, must-revalidate'
+            
+        return response
+    return wrapper

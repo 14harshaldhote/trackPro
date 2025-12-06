@@ -52,14 +52,7 @@ def ensure_tracker_instance(tracker_id: str, reference_date: date = None, user=N
     ).first()
     
     if existing_instance:
-        # Return as dict for compatibility
-        return {
-            'instance_id': existing_instance.instance_id,
-            'tracker_id': tracker_id,
-            'period_start': existing_instance.period_start,
-            'period_end': existing_instance.period_end,
-            'status': existing_instance.status
-        }
+        return existing_instance
     
     # Create new instance using transaction
     with transaction.atomic():
@@ -91,13 +84,7 @@ def ensure_tracker_instance(tracker_id: str, reference_date: date = None, user=N
         if tasks_to_create:
             TaskInstance.objects.bulk_create(tasks_to_create)
     
-    return {
-        'instance_id': new_instance.instance_id,
-        'tracker_id': tracker_id,
-        'period_start': new_instance.period_start,
-        'period_end': new_instance.period_end,
-        'status': new_instance.status
-    }
+    return new_instance
 
 
 def check_all_trackers(reference_date: date = None, user=None):

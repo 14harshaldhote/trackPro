@@ -28,7 +28,7 @@ urlpatterns = [
     path('panels/settings/<str:section>/', views_spa.panel_settings, name='panel_settings_section'),
     
     # Modals
-    path('modals/<str:modal_name>/', views_spa.modal_view, name='modal_view'),
+    path('modals/<str:modal_name>/', views_spa.load_modal_content, name='modal_view'),
     
     # Error panels
     path('panels/error/404/', views_spa.panel_error_404, name='panel_error_404'),
@@ -93,6 +93,8 @@ urlpatterns = [
     path('api/prefetch/', views_api.api_prefetch, name='api_prefetch'),
     path('api/tasks/infinite/', views_api.api_tasks_infinite, name='api_tasks_infinite'),
     path('api/suggestions/', views_api.api_smart_suggestions, name='api_smart_suggestions'),
+    path('api/sync/', views_api.api_sync, name='api_sync'),
+
     
     # =========================================================================
     # AUTHENTICATION

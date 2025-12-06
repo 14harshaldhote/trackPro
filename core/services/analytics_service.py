@@ -226,3 +226,25 @@ class AnalyticsService:
             'forecasts': forecasts,
             'forecast_days': days
         }
+
+    def get_time_distribution(self) -> Dict[str, int]:
+        """
+        Get distribution of tasks by time of day.
+        
+        Returns:
+            {'morning': count, 'afternoon': count, 'evening': count}
+        """
+        if not self.tracker_id:
+            return {'morning': 0, 'afternoon': 0, 'evening': 0}
+            
+        result = TaskInstance.objects.filter(
+            tracker_instance__tracker__tracker_id=self.tracker_id
+        ).values('template__time_of_day').annotate(count=Count('task_instance_id'))
+        
+        dist = {item['template__time_of_day']: item['count'] for item in result}
+        
+        return {
+            'morning': dist.get('morning', 0),
+            'afternoon': dist.get('afternoon', 0),
+            'evening': dist.get('evening', 0)
+        }

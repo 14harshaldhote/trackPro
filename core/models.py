@@ -4,7 +4,28 @@ from simple_history.models import HistoricalRecords
 import uuid
 
 
-class TrackerDefinition(models.Model):
+class SoftDeleteModel(models.Model):
+    """
+    Abstract model to support soft deletion.
+    Essential for sync systems to track deleted items.
+    """
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        abstract = True
+        
+    def soft_delete(self):
+        """Mark object as deleted"""
+        self.deleted_at = timezone.now()
+        self.save()
+        
+    def restore(self):
+        """Restore deleted object"""
+        self.deleted_at = None
+        self.save()
+
+
+class TrackerDefinition(SoftDeleteModel):
     """Main tracker definition - what you're tracking (e.g., Daily Habits, Weekly Goals)"""
     
     TIME_MODE_CHOICES = [
@@ -84,7 +105,7 @@ class TrackerDefinition(models.Model):
         return self.status == 'active'
 
 
-class TaskTemplate(models.Model):
+class TaskTemplate(SoftDeleteModel):
     """Template for tasks within a tracker (e.g., Exercise, Meditate, Read)"""
     
     TIME_OF_DAY_CHOICES = [
@@ -118,7 +139,7 @@ class TaskTemplate(models.Model):
         return f"{self.description} ({self.tracker.name})"
 
 
-class TrackerInstance(models.Model):
+class TrackerInstance(SoftDeleteModel):
     """Specific instance of tracking for a particular date/period"""
     
     instance_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
@@ -150,7 +171,7 @@ class TrackerInstance(models.Model):
         return f"{self.tracker.name} - {self.tracking_date}"
 
 
-class TaskInstance(models.Model):
+class TaskInstance(SoftDeleteModel):
     """Actual task completion record for a specific date"""
     
     STATUS_CHOICES = [
@@ -202,7 +223,7 @@ class TaskInstance(models.Model):
         self.save()
 
 
-class DayNote(models.Model):
+class DayNote(SoftDeleteModel):
     """Daily notes/journal entries for a tracker"""
     
     note_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
@@ -267,7 +288,7 @@ class TaskTemplateTag(models.Model):
         return f"{self.template.description} - {self.tag.name}"
 
 
-class Goal(models.Model):
+class Goal(SoftDeleteModel):
     """User goals that tasks contribute towards."""
     
     STATUS_CHOICES = [

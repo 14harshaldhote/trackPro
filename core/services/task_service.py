@@ -4,15 +4,22 @@ Task Management Service
 Centralizes all task-related business logic from views.
 Provides clean interface for task operations with proper validation and error handling.
 """
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from django.utils import timezone
 from django.db import transaction
 
 from core.repositories import base_repository as crud
-from core.models import TaskInstance
+from core.models import TaskInstance, TrackerDefinition, TaskTemplate, TrackerInstance
 from core.helpers.cache_helpers import invalidate_tracker_cache
-from core.serializers import TaskTemplateSerializer, TaskStatusUpdateSerializer
+from core.serializers import (
+    TaskTemplateSerializer, 
+    TaskStatusUpdateSerializer,
+    BulkStatusUpdateSerializer
+)
+from core.services.instance_service import ensure_tracker_instance
+
 from core.exceptions import (
     TaskNotFoundError, TemplateNotFoundError, InvalidStatusError, 
     ValidationError as AppValidationError
@@ -63,7 +70,7 @@ class TaskService:
         # Invalidate cache
         invalidate_tracker_cache(tracker_id)
         
-        return template
+        return crud.model_to_dict(template)
     
     def update_task_status(self, task_id: str, status: str, notes: Optional[str] = None) -> Dict:
         """
@@ -81,9 +88,19 @@ class TaskService:
             InvalidStatusError: If status is invalid
             TaskNotFoundError: If task not found
         """
-        valid_statuses = ['TODO', 'IN_PROGRESS', 'DONE', 'MISSED', 'BLOCKED']
-        if status not in valid_statuses:
-            raise InvalidStatusError(status, valid_statuses)
+        # Validate using serializer
+        serializer = TaskStatusUpdateSerializer(data={'status': status, 'notes': notes})
+        if not serializer.is_valid():
+            errors = serializer.errors
+            first_error = next(iter(errors.items()))
+            # Map serializer error to InvalidStatusError if status is invalid
+            if 'status' in errors:
+                raise InvalidStatusError(status, serializer.fields['status'].choices)
+            raise AppValidationError(first_error[0], str(first_error[1][0]))
+            
+        validated = serializer.validated_data
+        status = validated['status']
+        notes = validated.get('notes')
         
         # Fetch task
         task = crud.db.fetch_by_id('TaskInstances', 'task_instance_id', task_id)
@@ -113,7 +130,7 @@ class TaskService:
         if tracker_id:
             invalidate_tracker_cache(tracker_id)
         
-        return updated_task
+        return crud.model_to_dict(updated_task)
     
     def toggle_task_status(self, task_id: str) -> Dict:
         """
@@ -162,6 +179,15 @@ class TaskService:
                 'tracker_ids': set of affected tracker IDs
             }
         """
+        # Validate using serializer
+        serializer = BulkStatusUpdateSerializer(data={'task_ids': task_ids, 'status': status})
+        if not serializer.is_valid():
+            # For bulk, maybe we just log or standard error?
+            # Raising generic validation error
+            errors = serializer.errors
+            first_error = next(iter(errors.items()))
+            raise AppValidationError(first_error[0], str(first_error[1][0]))
+
         updated_count = 0
         failed_count = 0
         tracker_ids = set()
@@ -202,6 +228,52 @@ class TaskService:
             import logging
             logging.error(f"Bulk update transaction failed: {e}")
             raise
+
+    def bulk_update_by_filter(self, user, status: str, filters: Dict) -> int:
+        """
+        Bulk update tasks based on criteria.
+        
+        Args:
+            user: User object
+            status: New status
+            filters: Dict containing 'tracker_id', 'start_date', 'end_date', 'current_statuses'
+            
+        Returns:
+            Number of tasks updated
+        """
+        # Validate status
+        valid_statuses = ['TODO', 'IN_PROGRESS', 'DONE', 'MISSED', 'SKIPPED']
+        if status not in valid_statuses:
+             raise InvalidStatusError(status, valid_statuses)
+             
+        query_filter = {
+            'tracker_instance__tracker__user': user,
+            'status__in': filters.get('current_statuses', ['TODO', 'IN_PROGRESS'])
+        }
+        
+        if filters.get('tracker_id'):
+            query_filter['tracker_instance__tracker__tracker_id'] = filters['tracker_id']
+            
+        if filters.get('start_date'):
+            query_filter['tracker_instance__period_start__gte'] = filters['start_date']
+            
+        if filters.get('end_date'):
+            query_filter['tracker_instance__period_end__lte'] = filters['end_date']
+            
+        # Perform update
+        updates = {'status': status}
+        if status == 'DONE':
+            updates['completed_at'] = timezone.now()
+        elif status in ['TODO', 'IN_PROGRESS']:
+             updates['completed_at'] = None
+             
+        updated_count = TaskInstance.objects.filter(**query_filter).update(**updates)
+        
+        # Invalidate caches (Optimized: invalidate all if bulk, or specific if single tracker)
+        if filters.get('tracker_id'):
+            invalidate_tracker_cache(filters['tracker_id'])
+        
+        return updated_count
     
     
     @transaction.atomic
@@ -222,7 +294,7 @@ class TaskService:
         
         try:
             for inst in instances:
-                inst_date = inst['period_start']
+                inst_date = inst.period_start
                 if isinstance(inst_date, str):
                     from datetime import date
                     inst_date = date.fromisoformat(inst_date)
@@ -231,12 +303,12 @@ class TaskService:
                 if inst_date >= cutoff_date:
                     continue
                 
-                tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
+                tasks = crud.get_task_instances_for_tracker_instance(inst.instance_id)
                 
                 for task in tasks:
-                    status = task.get('status', 'TODO')
+                    status = task.status
                     if status in ['TODO', 'IN_PROGRESS']:
-                        self.update_task_status(task['task_instance_id'], 'MISSED')
+                        self.update_task_status(task.task_instance_id, 'MISSED')
                         marked_count += 1
             
             # Invalidate cache once at end
@@ -349,7 +421,7 @@ class TaskService:
         for inst in instances:
             # Apply date filter if provided
             if date_filter:
-                inst_date = inst['period_start']
+                inst_date = inst.period_start
                 if isinstance(inst_date, str):
                     from datetime import date
                     inst_date = date.fromisoformat(inst_date)
@@ -359,11 +431,11 @@ class TaskService:
                 if date_filter.get('end_date') and inst_date > date_filter['end_date']:
                     continue
             
-            tasks = crud.get_task_instances_for_tracker_instance(inst['instance_id'])
+            tasks = crud.get_task_instances_for_tracker_instance(inst.instance_id)
             
             for task in tasks:
                 total += 1
-                status = task.get('status', 'TODO')
+                status = task.status
                 if status == 'DONE':
                     done += 1
                 elif status == 'IN_PROGRESS':
@@ -383,3 +455,53 @@ class TaskService:
             'missed': missed,
             'completion_rate': round(completion_rate, 1)
         }
+
+    def get_historical_tasks(self, tracker_id: str, days: int = 30, end_date = None):
+        """
+        Get historical tasks for a tracker.
+        
+        Args:
+            tracker_id: Tracker ID
+            days: Number of days to look back
+            end_date: End date (exclusive)
+            
+        Returns:
+            QuerySet of TaskInstance objects
+        """
+        if end_date is None:
+            end_date = timezone.now().date()
+            
+        start_date = end_date - timedelta(days=days)
+        
+        return TaskInstance.objects.filter(
+            tracker_instance__tracker__tracker_id=tracker_id,
+            tracker_instance__period_start__gte=start_date,
+            tracker_instance__period_start__lt=end_date,
+            deleted_at__isnull=True
+        ).select_related('template', 'tracker_instance').order_by('-tracker_instance__period_start')
+
+    def get_all_tasks_for_user_range(self, user, start_date, end_date):
+        """
+        Get all tasks for a user within a date range.
+        """
+        return TaskInstance.objects.filter(
+            tracker_instance__tracker__user=user,
+            tracker_instance__period_start__gte=start_date,
+            tracker_instance__period_start__lte=end_date,
+            deleted_at__isnull=True
+        ).select_related('template', 'tracker_instance__tracker').order_by('-template__weight')
+        
+    def get_task_by_id(self, task_id: str, user):
+        """
+        Get task by ID.
+        """
+        try:
+            return TaskInstance.objects.select_related(
+                'template', 
+                'tracker_instance__tracker'
+            ).get(
+                task_instance_id=task_id,
+                tracker_instance__tracker__user=user
+            )
+        except TaskInstance.DoesNotExist:
+            raise TaskNotFoundError(task_id)

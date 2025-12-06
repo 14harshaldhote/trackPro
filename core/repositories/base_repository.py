@@ -24,9 +24,8 @@ def create_tracker_definition(data):
             tracker_id=tracker_id,
             name=data['name'],
             description=data.get('description', ''),
-            time_mode=data.get('time_mode', 'daily'),
         )
-        return model_to_dict(tracker)
+        return tracker
     except Exception as e:
         logger.error(f"Error creating tracker definition: {e}")
         raise
@@ -35,8 +34,8 @@ def create_tracker_definition(data):
 def get_all_tracker_definitions():
     """Get all tracker definitions"""
     try:
-        trackers = TrackerDefinition.objects.all().order_by('-created_at')
-        return [model_to_dict(t) for t in trackers]
+        trackers = TrackerDefinition.objects.filter(deleted_at__isnull=True).order_by('-created_at')
+        return trackers
     except Exception as e:
         logger.error(f"Error fetching tracker definitions: {e}")
         return []
@@ -45,8 +44,8 @@ def get_all_tracker_definitions():
 def get_tracker_by_id(tracker_id):
     """Get a specific tracker by ID"""
     try:
-        tracker = TrackerDefinition.objects.get(tracker_id=tracker_id)
-        return model_to_dict(tracker)
+        tracker = TrackerDefinition.objects.get(tracker_id=tracker_id, deleted_at__isnull=True)
+        return tracker
     except TrackerDefinition.DoesNotExist:
         return None
     except Exception as e:
@@ -70,9 +69,8 @@ def create_task_template(data):
             description=data['description'],
             is_recurring=data.get('is_recurring', True),
             category=data.get('category', ''),
-            weight=data.get('weight', 1),
         )
-        return model_to_dict(template)
+        return template
     except Exception as e:
         logger.error(f"Error creating task template: {e}")
         raise
@@ -82,7 +80,7 @@ def get_task_templates_for_tracker(tracker_id):
     """Get all task templates for a tracker"""
     try:
         templates = TaskTemplate.objects.filter(tracker_id=tracker_id).order_by('description')
-        return [model_to_dict(t) for t in templates]
+        return templates
     except Exception as e:
         logger.error(f"Error fetching task templates for tracker {tracker_id}: {e}")
         return []
@@ -92,7 +90,7 @@ def get_task_template_by_id(template_id):
     """Get a specific task template by ID"""
     try:
         template = TaskTemplate.objects.get(template_id=template_id)
-        return model_to_dict(template)
+        return template
     except TaskTemplate.DoesNotExist:
         return None
     except Exception as e:
@@ -125,7 +123,7 @@ def create_tracker_instance(data):
                 'status': data.get('status', 'active'),
             }
         )
-        return model_to_dict(instance)
+        return instance
     except Exception as e:
         logger.error(f"Error creating tracker instance: {e}")
         raise
@@ -134,7 +132,7 @@ def create_tracker_instance(data):
 def get_tracker_instances(tracker_id, start_date=None, end_date=None):
     """Get tracker instances, optionally filtered by date range"""
     try:
-        instances = TrackerInstance.objects.filter(tracker_id=tracker_id)
+        instances = TrackerInstance.objects.filter(tracker_id=tracker_id, deleted_at__isnull=True)
         
         if start_date:
             instances = instances.filter(tracking_date__gte=start_date)
@@ -142,7 +140,7 @@ def get_tracker_instances(tracker_id, start_date=None, end_date=None):
             instances = instances.filter(tracking_date__lte=end_date)
             
         instances = instances.order_by('-tracking_date')
-        return [model_to_dict(i) for i in instances]
+        return instances
     except Exception as e:
         logger.error(f"Error fetching tracker instances: {e}")
         return []
@@ -159,7 +157,7 @@ def get_tracker_instance_by_date(tracker_id, tracking_date):
             tracker_id=tracker_id,
             tracking_date=tracking_date
         )
-        return model_to_dict(instance)
+        return instance
     except TrackerInstance.DoesNotExist:
         return None
     except Exception as e:
@@ -190,7 +188,7 @@ def create_task_instance(data):
             task.completed_at = timezone.now()
             task.save()
             
-        return model_to_dict(task)
+        return task
     except Exception as e:
         logger.error(f"Error creating task instance: {e}")
         raise
@@ -200,22 +198,11 @@ def get_task_instances_for_tracker_instance(instance_id):
     """Get all task instances for a tracker instance"""
     try:
         tasks = TaskInstance.objects.filter(
-            tracker_instance_id=instance_id
+            tracker_instance_id=instance_id,
+            deleted_at__isnull=True
         ).select_related('template').order_by('template__description')
         
-        result = []
-        for task in tasks:
-            task_dict = model_to_dict(task)
-            # Include template fields at top level for convenience
-            if task.template:
-                task_dict['description'] = task.template.description
-                task_dict['category'] = task.template.category
-                task_dict['weight'] = task.template.weight
-                task_dict['time_of_day'] = task.template.time_of_day
-                task_dict['is_recurring'] = task.template.is_recurring
-            result.append(task_dict)
-        
-        return result
+        return tasks
     except Exception as e:
         logger.error(f"Error fetching task instances: {e}")
         return []
@@ -233,7 +220,7 @@ def update_task_instance_status(task_instance_id, status):
             task.completed_at = None
             
         task.save()
-        return model_to_dict(task)
+        return task
     except TaskInstance.DoesNotExist:
         logger.error(f"Task instance {task_instance_id} not found")
         return None
@@ -453,7 +440,7 @@ def get_tracker_instances_with_tasks(tracker_id, start_date=None, end_date=None)
             Prefetch('tasks', queryset=TaskInstance.objects.select_related('template'))
         ).order_by('-tracking_date')
         
-        return [model_to_dict_with_relations(i) for i in instances]
+        return instances
     
     except Exception as e:
         logger.error(f"Error fetching optimized tracker instances: {e}")
@@ -474,7 +461,7 @@ def get_tracker_with_templates(tracker_id):
         tracker = TrackerDefinition.objects.prefetch_related('templates').get(
             tracker_id=tracker_id
         )
-        return model_to_dict_with_relations(tracker)
+        return tracker
     except TrackerDefinition.DoesNotExist:
         return None
     except Exception as e:
@@ -516,11 +503,11 @@ def get_day_grid_data(tracker_id, dates_list):
         instances = get_tracker_instances_with_tasks(tracker_id, start_date, end_date)
         
         # Build lookup map by period_start date
-        instances_map = {inst['period_start']: inst for inst in instances}
+        instances_map = {inst.period_start: inst for inst in instances}
         
         return {
             'tracker': tracker_data,
-            'templates': tracker_data.get('templates', []),
+            'templates': tracker_data.templates.all() if tracker_data else [],
             'instances_map': instances_map
         }
     
@@ -555,7 +542,7 @@ def update_task_instance(task_instance_id, updates):
                 task.completed_at = None
         
         task.save()
-        return model_to_dict(task)
+        return task
     
     except TaskInstance.DoesNotExist:
         logger.error(f"Task instance {task_instance_id} not found")
