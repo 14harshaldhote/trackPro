@@ -1,0 +1,269 @@
+/* JavaScript-Enhanced UI Styles */
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+    pointer-events: auto;
+    min-width: 300px;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast.hide {
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+.toast-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+}
+
+.toast-message {
+    flex: 1;
+    font-size: 0.875rem;
+}
+
+.toast-close {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: color 0.2s;
+}
+
+.toast-close:hover {
+    color: var(--color-text);
+}
+
+.toast-success {
+    border-left: 4px solid var(--color-success);
+}
+
+.toast-success .toast-icon {
+    color: var(--color-success);
+}
+
+.toast-error {
+    border-left: 4px solid var(--color-error);
+}
+
+.toast-error .toast-icon {
+    color: var(--color-error);
+}
+
+.toast-warning {
+    border-left: 4px solid var(--color-warning);
+}
+
+.toast-warning .toast-icon {
+    color: var(--color-warning);
+}
+
+.toast-info {
+    border-left: 4px solid var(--color-info);
+}
+
+.toast-info .toast-icon {
+    color: var(--color-info);
+}
+
+/* Swipe Gesture Indicators */
+.task-item {
+    position: relative;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.task-item::before,
+.task-item::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+.task-item::before {
+    left: 0;
+    background: linear-gradient(90deg, var(--color-success) 0%, transparent 100%);
+}
+
+.task-item::after {
+    right: 0;
+    background: linear-gradient(270deg, var(--color-warning) 0%, transparent 100%);
+}
+
+.task-item.swipe-right::before {
+    opacity: 0.3;
+}
+
+.task-item.swipe-left::after {
+    opacity: 0.3;
+}
+
+/* Form Field Errors */
+.form-input.error {
+    border-color: var(--color-error);
+}
+
+.field-error {
+    color: var(--color-error);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+/* Loading States */
+.btn-loader {
+    display: none;
+}
+
+.btn-loader .spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Dropdown Positioning */
+.dropdown-menu[data-placement="top"] {
+    bottom: 100%;
+    top: auto;
+    margin-bottom: 0.5rem;
+}
+
+.dropdown-menu[data-placement="bottom"] {
+    top: 100%;
+    bottom: auto;
+    margin-top: 0.5rem;
+}
+
+/* Accessibility - Screen Reader Only */
+#aria-announcer {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+/* App Loading State */
+body:not(.app-ready) {
+    cursor: wait;
+}
+
+/* Focus Visible (Keyboard Navigation) */
+*:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* Modal Fade Animations */
+.modal-overlay {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+}
+
+/* Skeleton Loading Pulse */
+@keyframes skeleton-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.loading-skeleton .skeleton-item {
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Touch Target Minimum (iOS) */
+@media (pointer: coarse) {
+
+    button,
+    a,
+    .btn,
+    .dropdown-toggle,
+    .task-checkbox,
+    input[type="checkbox"],
+    input[type="radio"] {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+/* Reduced Motion (Accessibility) */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* High Contrast Mode (Accessibility) */
+@media (prefers-contrast: high) {
+    .toast {
+        border-width: 2px;
+    }
+
+    .form-input.error {
+        border-width: 2px;
+    }
+
+    button:focus {
+        outline-width: 3px;
+    }
+}

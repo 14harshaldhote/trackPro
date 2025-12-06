@@ -1,0 +1,184 @@
+{% load static %}
+<!-- General Settings Panel Content -->
+<div class="settings-section" data-section="general">
+    <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem;">General Settings</h2>
+
+    <form id="general-form" method="post">
+        {% csrf_token %}
+
+        <!-- Profile Section -->
+        <section style="margin-bottom: 2rem;">
+            <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Profile</h3>
+
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-input" value="{{ user.email }}" readonly
+                    style="background: var(--color-bg-alt); cursor: not-allowed;">
+                <small style="color: var(--color-text-secondary);">Email cannot be changed here</small>
+            </div>
+
+            <div class="form-group">
+                <label for="display_name" class="form-label">Display Name</label>
+                <input type="text" id="display_name" name="display_name" class="form-input"
+                    value="{{ user.first_name }}" placeholder="Your name">
+            </div>
+        </section>
+
+        <!-- Quick Access: Theme Selection -->
+        <section style="margin-bottom: 2rem; padding-top: 2rem; border-top: 1px solid var(--color-border);">
+            <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Theme</h3>
+            <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 1rem;">
+                Select a color theme for the application
+            </p>
+
+            <div class="theme-grid"
+                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.75rem;">
+                {% for theme in themes %}
+                <div class="theme-option {% if preferences.theme == theme.id %}theme-selected{% endif %}"
+                    data-theme="{{ theme.id }}"
+                    style="cursor: pointer; padding: 0.75rem; border: 2px solid var(--color-border); border-radius: 12px; transition: all 0.2s;">
+                    <div
+                        style="height: 40px; background: linear-gradient(135deg, {{ theme.color }} 0%, {{ theme.bg }} 100%); border-radius: 6px; margin-bottom: 0.5rem;">
+                    </div>
+                    <div style="font-size: 0.75rem; font-weight: 500; text-align: center;">{{ theme.name }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <input type="hidden" name="theme" id="theme-input" value="{{ preferences.theme|default:'working-hard' }}">
+        </section>
+
+        <!-- Default View -->
+        <section style="margin-bottom: 2rem; padding-top: 2rem; border-top: 1px solid var(--color-border);">
+            <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Default View</h3>
+
+            <div class="form-group">
+                <label for="default_view" class="form-label">When you open the app, show</label>
+                <select name="default_view" id="default_view" class="form-input">
+                    <option value="dashboard" {% if preferences.default_view == 'dashboard' %}selected{% endif %}>
+                        Dashboard</option>
+                    <option value="today" {% if preferences.default_view == 'today' %}selected{% endif %}>Today's Tasks
+                    </option>
+                    <option value="trackers" {% if preferences.default_view == 'trackers' %}selected{% endif %}>Trackers
+                        List</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- Week Start -->
+        <section style="margin-bottom: 2rem; padding-top: 2rem; border-top: 1px solid var(--color-border);">
+            <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Week Settings</h3>
+
+            <div class="form-group">
+                <label for="week_start" class="form-label">Week starts on</label>
+                <select name="week_start" id="week_start" class="form-input">
+                    <option value="monday" {% if preferences.week_start=='monday' %}selected{% endif %}>Monday</option>
+                    <option value="sunday" {% if preferences.week_start=='sunday' %}selected{% endif %}>Sunday</option>
+                </select>
+            </div>
+        </section>
+
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+    </form>
+</div>
+
+<style>
+    .theme-option:hover {
+        border-color: var(--color-primary);
+        transform: translateY(-2px);
+    }
+
+    .theme-selected {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 2px var(--color-focus-ring);
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        background: var(--color-surface);
+        color: var(--color-text-primary);
+        font-size: 1rem;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 2px var(--color-focus-ring);
+    }
+</style>
+
+<script>
+    // Theme selection with live preview
+    document.querySelectorAll('.theme-option').forEach(option => {
+        option.addEventListener('click', () => {
+            // Update selection UI
+            document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('theme-selected'));
+            option.classList.add('theme-selected');
+
+            // Update hidden input
+            document.getElementById('theme-input').value = option.dataset.theme;
+
+            // Apply theme live
+            document.documentElement.setAttribute('data-theme', option.dataset.theme);
+
+            // Save to localStorage for persistence
+            localStorage.setItem('tracker-theme', option.dataset.theme);
+        });
+    });
+
+    // Form submission
+    document.getElementById('general-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+
+        try {
+            const response = await fetch('/api/preferences/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Show success notification
+                if (typeof showToast === 'function') {
+                    showToast('Settings saved', 'success');
+                } else if (typeof App !== 'undefined' && App.notifications) {
+                    App.notifications.show('Settings saved', 'success');
+                } else {
+                    alert('Settings saved successfully!');
+                }
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast(data.error || 'Failed to save settings', 'error');
+                } else {
+                    alert(data.error || 'Failed to save settings');
+                }
+            }
+        } catch (error) {
+            console.error('Settings save error:', error);
+            if (typeof showToast === 'function') {
+                showToast('An error occurred', 'error');
+            } else {
+                alert('An error occurred while saving settings');
+            }
+        }
+    });
+</script>

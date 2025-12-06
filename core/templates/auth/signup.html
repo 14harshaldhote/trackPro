@@ -1,0 +1,200 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="working-hard">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Tracker Pro</title>
+    <link rel="stylesheet" href="{% static 'core/css/themes.css' %}">
+    <link rel="stylesheet" href="{% static 'core/css/auth.css' %}">
+    <link rel="icon" type="image/x-icon" href="{% static 'icons/fav.ico' %}">
+
+    <!-- Google OAuth is handled via allauth redirect -->
+</head>
+
+<body class="auth-page">
+    <div class="auth-container">
+        <div class="auth-box">
+            <div class="auth-header">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="var(--color-primary)">
+                    <path
+                        d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z" />
+                </svg>
+                <h1 class="auth-title">Create Account</h1>
+                <p class="auth-subtitle">Start tracking your progress today</p>
+            </div>
+
+            <!-- Google OAuth Sign Up via Allauth -->
+            {% if google_oauth_enabled %}
+            <div class="auth-google">
+                <a href="/accounts/google/login/?process=login" class="btn btn-google">
+                    <svg width="20" height="20" viewBox="0 0 24 24">
+                        <path fill="#4285F4"
+                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                        <path fill="#34A853"
+                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05"
+                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                        <path fill="#EA4335"
+                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                    </svg>
+                    <span>Continue with Google</span>
+                </a>
+
+                <div class="auth-divider">
+                    <span>or sign up with email</span>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Email/Password Signup Form -->
+            <form id="signup-form" class="auth-form" method="post" action="/api/auth/signup/">
+                {% csrf_token %}
+
+                <div class="form-group">
+                    <label for="email" class="form-label">Email Address</label>
+                    <input type="email" id="email" name="email" class="form-input" placeholder="you@example.com"
+                        required autocomplete="email" autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password1" class="form-label">Password</label>
+                    <input type="password" id="password1" name="password1" class="form-input"
+                        placeholder="Create a strong password" required autocomplete="new-password" minlength="8">
+                    <small class="form-help">At least 8 characters</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="password2" class="form-label">Confirm Password</label>
+                    <input type="password" id="password2" name="password2" class="form-input"
+                        placeholder="Re-enter your password" required autocomplete="new-password" minlength="8">
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="agree_terms" required>
+                        <span>I agree to the <a href="/terms/" target="_blank">Terms of Service</a> and <a
+                                href="/privacy/" target="_blank">Privacy Policy</a></span>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block" id="signup-btn">
+                    <span class="btn-text">Create Account</span>
+                    <span class="btn-loader" style="display: none;">
+                        <svg class="spinner" width="20" height="20" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"
+                                opacity="0.25" />
+                            <path d="M12 2a10 10 0 0110 10" stroke="currentColor" stroke-width="4" fill="none"
+                                stroke-linecap="round" />
+                        </svg>
+                    </span>
+                </button>
+
+                <div id="error-message" class="error-message" style="display: none;"></div>
+            </form>
+
+            <div class="auth-footer">
+                <p>Already have an account? <a href="/login/" class="auth-link">Sign in</a></p>
+            </div>
+        </div>
+
+        <div class="auth-sidebar">
+            <div class="auth-feature">
+                <h2>Join Tracker Pro</h2>
+                <ul class="feature-list">
+                    <li>✨ Free to get started</li>
+                    <li>📊 Powerful analytics dashboard</li>
+                    <li>🎯 Goal tracking and reminders</li>
+                    <li>☁️ Cloud sync across devices</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const password1 = document.getElementById('password1').value;
+            const password2 = document.getElementById('password2').value;
+
+            if (password1 !== password2) {
+                showError('Passwords do not match');
+                return;
+            }
+
+            const btn = document.getElementById('signup-btn');
+            const btnText = btn.querySelector('.btn-text');
+            const btnLoader = btn.querySelector('.btn-loader');
+
+            btn.disabled = true;
+            btnText.style.display = 'none';
+            btnLoader.style.display = 'inline-block';
+
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch('/api/auth/signup/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    window.location.href = data.redirect || '/';
+                } else {
+                    showError(data.error || 'Failed to create account');
+                    btn.disabled = false;
+                    btnText.style.display = 'inline';
+                    btnLoader.style.display = 'none';
+                }
+            } catch (error) {
+                showError('Failed to create account. Please try again.');
+                btn.disabled = false;
+                btnText.style.display = 'inline';
+                btnLoader.style.display = 'none';
+            }
+        });
+
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            setTimeout(() => {
+                errorEl.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+    <style>
+        .btn-google {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--color-text-primary);
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .btn-google:hover {
+            background: var(--color-bg-alt);
+            border-color: var(--color-text-secondary);
+        }
+    </style>
+</body>
+
+</html>

@@ -1,0 +1,113 @@
+<!-- Theme Gallery Modal -->
+<div class="modal-dialog modal-lg">
+    <div class="modal-header">
+        <h2 class="modal-title">🎨 Theme Gallery</h2>
+        <button class="modal-close" data-action="close-modal" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clip-rule="evenodd" />
+            </svg>
+        </button>
+    </div>
+
+    <div class="modal-body">
+        <p style="color: var(--color-text-secondary); margin-bottom: 1.5rem;">
+            Choose a theme that matches your mood and workflow
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+            {% for theme in available_themes %}
+            <div class="theme-preview" data-theme="{{ theme.value }}">
+                <div class="theme-colors"
+                    style="background: linear-gradient(135deg, {{ theme.primary }} 0%, {{ theme.secondary }} 100%); height: 100px; border-radius: 8px 8px 0 0;">
+                </div>
+                <div style="padding: 1rem;">
+                    <h3 style="font-weight: 600; margin: 0 0 0.25rem;">{{ theme.name }}</h3>
+                    <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0;">
+                        {{ theme.description }}
+                    </p>
+                </div>
+                <button class="btn btn-sm btn-secondary theme-apply-btn" data-theme="{{ theme.value }}"
+                    style="width: calc(100% - 2rem); margin: 0 1rem 1rem;">
+                    {% if theme.value == current_theme %}Current{% else %}Apply{% endif %}
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="modal-footer">
+        <button class="btn btn-secondary" data-action="close-modal">Close</button>
+    </div>
+</div>
+
+<style>
+    .theme-preview {
+        background: var(--color-surface);
+        border: 2px solid var(--color-border);
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+
+    .theme-preview:hover {
+        border-color: var(--color-primary);
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+    }
+</style>
+
+<script>
+    document.querySelectorAll('.theme-apply-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const theme = btn.dataset.theme;
+
+            try {
+                const response = await fetch('/api/preferences/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ theme })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Apply theme immediately
+                    document.documentElement.setAttribute('data-theme', theme);
+                    localStorage.setItem('tracker-theme', theme);
+
+                    // Update button text
+                    document.querySelectorAll('.theme-apply-btn').forEach(b => {
+                        b.textContent = 'Apply';
+                    });
+                    btn.textContent = 'Current';
+
+                    showToast(`Theme "${theme}" applied`, 'success');
+                }
+            } catch (error) {
+                showToast('Failed to apply theme', 'error');
+            }
+        });
+    });
+
+    // Preview theme on hover
+    document.querySelectorAll('.theme-preview').forEach(preview => {
+        let originalTheme = document.documentElement.getAttribute('data-theme');
+
+        preview.addEventListener('mouseenter', () => {
+            const theme = preview.dataset.theme;
+            document.documentElement.setAttribute('data-theme', theme);
+        });
+
+        preview.addEventListener('mouseleave', () => {
+            const currentTheme = localStorage.getItem('tracker-theme') || 'working-hard';
+            document.documentElement.setAttribute('data-theme', currentTheme);
+        });
+    });
+</script>

@@ -1,212 +1,211 @@
-<!-- Templates Library Panel -->
-<div class="panel templates-panel fade-in">
+{% load static %}
+<div class="panel" data-panel="templates">
+    <div class="breadcrumb">
+        <a href="/">Home</a>
+        <span class="breadcrumb-separator">›</span>
+        <span>Templates</span>
+    </div>
+
     <div class="panel-header">
         <div>
-            <h1 class="panel-title">Templates Library</h1>
-            <p class="panel-subtitle">Ready-to-use tracker templates</p>
+            <h1 class="panel-title">📋 Tracker Templates</h1>
+            <p style="color: var(--color-text-secondary); margin: 0.5rem 0 0;">
+                Start tracking faster with pre-built templates
+            </p>
         </div>
-        <div class="panel-actions">
-            <button class="btn btn-primary" data-action="create-template">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
+    </div>
+
+    <!-- Category Filter -->
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;">
+        <button class="btn btn-sm {% if not selected_category %}btn-primary{% else %}btn-secondary{% endif %}"
+            data-filter-category="">
+            All Templates
+        </button>
+        {% for category in categories %}
+        <button class="btn btn-sm {% if selected_category == category %}btn-primary{% else %}btn-secondary{% endif %}"
+            data-filter-category="{{ category }}">
+            {{ category }}
+        </button>
+        {% endfor %}
+    </div>
+
+    <!-- Template Grid -->
+    {% if templates %}
+    <div
+        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
+        {% for template in templates %}
+        <div class="template-card" data-template-id="{{ template.id }}" data-category="{{ template.category }}"
+            style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; padding: 1.5rem; transition: all 0.2s;">
+
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                <div>
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">{{ template.icon|default:"📋" }}</div>
+                    <h3 style="font-size: 1.125rem; font-weight: 600; margin: 0 0 0.25rem;">{{ template.name }}</h3>
+                    <span
+                        style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: var(--color-bg); border-radius: 4px; color: var(--color-text-secondary);">
+                        {{ template.category }}
+                    </span>
+                </div>
+            </div>
+
+            <p style="color: var(--color-text-secondary); font-size: 0.875rem; margin: 0 0 1rem;">
+                {{ template.description }}
+            </p>
+
+            <!-- Template Details -->
+            <div style="margin-bottom: 1rem;">
+                <div
+                    style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 0.5rem;">
+                    Includes {{ template.task_count }} task{{ template.task_count|pluralize }}:
+                </div>
+                <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem; color: var(--color-text-secondary);">
+                    {% for task in template.tasks|slice:":3" %}
+                    <li>{{ task }}</li>
+                    {% endfor %}
+                    {% if template.task_count > 3 %}
+                    <li style="color: var(--color-text-tertiary);">+{{ template.task_count|add:"-3" }} more</li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-secondary" data-action="preview-template" data-template-id="{{ template.id }}"
+                    style="flex: 1;">
+                    Preview
+                </button>
+                <button class="btn btn-primary" data-action="use-template" data-template-id="{{ template.id }}"
+                    style="flex: 1;">
+                    Use Template
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg class="empty-state-icon" width="80" height="80" viewBox="0 0 20 20" fill="currentColor">
+            <path
+                d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+        </svg>
+        <h3 class="empty-state-title">No templates available</h3>
+        <p class="empty-state-description">Templates will appear here once they're added</p>
+    </div>
+    {% endif %}
+
+    <!-- User Created Templates -->
+    {% if user_templates %}
+    <section>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="font-size: 1.125rem; font-weight: 600; margin: 0;">Your Templates</h2>
+            <button class="btn btn-secondary btn-sm" data-action="create-template">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd"
+                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                        clip-rule="evenodd" />
                 </svg>
                 Create Template
             </button>
         </div>
-    </div>
 
-    <!-- Template Categories -->
-    <div class="template-categories">
-        <button class="category-btn active" data-category="all">All</button>
-        <button class="category-btn" data-category="health">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-            </svg>
-            Health
-        </button>
-        <button class="category-btn" data-category="productivity">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-            </svg>
-            Productivity
-        </button>
-        <button class="category-btn" data-category="learning">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-            </svg>
-            Learning
-        </button>
-        <button class="category-btn" data-category="lifestyle">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <polygon
-                    points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
-                </polygon>
-            </svg>
-            Lifestyle
-        </button>
-    </div>
-
-    <!-- Templates Grid -->
-    <div class="templates-grid">
-        <!-- Morning Routine -->
-        <div class="template-card" data-category="lifestyle">
-            <div class="template-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 2v8"></path>
-                    <path d="m4.93 10.93 1.41 1.41"></path>
-                    <path d="M2 18h2"></path>
-                    <path d="M20 18h2"></path>
-                    <path d="m19.07 10.93-1.41 1.41"></path>
-                    <path d="M22 22H2"></path>
-                    <path d="m8 22 4-10 4 10"></path>
-                </svg>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+            {% for template in user_templates %}
+            <div class="template-card"
+                style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <h4 style="font-weight: 600; margin: 0;">{{ template.name }}</h4>
+                    <div class="dropdown">
+                        <button class="btn-icon dropdown-toggle" aria-label="Options">
+                            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                                <path
+                                    d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu">
+                            <button class="dropdown-item" data-action="use-template"
+                                data-template-id="{{ template.id }}">Use Template</button>
+                            <button class="dropdown-item" data-action="edit-template"
+                                data-template-id="{{ template.id }}">Edit</button>
+                            <button class="dropdown-item" data-action="duplicate-template"
+                                data-template-id="{{ template.id }}">Duplicate</button>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item dropdown-item-danger" data-action="delete-template"
+                                data-template-id="{{ template.id }}">Delete</button>
+                        </div>
+                    </div>
+                </div>
+                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0 0 0.5rem;">
+                    {{ template.task_count }} task{{ template.task_count|pluralize }} • {{ template.time_period|title }}
+                </p>
             </div>
-            <h3 class="template-name">Morning Routine</h3>
-            <p class="template-description">Start your day with purpose. Includes meditation, exercise, and planning.
-            </p>
-            <div class="template-tasks">
-                <span class="task-count">8 tasks</span>
-                <span class="template-type">Daily</span>
-            </div>
-            <button class="btn btn-primary" data-action="use-template" data-template="morning">Use Template</button>
+            {% endfor %}
         </div>
-
-        <!-- Fitness Tracker -->
-        <div class="template-card" data-category="health">
-            <div class="template-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                </svg>
-            </div>
-            <h3 class="template-name">Fitness Tracker</h3>
-            <p class="template-description">Track workouts, nutrition, and recovery for optimal fitness.</p>
-            <div class="template-tasks">
-                <span class="task-count">6 tasks</span>
-                <span class="template-type">Daily</span>
-            </div>
-            <button class="btn btn-primary" data-action="use-template" data-template="fitness">Use Template</button>
-        </div>
-
-        <!-- Study Plan -->
-        <div class="template-card" data-category="learning">
-            <div class="template-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                </svg>
-            </div>
-            <h3 class="template-name">Study Plan</h3>
-            <p class="template-description">Structured learning with reading, practice, and review sessions.</p>
-            <div class="template-tasks">
-                <span class="task-count">5 tasks</span>
-                <span class="template-type">Daily</span>
-            </div>
-            <button class="btn btn-primary" data-action="use-template" data-template="study">Use Template</button>
-        </div>
-
-        <!-- Work Productivity -->
-        <div class="template-card" data-category="productivity">
-            <div class="template-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <circle cx="12" cy="12" r="6"></circle>
-                    <circle cx="12" cy="12" r="2"></circle>
-                </svg>
-            </div>
-            <h3 class="template-name">Work Productivity</h3>
-            <p class="template-description">Focus blocks, email management, and daily planning.</p>
-            <div class="template-tasks">
-                <span class="task-count">7 tasks</span>
-                <span class="template-type">Daily</span>
-            </div>
-            <button class="btn btn-primary" data-action="use-template" data-template="work">Use Template</button>
-        </div>
-
-        <!-- Mindfulness -->
-        <div class="template-card" data-category="health">
-            <div class="template-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
-                    <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                    <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                    <line x1="15" y1="9" x2="15.01" y2="9"></line>
-                </svg>
-            </div>
-            <h3 class="template-name">Mindfulness</h3>
-            <p class="template-description">Meditation, gratitude journaling, and mental wellness.</p>
-            <div class="template-tasks">
-                <span class="task-count">4 tasks</span>
-                <span class="template-type">Daily</span>
-            </div>
-            <button class="btn btn-primary" data-action="use-template" data-template="mindfulness">Use Template</button>
-        </div>
-
-        <!-- Evening Wind Down -->
-        <div class="template-card" data-category="lifestyle">
-            <div class="template-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                </svg>
-            </div>
-            <h3 class="template-name">Evening Wind Down</h3>
-            <p class="template-description">Prepare for restful sleep with relaxation routines.</p>
-            <div class="template-tasks">
-                <span class="task-count">5 tasks</span>
-                <span class="template-type">Daily</span>
-            </div>
-            <button class="btn btn-primary" data-action="use-template" data-template="evening">Use Template</button>
-        </div>
-
-        <!-- Weekly Review -->
-        <div class="template-card" data-category="productivity">
-            <div class="template-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="20" x2="12" y2="10"></line>
-                    <line x1="18" y1="20" x2="18" y2="4"></line>
-                    <line x1="6" y1="20" x2="6" y2="16"></line>
-                </svg>
-            </div>
-            <h3 class="template-name">Weekly Review</h3>
-            <p class="template-description">Reflect on the week and plan for success ahead.</p>
-            <div class="template-tasks">
-                <span class="task-count">6 tasks</span>
-                <span class="template-type">Weekly</span>
-            </div>
-            <button class="btn btn-primary" data-action="use-template" data-template="weekly-review">Use
-                Template</button>
-        </div>
-
-        <!-- Language Learning -->
-        <div class="template-card" data-category="learning">
-            <div class="template-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <path
-                        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z">
-                    </path>
-                </svg>
-            </div>
-            <h3 class="template-name">Language Learning</h3>
-            <p class="template-description">Vocabulary, grammar, speaking practice, and immersion.</p>
-            <div class="template-tasks">
-                <span class="task-count">5 tasks</span>
-                <span class="template-type">Daily</span>
-            </div>
-            <button class="btn btn-primary" data-action="use-template" data-template="language">Use Template</button>
-        </div>
-    </div>
+    </section>
+    {% endif %}
 </div>
+
+<style>
+    .template-card:hover {
+        border-color: var(--color-primary);
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+    }
+</style>
+
+<script>
+    // Category filter
+    document.querySelectorAll('[data-filter-category]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const category = btn.dataset.filterCategory;
+
+            // Update button states
+            document.querySelectorAll('[data-filter-category]').forEach(b => {
+                b.classList.remove('btn-primary');
+                b.classList.add('btn-secondary');
+            });
+            btn.classList.remove('btn-secondary');
+            btn.classList.add('btn-primary');
+
+            // Filter templates
+            document.querySelectorAll('.template-card').forEach(card => {
+                if (!category || card.dataset.category === category) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    });
+
+    // Use template
+    document.querySelectorAll('[data-action="use-template"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const templateId = btn.dataset.templateId;
+
+            try {
+                const response = await fetch(`/api/templates/${templateId}/use/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('Tracker created from template!', 'success');
+                    window.location.href = `/tracker/${data.tracker_id}/`;
+                } else {
+                    showToast(data.error || 'Failed to use template', 'error');
+                }
+            } catch (error) {
+                showToast('An error occurred', 'error');
+            }
+        });
+    });
+
+    // Preview template
+    document.querySelectorAll('[data-action="preview-template"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const templateId = btn.dataset.templateId;
+            openModal('tracker-templates', { template_id: templateId });
+        });
+    });
+</script>

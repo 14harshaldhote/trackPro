@@ -1,0 +1,1538 @@
+/* Base Variables (Default Theme: Working Hard Mode) */
+:root {
+    /* Primary Colors */
+    --color-primary: #0277BD;
+    --color-primary-rgb: 2, 119, 189;
+    --color-secondary: #01579B;
+    --color-accent: #29B6F6;
+
+    /* Backgrounds */
+    --color-bg: #ECEFF1;
+    --color-bg-alt: #E0E4E6;
+    --color-bg-muted: #F5F7F8;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(0, 0, 0, 0.5);
+
+    /* Text Hierarchy */
+    --color-text-primary: #263238;
+    --color-text-secondary: #546E7A;
+    --color-text-tertiary: #90A4AE;
+    --color-text-disabled: #B0BEC5;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #0277BD;
+    --color-text-link-hover: #01579B;
+
+    /* State Colors */
+    --color-success: #10B981;
+    --color-success-rgb: 16, 185, 129;
+    --color-success-bg: rgba(16, 185, 129, 0.1);
+    --color-warning: #F59E0B;
+    --color-warning-rgb: 245, 158, 11;
+    --color-warning-bg: rgba(245, 158, 11, 0.1);
+    --color-error: #EF4444;
+    --color-error-rgb: 239, 68, 68;
+    --color-error-bg: rgba(239, 68, 68, 0.1);
+    --color-info: #3B82F6;
+    --color-info-rgb: 59, 130, 246;
+    --color-info-bg: rgba(59, 130, 246, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(2, 119, 189, 0.08);
+    --color-active: rgba(2, 119, 189, 0.16);
+    --color-focus-ring: rgba(2, 119, 189, 0.3);
+    --color-disabled-bg: #E0E4E6;
+
+    /* Borders */
+    --color-border: rgba(2, 119, 189, 0.15);
+    --color-border-light: rgba(2, 119, 189, 0.08);
+    --color-border-strong: rgba(2, 119, 189, 0.3);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 1. Rage */
+[data-theme="rage"] {
+    /* Primary Colors */
+    --color-primary: #FF1744;
+    --color-primary-rgb: 255, 23, 68;
+    --color-secondary: #C62828;
+    --color-accent: #FF6F00;
+
+    /* Backgrounds */
+    --color-bg: #1A0000;
+    --color-bg-alt: #250505;
+    --color-bg-muted: #2D0A0A;
+    --color-surface: #2D0A0A;
+    --color-surface-raised: #3D1010;
+    --color-surface-overlay: rgba(0, 0, 0, 0.75);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #FFCDD2;
+    --color-text-tertiary: #EF9A9A;
+    --color-text-disabled: #B71C1C;
+    --color-text-inverse: #1A0000;
+    --color-text-link: #FF6F00;
+    --color-text-link-hover: #FF8F00;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFAB00;
+    --color-warning-rgb: 255, 171, 0;
+    --color-warning-bg: rgba(255, 171, 0, 0.15);
+    --color-error: #FF5252;
+    --color-error-rgb: 255, 82, 82;
+    --color-error-bg: rgba(255, 82, 82, 0.15);
+    --color-info: #40C4FF;
+    --color-info-rgb: 64, 196, 255;
+    --color-info-bg: rgba(64, 196, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(255, 23, 68, 0.12);
+    --color-active: rgba(255, 23, 68, 0.24);
+    --color-focus-ring: rgba(255, 23, 68, 0.4);
+    --color-disabled-bg: #250505;
+
+    /* Borders */
+    --color-border: rgba(255, 23, 68, 0.3);
+    --color-border-light: rgba(255, 23, 68, 0.15);
+    --color-border-strong: rgba(255, 23, 68, 0.5);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 2. Bloom */
+[data-theme="bloom"] {
+    /* Primary Colors */
+    --color-primary: #66BB6A;
+    --color-primary-rgb: 102, 187, 106;
+    --color-secondary: #43A047;
+    --color-accent: #AED581;
+
+    /* Backgrounds */
+    --color-bg: #F1F8E9;
+    --color-bg-alt: #E8F5E0;
+    --color-bg-muted: #F9FBF7;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(0, 0, 0, 0.4);
+
+    /* Text Hierarchy */
+    --color-text-primary: #1B5E20;
+    --color-text-secondary: #558B2F;
+    --color-text-tertiary: #7CB342;
+    --color-text-disabled: #A5D6A7;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #43A047;
+    --color-text-link-hover: #2E7D32;
+
+    /* State Colors */
+    --color-success: #00C853;
+    --color-success-rgb: 0, 200, 83;
+    --color-success-bg: rgba(0, 200, 83, 0.1);
+    --color-warning: #FFD600;
+    --color-warning-rgb: 255, 214, 0;
+    --color-warning-bg: rgba(255, 214, 0, 0.1);
+    --color-error: #D32F2F;
+    --color-error-rgb: 211, 47, 47;
+    --color-error-bg: rgba(211, 47, 47, 0.1);
+    --color-info: #0288D1;
+    --color-info-rgb: 2, 136, 209;
+    --color-info-bg: rgba(2, 136, 209, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(102, 187, 106, 0.08);
+    --color-active: rgba(102, 187, 106, 0.16);
+    --color-focus-ring: rgba(102, 187, 106, 0.3);
+    --color-disabled-bg: #E8F5E0;
+
+    /* Borders */
+    --color-border: rgba(102, 187, 106, 0.2);
+    --color-border-light: rgba(102, 187, 106, 0.1);
+    --color-border-strong: rgba(102, 187, 106, 0.35);
+
+    /* Shadows */
+    --shadow-color: rgba(27, 94, 32, 0.08);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 3. Blossom */
+[data-theme="blossom"] {
+    /* Primary Colors */
+    --color-primary: #F48FB1;
+    --color-primary-rgb: 244, 143, 177;
+    --color-secondary: #EC407A;
+    --color-accent: #FFD54F;
+
+    /* Backgrounds */
+    --color-bg: #FFF0F5;
+    --color-bg-alt: #FCE4EC;
+    --color-bg-muted: #FFF8FA;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(136, 14, 79, 0.4);
+
+    /* Text Hierarchy */
+    --color-text-primary: #880E4F;
+    --color-text-secondary: #AD1457;
+    --color-text-tertiary: #C2185B;
+    --color-text-disabled: #F8BBD0;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #EC407A;
+    --color-text-link-hover: #D81B60;
+
+    /* State Colors */
+    --color-success: #00C853;
+    --color-success-rgb: 0, 200, 83;
+    --color-success-bg: rgba(0, 200, 83, 0.1);
+    --color-warning: #FFC107;
+    --color-warning-rgb: 255, 193, 7;
+    --color-warning-bg: rgba(255, 193, 7, 0.1);
+    --color-error: #D32F2F;
+    --color-error-rgb: 211, 47, 47;
+    --color-error-bg: rgba(211, 47, 47, 0.1);
+    --color-info: #1976D2;
+    --color-info-rgb: 25, 118, 210;
+    --color-info-bg: rgba(25, 118, 210, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(244, 143, 177, 0.1);
+    --color-active: rgba(244, 143, 177, 0.2);
+    --color-focus-ring: rgba(244, 143, 177, 0.35);
+    --color-disabled-bg: #FCE4EC;
+
+    /* Borders */
+    --color-border: rgba(244, 143, 177, 0.25);
+    --color-border-light: rgba(244, 143, 177, 0.12);
+    --color-border-strong: rgba(244, 143, 177, 0.4);
+
+    /* Shadows */
+    --shadow-color: rgba(136, 14, 79, 0.08);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 4. Cherry */
+[data-theme="cherry"] {
+    /* Primary Colors */
+    --color-primary: #E91E63;
+    --color-primary-rgb: 233, 30, 99;
+    --color-secondary: #C2185B;
+    --color-accent: #FF4081;
+
+    /* Backgrounds */
+    --color-bg: #FCE4EC;
+    --color-bg-alt: #F8BBD0;
+    --color-bg-muted: #FFF1F5;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(136, 14, 79, 0.5);
+
+    /* Text Hierarchy */
+    --color-text-primary: #880E4F;
+    --color-text-secondary: #C2185B;
+    --color-text-tertiary: #E91E63;
+    --color-text-disabled: #F8BBD0;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #E91E63;
+    --color-text-link-hover: #AD1457;
+
+    /* State Colors */
+    --color-success: #00C853;
+    --color-success-rgb: 0, 200, 83;
+    --color-success-bg: rgba(0, 200, 83, 0.1);
+    --color-warning: #FFC107;
+    --color-warning-rgb: 255, 193, 7;
+    --color-warning-bg: rgba(255, 193, 7, 0.1);
+    --color-error: #D50000;
+    --color-error-rgb: 213, 0, 0;
+    --color-error-bg: rgba(213, 0, 0, 0.1);
+    --color-info: #1976D2;
+    --color-info-rgb: 25, 118, 210;
+    --color-info-bg: rgba(25, 118, 210, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(233, 30, 99, 0.08);
+    --color-active: rgba(233, 30, 99, 0.16);
+    --color-focus-ring: rgba(233, 30, 99, 0.3);
+    --color-disabled-bg: #F8BBD0;
+
+    /* Borders */
+    --color-border: rgba(233, 30, 99, 0.2);
+    --color-border-light: rgba(233, 30, 99, 0.1);
+    --color-border-strong: rgba(233, 30, 99, 0.35);
+
+    /* Shadows */
+    --shadow-color: rgba(136, 14, 79, 0.1);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 5. Horny */
+[data-theme="horny"] {
+    /* Primary Colors */
+    --color-primary: #D32F2F;
+    --color-primary-rgb: 211, 47, 47;
+    --color-secondary: #7B1FA2;
+    --color-accent: #FF6F00;
+
+    /* Backgrounds */
+    --color-bg: #1A0A14;
+    --color-bg-alt: #25101D;
+    --color-bg-muted: #2D1B2E;
+    --color-surface: #2D1B2E;
+    --color-surface-raised: #3D2840;
+    --color-surface-overlay: rgba(0, 0, 0, 0.75);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #E1BEE7;
+    --color-text-tertiary: #CE93D8;
+    --color-text-disabled: #7B1FA2;
+    --color-text-inverse: #1A0A14;
+    --color-text-link: #FF6F00;
+    --color-text-link-hover: #FF8F00;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFAB00;
+    --color-warning-rgb: 255, 171, 0;
+    --color-warning-bg: rgba(255, 171, 0, 0.15);
+    --color-error: #FF5252;
+    --color-error-rgb: 255, 82, 82;
+    --color-error-bg: rgba(255, 82, 82, 0.15);
+    --color-info: #E040FB;
+    --color-info-rgb: 224, 64, 251;
+    --color-info-bg: rgba(224, 64, 251, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(211, 47, 47, 0.15);
+    --color-active: rgba(211, 47, 47, 0.3);
+    --color-focus-ring: rgba(211, 47, 47, 0.5);
+    --color-disabled-bg: #25101D;
+
+    /* Borders */
+    --color-border: rgba(211, 47, 47, 0.4);
+    --color-border-light: rgba(211, 47, 47, 0.2);
+    --color-border-strong: rgba(211, 47, 47, 0.6);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 6. Working Hard Mode (Default) */
+[data-theme="working-hard"] {
+    /* Primary Colors */
+    --color-primary: #0277BD;
+    --color-primary-rgb: 2, 119, 189;
+    --color-secondary: #01579B;
+    --color-accent: #29B6F6;
+
+    /* Backgrounds */
+    --color-bg: #ECEFF1;
+    --color-bg-alt: #E0E4E6;
+    --color-bg-muted: #F5F7F8;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(0, 0, 0, 0.5);
+
+    /* Text Hierarchy */
+    --color-text-primary: #263238;
+    --color-text-secondary: #546E7A;
+    --color-text-tertiary: #90A4AE;
+    --color-text-disabled: #B0BEC5;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #0277BD;
+    --color-text-link-hover: #01579B;
+
+    /* State Colors */
+    --color-success: #10B981;
+    --color-success-rgb: 16, 185, 129;
+    --color-success-bg: rgba(16, 185, 129, 0.1);
+    --color-warning: #F59E0B;
+    --color-warning-rgb: 245, 158, 11;
+    --color-warning-bg: rgba(245, 158, 11, 0.1);
+    --color-error: #EF4444;
+    --color-error-rgb: 239, 68, 68;
+    --color-error-bg: rgba(239, 68, 68, 0.1);
+    --color-info: #3B82F6;
+    --color-info-rgb: 59, 130, 246;
+    --color-info-bg: rgba(59, 130, 246, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(2, 119, 189, 0.08);
+    --color-active: rgba(2, 119, 189, 0.16);
+    --color-focus-ring: rgba(2, 119, 189, 0.3);
+    --color-disabled-bg: #E0E4E6;
+
+    /* Borders */
+    --color-border: rgba(2, 119, 189, 0.15);
+    --color-border-light: rgba(2, 119, 189, 0.08);
+    --color-border-strong: rgba(2, 119, 189, 0.3);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 7. Total Dark */
+[data-theme="total-dark"] {
+    /* Primary Colors */
+    --color-primary: #00BFA5;
+    --color-primary-rgb: 0, 191, 165;
+    --color-secondary: #00897B;
+    --color-accent: #64FFDA;
+
+    /* Backgrounds */
+    --color-bg: #000000;
+    --color-bg-alt: #0A0A0A;
+    --color-bg-muted: #121212;
+    --color-surface: #121212;
+    --color-surface-raised: #1E1E1E;
+    --color-surface-overlay: rgba(0, 0, 0, 0.85);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #B0BEC5;
+    --color-text-tertiary: #78909C;
+    --color-text-disabled: #546E7A;
+    --color-text-inverse: #000000;
+    --color-text-link: #64FFDA;
+    --color-text-link-hover: #00BFA5;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFAB00;
+    --color-warning-rgb: 255, 171, 0;
+    --color-warning-bg: rgba(255, 171, 0, 0.15);
+    --color-error: #FF5252;
+    --color-error-rgb: 255, 82, 82;
+    --color-error-bg: rgba(255, 82, 82, 0.15);
+    --color-info: #40C4FF;
+    --color-info-rgb: 64, 196, 255;
+    --color-info-bg: rgba(64, 196, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(0, 191, 165, 0.12);
+    --color-active: rgba(0, 191, 165, 0.24);
+    --color-focus-ring: rgba(0, 191, 165, 0.4);
+    --color-disabled-bg: #0A0A0A;
+
+    /* Borders */
+    --color-border: rgba(0, 191, 165, 0.3);
+    --color-border-light: rgba(0, 191, 165, 0.15);
+    --color-border-strong: rgba(0, 191, 165, 0.5);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.7);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 8. Rising Up */
+[data-theme="rising-up"] {
+    /* Primary Colors */
+    --color-primary: #FFA726;
+    --color-primary-rgb: 255, 167, 38;
+    --color-secondary: #FB8C00;
+    --color-accent: #FFEB3B;
+
+    /* Backgrounds */
+    --color-bg: #FFF8E1;
+    --color-bg-alt: #FFECB3;
+    --color-bg-muted: #FFFBF0;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(230, 81, 0, 0.4);
+
+    /* Text Hierarchy */
+    --color-text-primary: #E65100;
+    --color-text-secondary: #F57C00;
+    --color-text-tertiary: #FB8C00;
+    --color-text-disabled: #FFE0B2;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #FB8C00;
+    --color-text-link-hover: #EF6C00;
+
+    /* State Colors */
+    --color-success: #00C853;
+    --color-success-rgb: 0, 200, 83;
+    --color-success-bg: rgba(0, 200, 83, 0.1);
+    --color-warning: #FFC107;
+    --color-warning-rgb: 255, 193, 7;
+    --color-warning-bg: rgba(255, 193, 7, 0.1);
+    --color-error: #D32F2F;
+    --color-error-rgb: 211, 47, 47;
+    --color-error-bg: rgba(211, 47, 47, 0.1);
+    --color-info: #0288D1;
+    --color-info-rgb: 2, 136, 209;
+    --color-info-bg: rgba(2, 136, 209, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(255, 167, 38, 0.08);
+    --color-active: rgba(255, 167, 38, 0.16);
+    --color-focus-ring: rgba(255, 167, 38, 0.3);
+    --color-disabled-bg: #FFECB3;
+
+    /* Borders */
+    --color-border: rgba(255, 167, 38, 0.2);
+    --color-border-light: rgba(255, 167, 38, 0.1);
+    --color-border-strong: rgba(255, 167, 38, 0.35);
+
+    /* Shadows */
+    --shadow-color: rgba(230, 81, 0, 0.1);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 9. Dig Deep */
+[data-theme="dig-deep"] {
+    /* Primary Colors */
+    --color-primary: #6D4C41;
+    --color-primary-rgb: 109, 76, 65;
+    --color-secondary: #4E342E;
+    --color-accent: #A1887F;
+
+    /* Backgrounds */
+    --color-bg: #EFEBE9;
+    --color-bg-alt: #D7CCC8;
+    --color-bg-muted: #F5F3F2;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(62, 39, 35, 0.5);
+
+    /* Text Hierarchy */
+    --color-text-primary: #3E2723;
+    --color-text-secondary: #5D4037;
+    --color-text-tertiary: #795548;
+    --color-text-disabled: #BCAAA4;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #6D4C41;
+    --color-text-link-hover: #4E342E;
+
+    /* State Colors */
+    --color-success: #00C853;
+    --color-success-rgb: 0, 200, 83;
+    --color-success-bg: rgba(0, 200, 83, 0.1);
+    --color-warning: #FFC107;
+    --color-warning-rgb: 255, 193, 7;
+    --color-warning-bg: rgba(255, 193, 7, 0.1);
+    --color-error: #D32F2F;
+    --color-error-rgb: 211, 47, 47;
+    --color-error-bg: rgba(211, 47, 47, 0.1);
+    --color-info: #0288D1;
+    --color-info-rgb: 2, 136, 209;
+    --color-info-bg: rgba(2, 136, 209, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(109, 76, 65, 0.08);
+    --color-active: rgba(109, 76, 65, 0.16);
+    --color-focus-ring: rgba(109, 76, 65, 0.3);
+    --color-disabled-bg: #D7CCC8;
+
+    /* Borders */
+    --color-border: rgba(109, 76, 65, 0.25);
+    --color-border-light: rgba(109, 76, 65, 0.12);
+    --color-border-strong: rgba(109, 76, 65, 0.4);
+
+    /* Shadows */
+    --shadow-color: rgba(62, 39, 35, 0.1);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 10. Sprinter */
+[data-theme="sprinter"] {
+    /* Primary Colors */
+    --color-primary: #00E676;
+    --color-primary-rgb: 0, 230, 118;
+    --color-secondary: #00C853;
+    --color-accent: #FFFF00;
+
+    /* Backgrounds */
+    --color-bg: #0A0A0A;
+    --color-bg-alt: #141414;
+    --color-bg-muted: #1C1C1C;
+    --color-surface: #1C1C1C;
+    --color-surface-raised: #2A2A2A;
+    --color-surface-overlay: rgba(0, 0, 0, 0.85);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #B9F6CA;
+    --color-text-tertiary: #69F0AE;
+    --color-text-disabled: #00C853;
+    --color-text-inverse: #0A0A0A;
+    --color-text-link: #FFFF00;
+    --color-text-link-hover: #FFEA00;
+
+    /* State Colors */
+    --color-success: #76FF03;
+    --color-success-rgb: 118, 255, 3;
+    --color-success-bg: rgba(118, 255, 3, 0.15);
+    --color-warning: #FFEA00;
+    --color-warning-rgb: 255, 234, 0;
+    --color-warning-bg: rgba(255, 234, 0, 0.15);
+    --color-error: #FF1744;
+    --color-error-rgb: 255, 23, 68;
+    --color-error-bg: rgba(255, 23, 68, 0.15);
+    --color-info: #00E5FF;
+    --color-info-rgb: 0, 229, 255;
+    --color-info-bg: rgba(0, 229, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(0, 230, 118, 0.15);
+    --color-active: rgba(0, 230, 118, 0.3);
+    --color-focus-ring: rgba(0, 230, 118, 0.5);
+    --color-disabled-bg: #141414;
+
+    /* Borders */
+    --color-border: rgba(0, 230, 118, 0.5);
+    --color-border-light: rgba(0, 230, 118, 0.25);
+    --color-border-strong: rgba(0, 230, 118, 0.7);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.7);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 11. Rider */
+[data-theme="rider"] {
+    /* Primary Colors */
+    --color-primary: #FF6EC7;
+    --color-primary-rgb: 255, 110, 199;
+    --color-secondary: #00D9FF;
+    --color-accent: #FFF01F;
+
+    /* Backgrounds */
+    --color-bg: #1A0033;
+    --color-bg-alt: #250047;
+    --color-bg-muted: #2D1B3D;
+    --color-surface: #2D1B3D;
+    --color-surface-raised: #3D2850;
+    --color-surface-overlay: rgba(0, 0, 0, 0.75);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #FFB3E6;
+    --color-text-tertiary: #FF80D5;
+    --color-text-disabled: #8B4F9C;
+    --color-text-inverse: #1A0033;
+    --color-text-link: #FFF01F;
+    --color-text-link-hover: #FFE000;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFD600;
+    --color-warning-rgb: 255, 214, 0;
+    --color-warning-bg: rgba(255, 214, 0, 0.15);
+    --color-error: #FF1744;
+    --color-error-rgb: 255, 23, 68;
+    --color-error-bg: rgba(255, 23, 68, 0.15);
+    --color-info: #00D9FF;
+    --color-info-rgb: 0, 217, 255;
+    --color-info-bg: rgba(0, 217, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(255, 110, 199, 0.15);
+    --color-active: rgba(255, 110, 199, 0.3);
+    --color-focus-ring: rgba(255, 110, 199, 0.5);
+    --color-disabled-bg: #250047;
+
+    /* Borders */
+    --color-border: rgba(255, 110, 199, 0.4);
+    --color-border-light: rgba(255, 110, 199, 0.2);
+    --color-border-strong: rgba(255, 110, 199, 0.6);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 12. Beast Mode */
+[data-theme="beast-mode"] {
+    /* Primary Colors */
+    --color-primary: #1A1A1A;
+    --color-primary-rgb: 26, 26, 26;
+    --color-secondary: #FF3D00;
+    --color-accent: #FFAB00;
+
+    /* Backgrounds */
+    --color-bg: #0D0D0D;
+    --color-bg-alt: #1A1A1A;
+    --color-bg-muted: #262626;
+    --color-surface: #262626;
+    --color-surface-raised: #333333;
+    --color-surface-overlay: rgba(0, 0, 0, 0.85);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #BDBDBD;
+    --color-text-tertiary: #9E9E9E;
+    --color-text-disabled: #616161;
+    --color-text-inverse: #0D0D0D;
+    --color-text-link: #FFAB00;
+    --color-text-link-hover: #FF6F00;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFD600;
+    --color-warning-rgb: 255, 214, 0;
+    --color-warning-bg: rgba(255, 214, 0, 0.15);
+    --color-error: #FF3D00;
+    --color-error-rgb: 255, 61, 0;
+    --color-error-bg: rgba(255, 61, 0, 0.15);
+    --color-info: #00B0FF;
+    --color-info-rgb: 0, 176, 255;
+    --color-info-bg: rgba(0, 176, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(255, 61, 0, 0.12);
+    --color-active: rgba(255, 61, 0, 0.24);
+    --color-focus-ring: rgba(255, 61, 0, 0.5);
+    --color-disabled-bg: #1A1A1A;
+
+    /* Borders */
+    --color-border: rgba(255, 61, 0, 0.4);
+    --color-border-light: rgba(255, 61, 0, 0.2);
+    --color-border-strong: rgba(255, 61, 0, 0.6);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.8);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 13. Ocean Wave */
+[data-theme="ocean-wave"] {
+    /* Primary Colors */
+    --color-primary: #0288D1;
+    --color-primary-rgb: 2, 136, 209;
+    --color-secondary: #00ACC1;
+    --color-accent: #80DEEA;
+
+    /* Backgrounds */
+    --color-bg: #E0F7FA;
+    --color-bg-alt: #B2EBF2;
+    --color-bg-muted: #F0FBFC;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(1, 87, 155, 0.5);
+
+    /* Text Hierarchy */
+    --color-text-primary: #01579B;
+    --color-text-secondary: #0277BD;
+    --color-text-tertiary: #0288D1;
+    --color-text-disabled: #B3E5FC;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #0288D1;
+    --color-text-link-hover: #01579B;
+
+    /* State Colors */
+    --color-success: #00C853;
+    --color-success-rgb: 0, 200, 83;
+    --color-success-bg: rgba(0, 200, 83, 0.1);
+    --color-warning: #FFC107;
+    --color-warning-rgb: 255, 193, 7;
+    --color-warning-bg: rgba(255, 193, 7, 0.1);
+    --color-error: #D32F2F;
+    --color-error-rgb: 211, 47, 47;
+    --color-error-bg: rgba(211, 47, 47, 0.1);
+    --color-info: #00ACC1;
+    --color-info-rgb: 0, 172, 193;
+    --color-info-bg: rgba(0, 172, 193, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(2, 136, 209, 0.08);
+    --color-active: rgba(2, 136, 209, 0.16);
+    --color-focus-ring: rgba(2, 136, 209, 0.3);
+    --color-disabled-bg: #B2EBF2;
+
+    /* Borders */
+    --color-border: rgba(2, 136, 209, 0.2);
+    --color-border-light: rgba(2, 136, 209, 0.1);
+    --color-border-strong: rgba(2, 136, 209, 0.35);
+
+    /* Shadows */
+    --shadow-color: rgba(1, 87, 155, 0.1);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 14. Sunset Grind */
+[data-theme="sunset-grind"] {
+    /* Primary Colors */
+    --color-primary: #EF6C00;
+    --color-primary-rgb: 239, 108, 0;
+    --color-secondary: #D84315;
+    --color-accent: #FFC107;
+
+    /* Backgrounds */
+    --color-bg: #3E2723;
+    --color-bg-alt: #4E342E;
+    --color-bg-muted: #5D4037;
+    --color-surface: #4E342E;
+    --color-surface-raised: #5D4037;
+    --color-surface-overlay: rgba(0, 0, 0, 0.7);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #FFCCBC;
+    --color-text-tertiary: #FFAB91;
+    --color-text-disabled: #8D6E63;
+    --color-text-inverse: #3E2723;
+    --color-text-link: #FFC107;
+    --color-text-link-hover: #FFB300;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFAB00;
+    --color-warning-rgb: 255, 171, 0;
+    --color-warning-bg: rgba(255, 171, 0, 0.15);
+    --color-error: #FF5252;
+    --color-error-rgb: 255, 82, 82;
+    --color-error-bg: rgba(255, 82, 82, 0.15);
+    --color-info: #40C4FF;
+    --color-info-rgb: 64, 196, 255;
+    --color-info-bg: rgba(64, 196, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(239, 108, 0, 0.15);
+    --color-active: rgba(239, 108, 0, 0.3);
+    --color-focus-ring: rgba(239, 108, 0, 0.45);
+    --color-disabled-bg: #4E342E;
+
+    /* Borders */
+    --color-border: rgba(239, 108, 0, 0.35);
+    --color-border-light: rgba(239, 108, 0, 0.18);
+    --color-border-strong: rgba(239, 108, 0, 0.5);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 15. Ice Cold */
+[data-theme="ice-cold"] {
+    /* Primary Colors */
+    --color-primary: #00B8D4;
+    --color-primary-rgb: 0, 184, 212;
+    --color-secondary: #0097A7;
+    --color-accent: #18FFFF;
+
+    /* Backgrounds */
+    --color-bg: #E0F2F1;
+    --color-bg-alt: #B2DFDB;
+    --color-bg-muted: #F0F9F8;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(0, 77, 64, 0.5);
+
+    /* Text Hierarchy */
+    --color-text-primary: #004D40;
+    --color-text-secondary: #00695C;
+    --color-text-tertiary: #00897B;
+    --color-text-disabled: #80CBC4;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #00B8D4;
+    --color-text-link-hover: #00838F;
+
+    /* State Colors */
+    --color-success: #00C853;
+    --color-success-rgb: 0, 200, 83;
+    --color-success-bg: rgba(0, 200, 83, 0.1);
+    --color-warning: #FFC107;
+    --color-warning-rgb: 255, 193, 7;
+    --color-warning-bg: rgba(255, 193, 7, 0.1);
+    --color-error: #D32F2F;
+    --color-error-rgb: 211, 47, 47;
+    --color-error-bg: rgba(211, 47, 47, 0.1);
+    --color-info: #0097A7;
+    --color-info-rgb: 0, 151, 167;
+    --color-info-bg: rgba(0, 151, 167, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(0, 184, 212, 0.08);
+    --color-active: rgba(0, 184, 212, 0.16);
+    --color-focus-ring: rgba(0, 184, 212, 0.3);
+    --color-disabled-bg: #B2DFDB;
+
+    /* Borders */
+    --color-border: rgba(0, 184, 212, 0.25);
+    --color-border-light: rgba(0, 184, 212, 0.12);
+    --color-border-strong: rgba(0, 184, 212, 0.4);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 77, 64, 0.1);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 16. Warrior Spirit */
+[data-theme="warrior-spirit"] {
+    /* Primary Colors */
+    --color-primary: #8D6E63;
+    --color-primary-rgb: 141, 110, 99;
+    --color-secondary: #5D4037;
+    --color-accent: #D7CCC8;
+
+    /* Backgrounds */
+    --color-bg: #121212;
+    --color-bg-alt: #1E1E1E;
+    --color-bg-muted: #2A2A2A;
+    --color-surface: #1E1E1E;
+    --color-surface-raised: #2A2A2A;
+    --color-surface-overlay: rgba(0, 0, 0, 0.8);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #BCAAA4;
+    --color-text-tertiary: #A1887F;
+    --color-text-disabled: #6D4C41;
+    --color-text-inverse: #121212;
+    --color-text-link: #D7CCC8;
+    --color-text-link-hover: #BCAAA4;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFAB00;
+    --color-warning-rgb: 255, 171, 0;
+    --color-warning-bg: rgba(255, 171, 0, 0.15);
+    --color-error: #FF5252;
+    --color-error-rgb: 255, 82, 82;
+    --color-error-bg: rgba(255, 82, 82, 0.15);
+    --color-info: #40C4FF;
+    --color-info-rgb: 64, 196, 255;
+    --color-info-bg: rgba(64, 196, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(141, 110, 99, 0.15);
+    --color-active: rgba(141, 110, 99, 0.3);
+    --color-focus-ring: rgba(141, 110, 99, 0.4);
+    --color-disabled-bg: #1E1E1E;
+
+    /* Borders */
+    --color-border: rgba(141, 110, 99, 0.3);
+    --color-border-light: rgba(141, 110, 99, 0.15);
+    --color-border-strong: rgba(141, 110, 99, 0.5);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.7);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 17. Neon Pulse */
+[data-theme="neon-pulse"] {
+    /* Primary Colors */
+    --color-primary: #E040FB;
+    --color-primary-rgb: 224, 64, 251;
+    --color-secondary: #00E5FF;
+    --color-accent: #76FF03;
+
+    /* Backgrounds */
+    --color-bg: #000000;
+    --color-bg-alt: #0A0A0A;
+    --color-bg-muted: #1A1A1A;
+    --color-surface: #1A1A1A;
+    --color-surface-raised: #2A2A2A;
+    --color-surface-overlay: rgba(0, 0, 0, 0.85);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #E1BEE7;
+    --color-text-tertiary: #CE93D8;
+    --color-text-disabled: #7B1FA2;
+    --color-text-inverse: #000000;
+    --color-text-link: #76FF03;
+    --color-text-link-hover: #64DD17;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFD600;
+    --color-warning-rgb: 255, 214, 0;
+    --color-warning-bg: rgba(255, 214, 0, 0.15);
+    --color-error: #FF1744;
+    --color-error-rgb: 255, 23, 68;
+    --color-error-bg: rgba(255, 23, 68, 0.15);
+    --color-info: #00E5FF;
+    --color-info-rgb: 0, 229, 255;
+    --color-info-bg: rgba(0, 229, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(224, 64, 251, 0.15);
+    --color-active: rgba(224, 64, 251, 0.3);
+    --color-focus-ring: rgba(224, 64, 251, 0.5);
+    --color-disabled-bg: #0A0A0A;
+
+    /* Borders */
+    --color-border: rgba(224, 64, 251, 0.5);
+    --color-border-light: rgba(224, 64, 251, 0.25);
+    --color-border-strong: rgba(224, 64, 251, 0.7);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.8);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 18. Forest Trail */
+[data-theme="forest-trail"] {
+    /* Primary Colors */
+    --color-primary: #558B2F;
+    --color-primary-rgb: 85, 139, 47;
+    --color-secondary: #33691E;
+    --color-accent: #8BC34A;
+
+    /* Backgrounds */
+    --color-bg: #F1F8E9;
+    --color-bg-alt: #DCEDC8;
+    --color-bg-muted: #F9FBF5;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(27, 94, 32, 0.5);
+
+    /* Text Hierarchy */
+    --color-text-primary: #1B5E20;
+    --color-text-secondary: #33691E;
+    --color-text-tertiary: #558B2F;
+    --color-text-disabled: #AED581;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #558B2F;
+    --color-text-link-hover: #33691E;
+
+    /* State Colors */
+    --color-success: #00C853;
+    --color-success-rgb: 0, 200, 83;
+    --color-success-bg: rgba(0, 200, 83, 0.1);
+    --color-warning: #FFC107;
+    --color-warning-rgb: 255, 193, 7;
+    --color-warning-bg: rgba(255, 193, 7, 0.1);
+    --color-error: #D32F2F;
+    --color-error-rgb: 211, 47, 47;
+    --color-error-bg: rgba(211, 47, 47, 0.1);
+    --color-info: #0288D1;
+    --color-info-rgb: 2, 136, 209;
+    --color-info-bg: rgba(2, 136, 209, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(85, 139, 47, 0.08);
+    --color-active: rgba(85, 139, 47, 0.16);
+    --color-focus-ring: rgba(85, 139, 47, 0.3);
+    --color-disabled-bg: #DCEDC8;
+
+    /* Borders */
+    --color-border: rgba(85, 139, 47, 0.2);
+    --color-border-light: rgba(85, 139, 47, 0.1);
+    --color-border-strong: rgba(85, 139, 47, 0.35);
+
+    /* Shadows */
+    --shadow-color: rgba(27, 94, 32, 0.1);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 19. Midnight Oil */
+[data-theme="midnight-oil"] {
+    /* Primary Colors */
+    --color-primary: #5C6BC0;
+    --color-primary-rgb: 92, 107, 192;
+    --color-secondary: #3949AB;
+    --color-accent: #7986CB;
+
+    /* Backgrounds */
+    --color-bg: #0A0E27;
+    --color-bg-alt: #141A35;
+    --color-bg-muted: #1A1F3A;
+    --color-surface: #1A1F3A;
+    --color-surface-raised: #252C4A;
+    --color-surface-overlay: rgba(0, 0, 0, 0.8);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #C5CAE9;
+    --color-text-tertiary: #9FA8DA;
+    --color-text-disabled: #5C6BC0;
+    --color-text-inverse: #0A0E27;
+    --color-text-link: #7986CB;
+    --color-text-link-hover: #9FA8DA;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFAB00;
+    --color-warning-rgb: 255, 171, 0;
+    --color-warning-bg: rgba(255, 171, 0, 0.15);
+    --color-error: #FF5252;
+    --color-error-rgb: 255, 82, 82;
+    --color-error-bg: rgba(255, 82, 82, 0.15);
+    --color-info: #40C4FF;
+    --color-info-rgb: 64, 196, 255;
+    --color-info-bg: rgba(64, 196, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(92, 107, 192, 0.15);
+    --color-active: rgba(92, 107, 192, 0.3);
+    --color-focus-ring: rgba(92, 107, 192, 0.4);
+    --color-disabled-bg: #141A35;
+
+    /* Borders */
+    --color-border: rgba(92, 107, 192, 0.3);
+    --color-border-light: rgba(92, 107, 192, 0.15);
+    --color-border-strong: rgba(92, 107, 192, 0.5);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.7);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 20. Gold Rush */
+[data-theme="gold-rush"] {
+    /* Primary Colors */
+    --color-primary: #FFB300;
+    --color-primary-rgb: 255, 179, 0;
+    --color-secondary: #FF8F00;
+    --color-accent: #FFD54F;
+
+    /* Backgrounds */
+    --color-bg: #1A1A1A;
+    --color-bg-alt: #2C2C2C;
+    --color-bg-muted: #3D3D3D;
+    --color-surface: #2C2C2C;
+    --color-surface-raised: #3D3D3D;
+    --color-surface-overlay: rgba(0, 0, 0, 0.8);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #FFE082;
+    --color-text-tertiary: #FFD54F;
+    --color-text-disabled: #FF8F00;
+    --color-text-inverse: #1A1A1A;
+    --color-text-link: #FFD54F;
+    --color-text-link-hover: #FFC107;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFAB00;
+    --color-warning-rgb: 255, 171, 0;
+    --color-warning-bg: rgba(255, 171, 0, 0.15);
+    --color-error: #FF5252;
+    --color-error-rgb: 255, 82, 82;
+    --color-error-bg: rgba(255, 82, 82, 0.15);
+    --color-info: #40C4FF;
+    --color-info-rgb: 64, 196, 255;
+    --color-info-bg: rgba(64, 196, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(255, 179, 0, 0.12);
+    --color-active: rgba(255, 179, 0, 0.24);
+    --color-focus-ring: rgba(255, 179, 0, 0.5);
+    --color-disabled-bg: #2C2C2C;
+
+    /* Borders */
+    --color-border: rgba(255, 179, 0, 0.4);
+    --color-border-light: rgba(255, 179, 0, 0.2);
+    --color-border-strong: rgba(255, 179, 0, 0.6);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.7);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 21. Arctic Blast */
+[data-theme="arctic-blast"] {
+    /* Primary Colors */
+    --color-primary: #B0BEC5;
+    --color-primary-rgb: 176, 190, 197;
+    --color-secondary: #78909C;
+    --color-accent: #CFD8DC;
+
+    /* Backgrounds */
+    --color-bg: #263238;
+    --color-bg-alt: #37474F;
+    --color-bg-muted: #455A64;
+    --color-surface: #37474F;
+    --color-surface-raised: #455A64;
+    --color-surface-overlay: rgba(0, 0, 0, 0.75);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #ECEFF1;
+    --color-text-tertiary: #CFD8DC;
+    --color-text-disabled: #90A4AE;
+    --color-text-inverse: #263238;
+    --color-text-link: #CFD8DC;
+    --color-text-link-hover: #ECEFF1;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFAB00;
+    --color-warning-rgb: 255, 171, 0;
+    --color-warning-bg: rgba(255, 171, 0, 0.15);
+    --color-error: #FF5252;
+    --color-error-rgb: 255, 82, 82;
+    --color-error-bg: rgba(255, 82, 82, 0.15);
+    --color-info: #40C4FF;
+    --color-info-rgb: 64, 196, 255;
+    --color-info-bg: rgba(64, 196, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(176, 190, 197, 0.12);
+    --color-active: rgba(176, 190, 197, 0.24);
+    --color-focus-ring: rgba(176, 190, 197, 0.35);
+    --color-disabled-bg: #37474F;
+
+    /* Borders */
+    --color-border: rgba(176, 190, 197, 0.25);
+    --color-border-light: rgba(176, 190, 197, 0.12);
+    --color-border-strong: rgba(176, 190, 197, 0.4);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 22. Volcano */
+[data-theme="volcano"] {
+    /* Primary Colors */
+    --color-primary: #D84315;
+    --color-primary-rgb: 216, 67, 21;
+    --color-secondary: #BF360C;
+    --color-accent: #FF6E40;
+
+    /* Backgrounds */
+    --color-bg: #1C0A00;
+    --color-bg-alt: #3E1C00;
+    --color-bg-muted: #542800;
+    --color-surface: #3E1C00;
+    --color-surface-raised: #542800;
+    --color-surface-overlay: rgba(0, 0, 0, 0.8);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #FFCCBC;
+    --color-text-tertiary: #FFAB91;
+    --color-text-disabled: #BF360C;
+    --color-text-inverse: #1C0A00;
+    --color-text-link: #FF6E40;
+    --color-text-link-hover: #FF5722;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFAB00;
+    --color-warning-rgb: 255, 171, 0;
+    --color-warning-bg: rgba(255, 171, 0, 0.15);
+    --color-error: #FF5252;
+    --color-error-rgb: 255, 82, 82;
+    --color-error-bg: rgba(255, 82, 82, 0.15);
+    --color-info: #40C4FF;
+    --color-info-rgb: 64, 196, 255;
+    --color-info-bg: rgba(64, 196, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(216, 67, 21, 0.15);
+    --color-active: rgba(216, 67, 21, 0.3);
+    --color-focus-ring: rgba(216, 67, 21, 0.5);
+    --color-disabled-bg: #3E1C00;
+
+    /* Borders */
+    --color-border: rgba(216, 67, 21, 0.45);
+    --color-border-light: rgba(216, 67, 21, 0.22);
+    --color-border-strong: rgba(216, 67, 21, 0.65);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.7);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 23. Zen Master */
+[data-theme="zen-master"] {
+    /* Primary Colors */
+    --color-primary: #9E9E9E;
+    --color-primary-rgb: 158, 158, 158;
+    --color-secondary: #616161;
+    --color-accent: #FFEB3B;
+
+    /* Backgrounds */
+    --color-bg: #FAFAFA;
+    --color-bg-alt: #EEEEEE;
+    --color-bg-muted: #F5F5F5;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #FFFFFF;
+    --color-surface-overlay: rgba(0, 0, 0, 0.5);
+
+    /* Text Hierarchy */
+    --color-text-primary: #212121;
+    --color-text-secondary: #757575;
+    --color-text-tertiary: #9E9E9E;
+    --color-text-disabled: #BDBDBD;
+    --color-text-inverse: #FFFFFF;
+    --color-text-link: #616161;
+    --color-text-link-hover: #424242;
+
+    /* State Colors */
+    --color-success: #00C853;
+    --color-success-rgb: 0, 200, 83;
+    --color-success-bg: rgba(0, 200, 83, 0.1);
+    --color-warning: #FFC107;
+    --color-warning-rgb: 255, 193, 7;
+    --color-warning-bg: rgba(255, 193, 7, 0.1);
+    --color-error: #D32F2F;
+    --color-error-rgb: 211, 47, 47;
+    --color-error-bg: rgba(211, 47, 47, 0.1);
+    --color-info: #0288D1;
+    --color-info-rgb: 2, 136, 209;
+    --color-info-bg: rgba(2, 136, 209, 0.1);
+
+    /* Interactive States */
+    --color-hover: rgba(158, 158, 158, 0.08);
+    --color-active: rgba(158, 158, 158, 0.16);
+    --color-focus-ring: rgba(158, 158, 158, 0.25);
+    --color-disabled-bg: #EEEEEE;
+
+    /* Borders */
+    --color-border: rgba(158, 158, 158, 0.15);
+    --color-border-light: rgba(158, 158, 158, 0.08);
+    --color-border-strong: rgba(158, 158, 158, 0.3);
+
+    /* Shadows */
+    --shadow-color: rgba(33, 33, 33, 0.08);
+    --shadow-sm: 0 1px 2px 0 var(--shadow-color);
+    --shadow-md: 0 4px 6px -1px var(--shadow-color);
+    --shadow-lg: 0 10px 15px -3px var(--shadow-color);
+}
+
+/* 24. Cyberpunk */
+[data-theme="cyberpunk"] {
+    /* Primary Colors */
+    --color-primary: #00FFF0;
+    --color-primary-rgb: 0, 255, 240;
+    --color-secondary: #FF00FF;
+    --color-accent: #FFD700;
+
+    /* Backgrounds */
+    --color-bg: #0A0A0A;
+    --color-bg-alt: #1A1A2E;
+    --color-bg-muted: #252542;
+    --color-surface: #1A1A2E;
+    --color-surface-raised: #252542;
+    --color-surface-overlay: rgba(0, 0, 0, 0.85);
+
+    /* Text Hierarchy */
+    --color-text-primary: #00FFF0;
+    --color-text-secondary: #B4F8FD;
+    --color-text-tertiary: #7FDFE8;
+    --color-text-disabled: #338A93;
+    --color-text-inverse: #0A0A0A;
+    --color-text-link: #FFD700;
+    --color-text-link-hover: #FFC700;
+
+    /* State Colors */
+    --color-success: #00FF41;
+    --color-success-rgb: 0, 255, 65;
+    --color-success-bg: rgba(0, 255, 65, 0.15);
+    --color-warning: #FFEA00;
+    --color-warning-rgb: 255, 234, 0;
+    --color-warning-bg: rgba(255, 234, 0, 0.15);
+    --color-error: #FF006E;
+    --color-error-rgb: 255, 0, 110;
+    --color-error-bg: rgba(255, 0, 110, 0.15);
+    --color-info: #00E5FF;
+    --color-info-rgb: 0, 229, 255;
+    --color-info-bg: rgba(0, 229, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(0, 255, 240, 0.12);
+    --color-active: rgba(0, 255, 240, 0.24);
+    --color-focus-ring: rgba(0, 255, 240, 0.5);
+    --color-disabled-bg: #1A1A2E;
+
+    /* Borders */
+    --color-border: rgba(0, 255, 240, 0.4);
+    --color-border-light: rgba(0, 255, 240, 0.2);
+    --color-border-strong: rgba(0, 255, 240, 0.6);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 255, 240, 0.2);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 25. Desert Storm */
+[data-theme="desert-storm"] {
+    /* Primary Colors */
+    --color-primary: #BCAAA4;
+    --color-primary-rgb: 188, 170, 164;
+    --color-secondary: #A1887F;
+    --color-accent: #FF6F00;
+
+    /* Backgrounds */
+    --color-bg: #3E2723;
+    --color-bg-alt: #4E342E;
+    --color-bg-muted: #5D4037;
+    --color-surface: #4E342E;
+    --color-surface-raised: #5D4037;
+    --color-surface-overlay: rgba(0, 0, 0, 0.75);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #D7CCC8;
+    --color-text-tertiary: #BCAAA4;
+    --color-text-disabled: #8D6E63;
+    --color-text-inverse: #3E2723;
+    --color-text-link: #FF6F00;
+    --color-text-link-hover: #F57C00;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFAB00;
+    --color-warning-rgb: 255, 171, 0;
+    --color-warning-bg: rgba(255, 171, 0, 0.15);
+    --color-error: #FF5252;
+    --color-error-rgb: 255, 82, 82;
+    --color-error-bg: rgba(255, 82, 82, 0.15);
+    --color-info: #40C4FF;
+    --color-info-rgb: 64, 196, 255;
+    --color-info-bg: rgba(64, 196, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(188, 170, 164, 0.12);
+    --color-active: rgba(188, 170, 164, 0.24);
+    --color-focus-ring: rgba(188, 170, 164, 0.4);
+    --color-disabled-bg: #4E342E;
+
+    /* Borders */
+    --color-border: rgba(188, 170, 164, 0.3);
+    --color-border-light: rgba(188, 170, 164, 0.15);
+    --color-border-strong: rgba(188, 170, 164, 0.5);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}
+
+/* 26. Northern Lights */
+[data-theme="northern-lights"] {
+    /* Primary Colors */
+    --color-primary: #00BFA5;
+    --color-primary-rgb: 0, 191, 165;
+    --color-secondary: #7C4DFF;
+    --color-accent: #69F0AE;
+
+    /* Backgrounds */
+    --color-bg: #0D1B2A;
+    --color-bg-alt: #1B263B;
+    --color-bg-muted: #283F5C;
+    --color-surface: #1B263B;
+    --color-surface-raised: #283F5C;
+    --color-surface-overlay: rgba(0, 0, 0, 0.8);
+
+    /* Text Hierarchy */
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #B2EBF2;
+    --color-text-tertiary: #80DEEA;
+    --color-text-disabled: #00897B;
+    --color-text-inverse: #0D1B2A;
+    --color-text-link: #69F0AE;
+    --color-text-link-hover: #00E676;
+
+    /* State Colors */
+    --color-success: #00E676;
+    --color-success-rgb: 0, 230, 118;
+    --color-success-bg: rgba(0, 230, 118, 0.15);
+    --color-warning: #FFD600;
+    --color-warning-rgb: 255, 214, 0;
+    --color-warning-bg: rgba(255, 214, 0, 0.15);
+    --color-error: #FF1744;
+    --color-error-rgb: 255, 23, 68;
+    --color-error-bg: rgba(255, 23, 68, 0.15);
+    --color-info: #7C4DFF;
+    --color-info-rgb: 124, 77, 255;
+    --color-info-bg: rgba(124, 77, 255, 0.15);
+
+    /* Interactive States */
+    --color-hover: rgba(0, 191, 165, 0.15);
+    --color-active: rgba(0, 191, 165, 0.3);
+    --color-focus-ring: rgba(0, 191, 165, 0.45);
+    --color-disabled-bg: #1B263B;
+
+    /* Borders */
+    --color-border: rgba(0, 191, 165, 0.35);
+    --color-border-light: rgba(0, 191, 165, 0.18);
+    --color-border-strong: rgba(0, 191, 165, 0.5);
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.7);
+    --shadow-sm: 0 2px 4px 0 var(--shadow-color);
+    --shadow-md: 0 6px 12px -1px var(--shadow-color);
+    --shadow-lg: 0 15px 25px -3px var(--shadow-color);
+}

@@ -1,331 +1,250 @@
-<!-- Today View Panel -->
-<div class="panel today-panel fade-in">
-    <!-- Header -->
+{% load static %}
+<div class="panel" data-panel="today">
+    <!-- Breadcrumb -->
+    <div class="breadcrumb">
+        <a href="/">Home</a>
+        <span class="breadcrumb-separator">›</span>
+        <span>Today</span>
+    </div>
+
+    <!-- Panel Header -->
     <div class="panel-header">
         <div>
-            <h1 class="panel-title">Today</h1>
-            <p class="panel-subtitle">{{ today|date:"l, F j, Y" }}</p>
+            <h1 class="panel-title">{{ today|date:"F d, Y" }}</h1>
+            <p style="color: var(--color-text-secondary); margin: 0.5rem 0 0;">
+                {% if is_today %}Today{% else %}{{ today|date:"l" }}{% endif %} •
+                {{ completed_count }} of {{ total_count }} complete
+            </p>
         </div>
+
         <div class="panel-actions">
             <!-- Date Navigation -->
-            <div class="date-nav">
-                <a href="/today/?date={{ prev_day|date:'Y-m-d' }}" class="btn btn-icon" data-nav title="Previous day">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="15 18 9 12 15 6"></polyline>
+            <div class="btn-group">
+                <button class="btn btn-secondary btn-icon" data-action="prev-day" aria-label="Previous day">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                            clip-rule="evenodd" />
                     </svg>
-                </a>
-                <button class="btn btn-ghost" id="date-picker-toggle">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    {{ today|date:"M j" }}
                 </button>
-                <a href="/today/?date={{ next_day|date:'Y-m-d' }}" class="btn btn-icon" data-nav title="Next day">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="9 18 15 12 9 6"></polyline>
+                <button class="btn btn-secondary" data-action="goto-today">Today</button>
+                <button class="btn btn-secondary btn-icon" data-action="next-day" aria-label="Next day">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                            clip-rule="evenodd" />
                     </svg>
-                </a>
+                </button>
             </div>
 
-            {% if not is_today %}
-            <a href="/today/" class="btn btn-ghost btn-sm" data-nav>Go to Today</a>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Progress Summary -->
-    <div class="day-summary">
-        <div class="summary-stat">
-            <div class="summary-value">{{ completed_count }}</div>
-            <div class="summary-label">Completed</div>
-        </div>
-        <div class="summary-divider"></div>
-        <div class="summary-stat">
-            <div class="summary-value">{{ pending_count }}</div>
-            <div class="summary-label">Pending</div>
-        </div>
-        <div class="summary-divider"></div>
-        <div class="summary-stat">
-            <div class="summary-value">{{ progress }}%</div>
-            <div class="summary-label">Progress</div>
-            <div class="progress-bar progress-inline">
-                <div class="progress-fill" style="width: {{ progress }}%"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filter Tabs -->
-    <div class="tab-bar">
-        <button class="tab active" data-filter="all">All ({{ total_count }})</button>
-        <button class="tab" data-filter="pending">Pending ({{ pending_count }})</button>
-        <button class="tab" data-filter="done">Done ({{ completed_count }})</button>
-        <button class="tab" data-filter="missed">Missed ({{ missed_count }})</button>
-    </div>
-
-    <!-- Tasks Grouped by Tracker -->
-    <div class="task-groups" id="today-tasks">
-        {% for group in task_groups %}
-        <div class="task-group" data-tracker-id="{{ group.tracker.id }}">
-            <div class="task-group-header">
-                <a href="/tracker/{{ group.tracker.id }}/" class="group-title" data-nav>
-                    {{ group.tracker.name }}
-                </a>
-                <span class="group-progress">{{ group.completed }}/{{ group.total }}</span>
-            </div>
-
-            <div class="task-list">
-                {% for task in group.tasks %}
-                <div class="task-row" data-task-id="{{ task.task_instance_id }}" data-status="{{ task.status }}">
-                    <button class="task-toggle" data-action="toggle">
-                        <span class="status-icon status-{{ task.status|lower }}"></span>
-                    </button>
-                    <div class="task-content">
-                        <span class="task-description {% if task.status == 'DONE' %}completed{% endif %}">
-                            {{ task.description }}
-                        </span>
-                        {% if task.category %}
-                        <span class="task-category">{{ task.category }}</span>
-                        {% endif %}
-                    </div>
-                    <div class="task-actions">
-                        <button class="btn btn-icon btn-sm" data-action="edit">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% empty %}
-        <div class="empty-state">
-            <div class="empty-state-icon">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                    <line x1="3" y1="10" x2="21" y2="10"></line>
+            <button class="btn btn-primary" data-action="add-task">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd"
+                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                        clip-rule="evenodd" />
                 </svg>
-            </div>
-            <h3 class="empty-state-title">No Tasks for This Day</h3>
-            <p class="empty-state-description">There are no scheduled tasks for {{ today|date:"F j, Y" }}.</p>
+                Add Task
+            </button>
         </div>
-        {% endfor %}
     </div>
+
+    <!-- Progress Ring -->
+    <div class="progress-section" style="margin-bottom: 2rem;">
+        <div class="progress-ring-container" style="text-align: center;">
+            <div class="circular-progress" style="position: relative; display: inline-block;">
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="var(--color-bg)" stroke-width="8" />
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="var(--color-primary)" stroke-width="8"
+                        stroke-dasharray="{{ progress }} 340" stroke-dashoffset="85" transform="rotate(-90 60 60)"
+                        stroke-linecap="round" />
+                </svg>
+                <div
+                    style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-primary);">{{ progress }}%</div>
+                    <div style="font-size: 0.75rem; color: var(--color-text-secondary);">Complete</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Groups -->
+    {% if task_groups %}
+    {% for group in task_groups %}
+    <section class="task-group" style="margin-bottom: 2rem;">
+        <div class="task-group-header"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="font-size: 1rem; font-weight: 600; margin: 0;">
+                {{ group.tracker.name }}
+            </h2>
+            <span style="font-size: 0.875rem; color: var(--color-text-secondary);">
+                {{ group.completed }}/{{ group.total }}
+            </span>
+        </div>
+
+        <div class="task-list">
+            {% for task in group.tasks %}
+            <div class="task-item swipeable" data-task-id="{{ task.task_instance_id }}" data-status="{{ task.status }}">
+
+                <!-- Swipe Actions Background -->
+                <div class="swipe-actions-left">
+                    {% for action in task.ios_swipe_actions.leading %}
+                    <button class="swipe-action"
+                        style="background-color: {{ action.backgroundColor }}; min-width: {{ action.minWidth }}pt;"
+                        data-action="{{ action.id }}" data-endpoint="{{ action.endpoint }}">
+                        {{ action.title }}
+                    </button>
+                    {% endfor %}
+                </div>
+
+                <div class="swipe-actions-right">
+                    {% for action in task.ios_swipe_actions.trailing %}
+                    <button class="swipe-action"
+                        style="background-color: {{ action.backgroundColor }}; min-width: {{ action.minWidth }}pt;"
+                        data-action="{{ action.id }}" data-endpoint="{{ action.endpoint }}" {% if action.confirmRequired %}data-confirm="true" {% endif %}>
+                        {{ action.title }}
+                    </button>
+                    {% endfor %}
+                </div>
+
+                <!-- Task Content -->
+                <div class="task-content-wrapper">
+                    <label class="task-checkbox"
+                        style="min-width: 44pt; min-height: 44pt; display: flex; align-items: center;">
+                        <input type="checkbox" {% if task.status == 'DONE' %}checked{% endif %}
+                            data-task-id="{{ task.task_instance_id }}">
+                        <span class="checkbox-mark"></span>
+                    </label>
+
+                    <div class="task-content" style="flex: 1;">
+                        <div class="task-description" style="font-weight: 500;">
+                            {{ task.description }}
+                        </div>
+                        <div class="task-meta"
+                            style="display: flex; gap: 0.75rem; font-size: 0.75rem; color: var(--color-text-secondary); margin-top: 0.25rem;">
+                            {% if task.category %}
+                            <span class="task-category">{{ task.category }}</span>
+                            {% endif %}
+                            {% if task.time_of_day %}
+                            <span class="task-time">
+                                {% if task.time_of_day == 'morning' %}🌅 Morning
+                                {% elif task.time_of_day == 'afternoon' %}☀️ Afternoon
+                                {% elif task.time_of_day == 'evening' %}🌙 Evening
+                                {% else %}⏰ Anytime
+                                {% endif %}
+                            </span>
+                            {% endif %}
+                            <span class="task-weight">Weight: {{ task.weight }}</span>
+                        </div>
+                    </div>
+
+                    <button class="btn-icon context-menu-btn" style="min-width: 44pt; min-height: 44pt;"
+                        data-task-id="{{ task.task_instance_id }}" aria-label="More options">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                            <path
+                                d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state">
+        <svg class="empty-state-icon" width="80" height="80" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd"
+                d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                clip-rule="evenodd" />
+        </svg>
+        <h3 class="empty-state-title">No tasks for today</h3>
+        <p class="empty-state-description">Enjoy your free day or add some tasks to track</p>
+        <button class="btn btn-primary" data-action="add-task">Add Task</button>
+    </div>
+    {% endif %}
 
     <!-- Day Note -->
-    <div class="day-note-section">
-        <div class="section-header">
-            <h3 class="section-title">Day Note</h3>
+    <section style="margin-top: 2rem;">
+        <div class="day-note-card"
+            style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
+            <label for="day-note" style="display: block; font-weight: 600; margin-bottom: 0.5rem;">
+                📝 Day Note
+            </label>
+            <textarea id="day-note" rows="3" placeholder="How's your day going? Add a note..."
+                style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-family: inherit; resize: vertical;">{{ day_note|default:"" }}</textarea>
+            <button class="btn btn-sm btn-primary" data-action="save-note" style="margin-top: 0.5rem;">Save
+                Note</button>
         </div>
-        <textarea id="day-note" class="form-textarea" placeholder="Add a note about your day..." rows="3"
-            data-date="{{ today|date:'Y-m-d' }}">{{ day_note }}</textarea>
-        <button class="btn btn-ghost btn-sm" id="save-note" style="margin-top:0.5rem;">Save Note</button>
-    </div>
+    </section>
 </div>
 
-<!-- Date Picker Popup -->
-<div class="date-picker-popup" id="date-picker-popup" style="display:none; z-index: 9999;">
-    <div class="date-picker-header">
-        <button class="btn btn-icon btn-sm" id="prev-month">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-        </button>
-        <span id="current-month-year"></span>
-        <button class="btn btn-icon btn-sm" id="next-month">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-        </button>
-    </div>
-    <div class="date-picker-grid">
-        <div class="date-picker-days">
-            <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
-        </div>
-        <div class="date-picker-dates" id="date-picker-dates"></div>
-    </div>
-</div>
+<style>
+    .task-item.swipeable {
+        position: relative;
+        overflow: hidden;
+    }
 
-<script>
-    (function () {
-        const container = document.querySelector('.today-panel');
-        if (!container) return;
+    .swipe-actions-left,
+    .swipe-actions-right {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+    }
 
-        // Date Picker Logic
-        const toggleBtn = document.getElementById('date-picker-toggle');
-        const popup = document.getElementById('date-picker-popup');
-        const prevMonthBtn = document.getElementById('prev-month');
-        const nextMonthBtn = document.getElementById('next-month');
-        const monthYearLabel = document.getElementById('current-month-year');
-        const datesGrid = document.getElementById('date-picker-dates');
+    .swipe-actions-left {
+        left: 0;
+    }
 
-        // Use the server-provided date or default to today
-        // We can extract it from the URL or template context if available
-        // For now, let's use the current date from the subtitle or URL
-        let currentDate = new Date();
-        const urlParams = new URLSearchParams(window.location.search);
-        const dateParam = urlParams.get('date');
-        if (dateParam) {
-            currentDate = new Date(dateParam);
-        }
+    .swipe-actions-right {
+        right: 0;
+    }
 
-        let viewingDate = new Date(currentDate); // For calendar navigation
+    .swipe-action {
+        height: 100%;
+        color: white;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
 
-        function renderCalendar() {
-            if (!datesGrid || !monthYearLabel) return;
+    .task-content-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        background: var(--color-surface);
+        transition: transform 0.2s;
+    }
 
-            const year = viewingDate.getFullYear();
-            const month = viewingDate.getMonth();
+    /* Checkbox Styling */
+    .task-checkbox input {
+        position: absolute;
+        opacity: 0;
+    }
 
-            // Set header
-            const monthNames = ["January", "February", "March", "April", "May", "June",
-                "July", "August", "September", "October", "November", "December"
-            ];
-            monthYearLabel.textContent = `${monthNames[month]} ${year}`;
+    .checkbox-mark {
+        display: block;
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--color-border);
+        border-radius: 6px;
+        transition: all 0.2s;
+    }
 
-            datesGrid.innerHTML = '';
+    .task-checkbox input:checked+.checkbox-mark {
+        background: var(--color-success);
+        border-color: var(--color-success);
+    }
 
-            // First day of the month
-            const firstDay = new Date(year, month, 1).getDay(); // 0 = Sunday
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-            // Padding for previous month
-            for (let i = 0; i < firstDay; i++) {
-                const emptyCell = document.createElement('div');
-                emptyCell.className = 'date-cell empty';
-                datesGrid.appendChild(emptyCell);
-            }
-
-            // Days of the month
-            for (let day = 1; day <= daysInMonth; day++) {
-                const dateCell = document.createElement('div');
-                dateCell.className = 'date-cell';
-                dateCell.textContent = day;
-
-                // Check if this date matches the currently selected date
-                if (year === currentDate.getFullYear() &&
-                    month === currentDate.getMonth() &&
-                    day === currentDate.getDate()) {
-                    dateCell.classList.add('selected');
-                }
-
-                // Highlight today (real time)
-                const realToday = new Date();
-                if (year === realToday.getFullYear() &&
-                    month === realToday.getMonth() &&
-                    day === realToday.getDate()) {
-                    dateCell.classList.add('today');
-                }
-
-                dateCell.addEventListener('click', () => {
-                    const selectedDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    if (window.App) {
-                        window.App.loadPanel(`/today/?date=${selectedDateStr}`);
-                    } else {
-                        window.location.href = `/today/?date=${selectedDateStr}`;
-                    }
-                    popup.style.display = 'none';
-                });
-
-                datesGrid.appendChild(dateCell);
-            }
-        }
-
-        if (toggleBtn && popup) {
-            toggleBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // Toggle display
-                if (popup.style.display === 'none') {
-                    // Position popup
-                    const rect = toggleBtn.getBoundingClientRect();
-                    popup.style.top = (rect.bottom + window.scrollY + 5) + 'px';
-                    popup.style.left = rect.left + 'px';
-                    popup.style.display = 'block';
-                    renderCalendar();
-                } else {
-                    popup.style.display = 'none';
-                }
-            });
-
-            // Close when clicking outside
-            document.addEventListener('click', (e) => {
-                if (popup.style.display !== 'none' && !popup.contains(e.target) && e.target !== toggleBtn) {
-                    popup.style.display = 'none';
-                }
-            });
-        }
-
-        if (prevMonthBtn) {
-            prevMonthBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                viewingDate.setMonth(viewingDate.getMonth() - 1);
-                renderCalendar();
-            });
-        }
-
-        if (nextMonthBtn) {
-            nextMonthBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                viewingDate.setMonth(viewingDate.getMonth() + 1);
-                renderCalendar();
-            });
-        }
-
-        // Also handle filter tabs if they exist
-        const filterTabs = container.querySelectorAll('.tab');
-        if (filterTabs.length > 0) {
-            filterTabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    filterTabs.forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-
-                    const filter = tab.dataset.filter;
-                    const taskGroups = container.querySelectorAll('.task-group');
-
-                    taskGroups.forEach(group => {
-                        const tasks = group.querySelectorAll('.task-row');
-                        let hasVisibleTasks = false;
-
-                        tasks.forEach(task => {
-                            const status = task.dataset.status;
-                            let visible = false;
-
-                            if (filter === 'all') visible = true;
-                            else if (filter === 'pending') visible = ['TODO', 'IN_PROGRESS'].includes(status);
-                            else if (filter === 'done') visible = status === 'DONE';
-                            else if (filter === 'missed') visible = ['MISSED', 'SKIPPED', 'BLOCKED'].includes(status);
-
-                            task.style.display = visible ? 'flex' : 'none';
-                            if (visible) hasVisibleTasks = true;
-                        });
-
-                        // Hide group if no visible tasks
-                        group.style.display = hasVisibleTasks ? 'block' : 'none';
-                    });
-                });
-            });
-        }
-
-        // Handle Day Note saving
-        const saveNoteBtn = document.getElementById('save-note');
-        const noteTextarea = document.getElementById('day-note');
-
-        if (saveNoteBtn && noteTextarea) {
-            saveNoteBtn.addEventListener('click', () => {
-                // Since API implementation for global day note is pending, we'll confirm action for now
-                if (window.App) {
-                    window.App.showToast('success', 'Note saved (Placeholder)');
-                }
-            });
-        }
-
-        console.log('[TodayPanel] Initialized');
-    })();
-</script>
+    .task-checkbox input:checked+.checkbox-mark::after {
+        content: '✓';
+        display: block;
+        color: white;
+        text-align: center;
+        line-height: 20px;
+        font-weight: bold;
+    }
+</style>

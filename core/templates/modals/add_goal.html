@@ -1,132 +1,138 @@
 <!-- Add Goal Modal -->
-<div class="modal-dialog" role="document">
+<div class="modal-dialog">
     <div class="modal-header">
-        <h3 class="modal-title">Set New Goal</h3>
-        <button type="button" class="modal-close" data-action="close-modal" aria-label="Close">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
+        <h2 class="modal-title">🎯 Create New Goal</h2>
+        <button class="modal-close" data-action="close-modal" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clip-rule="evenodd" />
             </svg>
         </button>
     </div>
 
-    <form id="add-goal-form" method="POST" data-ajax>
-        {% csrf_token %}
+    <form id="add-goal-form" method="post">
         <div class="modal-body">
-            <!-- Goal Title -->
+            {% csrf_token %}
+
             <div class="form-group">
-                <label for="goal-title" class="form-label">Goal Title *</label>
-                <input type="text" id="goal-title" name="title" class="form-input"
-                    placeholder="e.g., Run a Marathon, Save $5000" required maxlength="100">
+                <label for="title" class="form-label">Goal Title *</label>
+                <input type="text" id="title" name="title" class="form-input" placeholder="e.g., Complete 100 workouts"
+                    required maxlength="200">
             </div>
 
-            <!-- Description -->
             <div class="form-group">
-                <label for="goal-description" class="form-label">Description</label>
-                <textarea id="goal-description" name="description" class="form-input" rows="2"
-                    placeholder="Why is this goal important?"></textarea>
+                <label for="description" class="form-label">Description</label>
+                <textarea id="description" name="description" class="form-input" rows="3"
+                    placeholder="Why is this goal important to you?" maxlength="1000"></textarea>
             </div>
 
-            <!-- Target Date -->
             <div class="form-group">
-                <label for="target-date" class="form-label">Target Date</label>
-                <input type="date" id="target-date" name="target_date" class="form-input" required>
+                <label for="target_value" class="form-label">Target *</label>
+                <input type="number" id="target_value" name="target_value" class="form-input" placeholder="e.g., 100"
+                    required min="1">
+                <small class="form-help">The number you want to reach</small>
             </div>
 
-            <!-- Goal Type -->
             <div class="form-group">
-                <label for="goal-type" class="form-label">Goal Type</label>
-                <select id="goal-type" name="goal_type" class="form-select">
-                    <option value="habit">Habit Building</option>
-                    <option value="achievement">Achievement</option>
-                    <option value="project">Project</option>
+                <label for="deadline" class="form-label">Deadline</label>
+                <input type="date" id="deadline" name="deadline" class="form-input">
+                <small class="form-help">Optional: Set a target date</small>
+            </div>
+
+            <div class="form-group">
+                <label for="icon" class="form-label">Icon</label>
+                <div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 0.5rem;">
+                    <button type="button" class="icon-btn" data-icon="🎯">🎯</button>
+                    <button type="button" class="icon-btn" data-icon="🏆">🏆</button>
+                    <button type="button" class="icon-btn" data-icon="💪">💪</button>
+                    <button type="button" class="icon-btn" data-icon="📚">📚</button>
+                    <button type="button" class="icon-btn" data-icon="🏃">🏃</button>
+                    <button type="button" class="icon-btn" data-icon="💰">💰</button>
+                    <button type="button" class="icon-btn" data-icon="🎨">🎨</button>
+                    <button type="button" class="icon-btn" data-icon="🌟">🌟</button>
+                </div>
+                <input type="hidden" id="icon" name="icon" value="🎯">
+            </div>
+
+            <div class="form-group">
+                <label for="related_tracker" class="form-label">Link to Tracker (Optional)</label>
+                <select id="related_tracker" name="related_tracker" class="form-input">
+                    <option value="">No tracker</option>
+                    {% for tracker in trackers %}
+                    <option value="{{ tracker.tracker_id }}">{{ tracker.name }}</option>
+                    {% endfor %}
                 </select>
+                <small class="form-help">Track progress based on a specific tracker</small>
             </div>
         </div>
 
         <div class="modal-footer">
-            <button type="button" class="btn btn-ghost" data-action="close-modal">Cancel</button>
-            <button type="submit" class="btn btn-primary" id="create-goal-btn">
-                Set Goal
-            </button>
+            <button type="button" class="btn btn-secondary" data-action="close-modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Create Goal</button>
         </div>
     </form>
 </div>
 
+<style>
+    .icon-btn {
+        aspect-ratio: 1;
+        padding: 0.75rem;
+        font-size: 1.5rem;
+        background: var(--color-bg);
+        border: 2px solid var(--color-border);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .icon-btn:hover {
+        border-color: var(--color-primary);
+        transform: scale(1.1);
+    }
+
+    .icon-btn.selected {
+        border-color: var(--color-primary);
+        background: rgba(var(--color-primary-rgb), 0.1);
+    }
+</style>
+
 <script>
-    (function () {
-        const form = document.getElementById('add-goal-form');
-        const submitBtn = document.getElementById('create-goal-btn');
-
-        if (!form) {
-            console.warn('[AddGoalModal] Form not found');
-            return;
-        }
-
-        form.addEventListener('submit', async function (e) {
-            e.preventDefault();
-
-            const formData = new FormData(form);
-
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<span class="loading-spinner" style="width:16px;height:16px;border-width:2px;"></span> Creating...';
-            }
-
-            try {
-                const data = {
-                    title: formData.get('title'),
-                    description: formData.get('description') || '',
-                    target_date: formData.get('target_date'),
-                    goal_type: formData.get('goal_type') || 'habit'
-                };
-
-                const csrfToken = formData.get('csrfmiddlewaretoken') ||
-                    document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
-                    (window.App ? window.App.getCsrfToken() : '');
-
-                const response = await fetch('/api/goals/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success) {
-                    if (window.App) {
-                        window.App.showToast('success', 'Goal Created', result.message || 'Your goal has been set!');
-                        window.App.closeModal();
-                        // Refresh goals panel if on goals page
-                        if (window.location.pathname.includes('goals')) {
-                            window.App.cache.panels.delete(window.location.pathname);
-                            window.App.loadPanel(window.location.pathname, false);
-                        }
-                    } else {
-                        alert('Goal created successfully!');
-                        window.location.reload();
-                    }
-                } else {
-                    throw new Error(result.error || 'Failed to create goal');
-                }
-            } catch (error) {
-                console.error('[AddGoalModal] Submit error:', error);
-                if (window.App) {
-                    window.App.showToast('error', 'Error', error.message);
-                } else {
-                    alert('Error: ' + error.message);
-                }
-            } finally {
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = 'Set Goal';
-                }
-            }
+    document.querySelectorAll('.icon-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.icon-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            document.getElementById('icon').value = btn.dataset.icon;
         });
+    });
 
-        console.log('[AddGoalModal] Form handler initialized');
-    })();
+    // Select first icon by default
+    document.querySelector('.icon-btn').classList.add('selected');
+
+    document.getElementById('add-goal-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+
+        try {
+            const response = await fetch('/api/goals/', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                document.querySelector('[data-action="close-modal"]').click();
+                showToast('Goal created successfully', 'success');
+                if (window.loadCurrentPanel) {
+                    window.loadCurrentPanel();
+                }
+            } else {
+                showToast(data.error || 'Failed to create goal', 'error');
+            }
+        } catch (error) {
+            showToast('An error occurred', 'error');
+        }
+    });
 </script>

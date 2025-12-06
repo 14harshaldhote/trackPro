@@ -1,0 +1,323 @@
+/* ============================================================================
+   SIMPLE & PROFESSIONAL AUTH STYLING
+   Clean, minimal design matching components.css
+   ============================================================================ */
+
+:root {
+    --auth-bg: #f8fafc;
+    --auth-card-bg: #ffffff;
+    --auth-border: #e2e8f0;
+    --auth-text-primary: #1e293b;
+    --auth-text-secondary: #64748b;
+    --auth-primary: var(--color-primary, #0284c7);
+    --auth-primary-hover: var(--color-secondary, #0369a1);
+}
+
+body {
+    color: var(--auth-text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.auth-card {
+    background: var(--auth-card-bg);
+    border: 1px solid var(--auth-border);
+    border-radius: 12px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Brand Section */
+.auth-card .brand {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.auth-card .brand-logo {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-card .brand-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.auth-card .brand-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--auth-text-primary);
+    margin: 0 0 0.5rem;
+}
+
+.auth-card .brand-tagline {
+    font-size: 0.875rem;
+    color: var(--auth-text-secondary);
+    margin: 0;
+}
+
+/* Headings */
+.auth-heading {
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    color: var(--auth-text-primary);
+}
+
+.auth-subheading {
+    text-align: center;
+    color: var(--auth-text-secondary);
+    margin-bottom: 2rem;
+    font-size: 0.875rem;
+}
+
+/* Form Elements */
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: var(--auth-text-primary);
+    font-size: 0.875rem;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--auth-border);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: #fff;
+    color: var(--auth-text-primary);
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--auth-primary);
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb, 2, 132, 199), 0.1);
+}
+
+.form-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.form-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid var(--auth-border);
+    cursor: pointer;
+}
+
+.form-checkbox label {
+    font-size: 0.875rem;
+    color: var(--auth-text-secondary);
+    cursor: pointer;
+}
+
+/* Buttons */
+.btn-primary-full {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: var(--auth-primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-primary-full:hover {
+    background-color: var(--auth-primary-hover);
+}
+
+.btn-google {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: white;
+    color: var(--auth-text-primary);
+    border: 1px solid var(--auth-border);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    margin-bottom: 1.5rem;
+}
+
+.btn-google:hover {
+    background-color: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.google-icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* Divider */
+.auth-divider {
+    position: relative;
+    text-align: center;
+    margin: 1.5rem 0;
+}
+
+.auth-divider::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 1px;
+    background: var(--auth-border);
+}
+
+.auth-divider span {
+    position: relative;
+    background: var(--auth-card-bg);
+    padding: 0 0.75rem;
+    color: var(--auth-text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Footer */
+.auth-footer {
+    text-align: center;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--auth-border);
+}
+
+.auth-footer p {
+    font-size: 0.875rem;
+    color: var(--auth-text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.auth-footer a {
+    color: var(--auth-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.auth-footer a:hover {
+    text-decoration: underline;
+}
+
+/* Alerts / Errors */
+.field-error {
+    color: #ef4444;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.non-field-error {
+    background-color: #fef2f2;
+    border: 1px solid #fee2e2;
+    color: #b91c1c;
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 1.25rem;
+    font-size: 0.875rem;
+}
+
+/* Password Strength */
+.password-indicator {
+    margin-top: 0.5rem;
+}
+
+.password-strength {
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.password-strength-bar-container {
+    height: 4px;
+    background: var(--auth-border);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.password-strength-bar {
+    height: 100%;
+    width: 0;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+/* Email Availability */
+.email-availability {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    font-weight: 500;
+}
+
+.success-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+/* Dark Theme Support */
+[data-theme*="dark"],
+[data-theme*="total-dark"],
+[data-theme*="midnight"] {
+    --auth-bg: #0f172a;
+    --auth-card-bg: #1e293b;
+    --auth-border: #334155;
+    --auth-text-primary: #f8fafc;
+    --auth-text-secondary: #94a3b8;
+}
+
+[data-theme*="dark"] .form-input,
+[data-theme*="total-dark"] .form-input,
+[data-theme*="midnight"] .form-input {
+    background-color: #0f172a;
+    border-color: #334155;
+    color: white;
+}
+
+[data-theme*="dark"] .btn-google,
+[data-theme*="total-dark"] .btn-google,
+[data-theme*="midnight"] .btn-google {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: white;
+}
+
+[data-theme*="dark"] .btn-google:hover,
+[data-theme*="total-dark"] .btn-google:hover,
+[data-theme*="midnight"] .btn-google:hover {
+    background-color: #334155;
+}

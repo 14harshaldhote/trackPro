@@ -1,0 +1,142 @@
+<!-- Template Selection Modal -->
+<div class="modal-dialog modal-lg">
+    <div class="modal-header">
+        <h2 class="modal-title">📋 Choose a Template</h2>
+        <button class="modal-close" data-action="close-modal" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clip-rule="evenodd" />
+            </svg>
+        </button>
+    </div>
+
+    <div class="modal-body">
+        {% if template %}
+        <!-- Preview Mode -->
+        <div style="margin-bottom: 2rem; padding: 1.5rem; background: var(--color-bg); border-radius: 12px;">
+            <div style="display: flex; align-items: start; gap: 1rem; margin-bottom: 1rem;">
+                <div style="font-size: 3rem;">{{ template.icon|default:"📋" }}</div>
+                <div style="flex: 1;">
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin: 0 0 0.5rem;">{{ template.name }}</h3>
+                    <p style="color: var(--color-text-secondary); margin: 0;">{{ template.description }}</p>
+                </div>
+            </div>
+
+            <div style="padding: 1rem; background: var(--color-surface); border-radius: 8px;">
+                <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">Includes {{
+                    template.tasks|length }} tasks:</div>
+                <ul style="margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                    {% for task in template.tasks %}
+                    <li style="font-size: 0.875rem;">{{ task.description }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                <button class="btn btn-primary" data-action="use-template" data-template-id="{{ template.id }}">
+                    Use This Template
+                </button>
+                <button class="btn btn-secondary" data-action="back-to-list">
+                    ← Back to Templates
+                </button>
+            </div>
+        </div>
+        {% else %}
+        <!-- List Mode -->
+        <div style="margin-bottom: 1.5rem;">
+            <input type="text" class="form-input" placeholder="Search templates..." id="template-search"
+                style="max-width: 400px;">
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
+            {% for tmpl in templates %}
+            <div class="template-card" data-template-id="{{ tmpl.id }}"
+                data-search-text="{{ tmpl.name|lower }} {{ tmpl.description|lower }} {{ tmpl.category|lower }}"
+                style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; transition: all 0.2s;">
+
+                <div style="font-size: 2rem; margin-bottom: 0.75rem;">{{ tmpl.icon|default:"📋" }}</div>
+
+                <h4 style="font-weight: 600; margin: 0 0 0.5rem;">{{ tmpl.name }}</h4>
+
+                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0 0 0.75rem;">
+                    {{ tmpl.description|truncatechars:80 }}
+                </p>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span
+                        style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: var(--color-bg); border-radius: 4px;">
+                        {{ tmpl.category }}
+                    </span>
+                    <span style="font-size: 0.75rem; color: var(--color-text-tertiary);">
+                        {{ tmpl.tasks|length }} task{{ tmpl.tasks|length|pluralize }}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .template-card:hover {
+        border-color: var(--color-primary);
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-md);
+    }
+</style>
+
+<script>
+    // Search functionality
+    document.getElementById('template-search')?.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+
+        document.querySelectorAll('.template-card').forEach(card => {
+            const searchText = card.dataset.searchText;
+            if (searchText.includes(query)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+
+    // Template click - open preview
+    document.querySelectorAll('.template-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const templateId = card.dataset.templateId;
+            // Reload modal with template preview
+            openModal('tracker-templates', { template_id: templateId });
+        });
+    });
+
+    // Use template
+    document.querySelector('[data-action="use-template"]')?.addEventListener('click', async (e) => {
+        const templateId = e.target.dataset.templateId;
+
+        try {
+            const response = await fetch(`/api/templates/${templateId}/use/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                document.querySelector('[data-action="close-modal"]').click();
+                showToast('Tracker created from template!', 'success');
+                window.location.href = `/tracker/${data.tracker_id}/`;
+            } else {
+                showToast(data.error || 'Failed to use template', 'error');
+            }
+        } catch (error) {
+            showToast('An error occurred', 'error');
+        }
+    });
+
+    // Back to list
+    document.querySelector('[data-action="back-to-list"]')?.addEventListener('click', () => {
+        openModal('tracker-templates');
+    });
+</script>

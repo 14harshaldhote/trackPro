@@ -10,10 +10,18 @@
 
     <!-- CSS -->
     <link rel="stylesheet" href="{% static 'core/css/themes.css' %}">
-    <link rel="stylesheet" href="{% static 'core/css/components.css' %}">
-    <link rel="stylesheet" href="{% static 'core/css/enhancements.css' %}">
     <link rel="stylesheet" href="{% static 'core/css/spa.css' %}">
+    <link rel="stylesheet" href="{% static 'core/css/js-enhanced.css' %}">
+    <link rel="stylesheet" href="{% static 'core/css/auth.css' %}">
     <link rel="icon" type="image/x-icon" href="{% static 'icons/fav.ico' %}">
+
+    <!-- Theme initialization (prevents flash of default theme) -->
+    <script>
+        (function () {
+            const savedTheme = localStorage.getItem('tracker-theme') || 'working-hard';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
 </head>
 
 <body>
@@ -24,11 +32,11 @@
 
     <div class="app-shell">
         <!-- Header -->
-        {% include 'components/_header.html' %}
+        {% include 'components/header.html' %}
 
         <div class="app-body">
             <!-- Sidebar -->
-            {% include 'components/_sidebar.html' %}
+            {% include 'components/sidebar.html' %}
 
             <!-- Main Content Container -->
             <main id="main-content" class="main-content" role="main" aria-live="polite">
@@ -75,11 +83,9 @@
             panelBase: '/panel/'
         };
     </script>
-    <script src="{% static 'core/js/app.js' %}"></script>
-    <script src="{% static 'core/js/panels.js' %}"></script>
-    <script src="{% static 'core/js/interactive.js' %}"></script>
-    <script src="{% static 'core/js/analytics.js' %}"></script>
-    <script src="{% static 'core/js/polish.js' %}"></script>
+
+    <!-- Load main SPA application -->
+    <script type="module" src="{% static 'core/js/app.js' %}"></script>
 
     {% block extra_js %}{% endblock %}
 </body>

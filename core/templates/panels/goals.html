@@ -1,173 +1,168 @@
-<!-- Goals Panel -->
-<div class="panel goals-panel fade-in">
-    <!-- Header -->
+{% load static %}
+<div class="panel" data-panel="goals">
+    <div class="breadcrumb">
+        <a href="/">Home</a>
+        <span class="breadcrumb-separator">›</span>
+        <span>Goals</span>
+    </div>
+
     <div class="panel-header">
-        <div>
-            <nav class="breadcrumb">
-                <a href="/" data-nav>Dashboard</a>
-                <span class="breadcrumb-separator">/</span>
-                <span>Goals</span>
-            </nav>
-            <h1 class="panel-title">Goals</h1>
-        </div>
+        <h1 class="panel-title">🎯 Your Goals</h1>
         <div class="panel-actions">
-            <button class="btn btn-primary" data-action="open-modal" data-modal="add-goal">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
+            <button class="btn btn-primary" data-action="add-goal">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd"
+                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                        clip-rule="evenodd" />
                 </svg>
                 New Goal
             </button>
         </div>
     </div>
 
-    <!-- Active Goals -->
-    <div class="goals-section">
-        <h3 class="section-title">Active Goals</h3>
-        <div class="goals-grid">
-            {% for goal in active_goals %}
-            <div class="goal-card {% if goal.progress >= 100 %}completed{% endif %}" data-goal-id="{{ goal.id }}">
-                <div class="goal-header">
-                    <span class="goal-icon">{{ goal.icon|default:'<svg width="20" height="20" viewBox="0 0 24 24"
-                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <circle cx="12" cy="12" r="6"></circle>
-                            <circle cx="12" cy="12" r="2"></circle>
-                        </svg>'|safe }}</span>
-                    <div class="goal-info">
-                        <h4 class="goal-title">{{ goal.name }}</h4>
-                        <span class="goal-tracker">{{ goal.tracker_name }}</span>
-                    </div>
-                    <button class="btn btn-icon btn-sm" data-action="context-menu">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <circle cx="12" cy="12" r="1"></circle>
-                            <circle cx="12" cy="5" r="1"></circle>
-                            <circle cx="12" cy="19" r="1"></circle>
-                        </svg>
-                    </button>
-                </div>
-
-                {% include 'partials/goal_progress.html' with progress=goal.progress target=goal.target
-                current=goal.current %}
-
-                <div class="goal-stats">
-                    <div class="goal-stat">
-                        <span class="goal-stat-value">{{ goal.current }}</span>
-                        <span class="goal-stat-label">of {{ goal.target }} {{ goal.unit }}</span>
-                    </div>
-                    <div class="goal-stat">
-                        <span class="goal-stat-value">{{ goal.days_left }}</span>
-                        <span class="goal-stat-label">days left</span>
-                    </div>
-                </div>
-
-                <div class="goal-forecast">
-                    {% if goal.on_track %}
-                    <span class="on-track">✓ On track</span>
-                    {% else %}
-                    <span class="behind">⚠ {{ goal.behind_by }} behind pace</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% empty %}
-            <div class="empty-state">
-                <div class="empty-state-icon">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <circle cx="12" cy="12" r="6"></circle>
-                        <circle cx="12" cy="12" r="2"></circle>
-                    </svg>
-                </div>
-                <h3>No Active Goals</h3>
-                <p>Set a goal to stay motivated and track your progress.</p>
-                <button class="btn btn-primary" data-action="open-modal" data-modal="add-goal">Create Goal</button>
-            </div>
-            {% endfor %}
+    <!-- Goal Stats -->
+    <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div class="stat-card">
+            <div class="stat-value">{{ goal_stats.total_active }}</div>
+            <div class="stat-label">Active Goals</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ goal_stats.avg_progress }}%</div>
+            <div class="stat-label">Average Progress</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ goal_stats.on_track }}</div>
+            <div class="stat-label">On Track</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ goal_stats.at_risk }}</div>
+            <div class="stat-label">At Risk</div>
         </div>
     </div>
 
-    <!-- Completed Goals -->
-    {% if completed_goals %}
-    <div class="goals-section">
-        <h3 class="section-title">🏆 Completed Goals</h3>
-        <div class="completed-goals-list">
-            {% for goal in completed_goals %}
-            <div class="completed-goal-item">
-                <span class="goal-icon">{{ goal.icon|default:'<svg width="20" height="20" viewBox="0 0 24 24"
-                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>'|safe }}</span>
-                <div class="goal-info">
-                    <span class="goal-name">{{ goal.name }}</span>
-                    <span class="goal-completed-date">Completed {{ goal.completed_at|timesince }} ago</span>
+    <!-- Active Goals -->
+    {% if active_goals %}
+    <section style="margin-bottom: 3rem;">
+        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Active Goals</h2>
+        <div style="display: grid; gap: 1rem;">
+            {% for goal in active_goals %}
+            <div class="goal-card"
+                style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; padding: 1.5rem; transition: all 0.2s;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <div style="font-size: 2rem;">{{ goal.icon|default:"🎯" }}</div>
+                            <h3 style="font-size: 1.125rem; font-weight: 600; margin: 0;">{{ goal.title }}</h3>
+                        </div>
+                        {% if goal.description %}
+                        <p style="color: var(--color-text-secondary); margin: 0 0 0 3.5rem; font-size: 0.875rem;">
+                            {{ goal.description }}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <div class="dropdown">
+                        <button class="btn-icon dropdown-toggle" aria-label="More options">
+                            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                                <path
+                                    d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu">
+                            <button class="dropdown-item" data-action="edit-goal"
+                                data-goal-id="{{ goal.goal_id }}">Edit</button>
+                            <button class="dropdown-item" data-action="complete-goal"
+                                data-goal-id="{{ goal.goal_id }}">Mark Complete</button>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item dropdown-item-danger" data-action="delete-goal"
+                                data-goal-id="{{ goal.goal_id }}">Delete</button>
+                        </div>
+                    </div>
                 </div>
-                <span class="goal-celebration">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5.8 11.3 2 22l10.7-3.79"></path>
-                        <path d="M4 3h.01"></path>
-                        <path d="M22 8h.01"></path>
-                        <path d="M15 2h.01"></path>
-                        <path d="M22 20h.01"></path>
-                        <path
-                            d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12v0c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10">
-                        </path>
-                        <path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11v0c-.11.7-.72 1.22-1.43 1.22H17"></path>
-                        <path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98v0C9.52 4.9 9 5.52 9 6.23V7"></path>
-                    </svg>
-                </span>
+
+                <div style="margin-bottom: 1rem;">
+                    <div
+                        style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.5rem;">
+                        <span style="color: var(--color-text-secondary);">Progress</span>
+                        <span style="font-weight: 600; color: var(--color-primary);">
+                            {{ goal.current_value }}/{{ goal.target_value }} ({{ goal.progress }}%)
+                        </span>
+                    </div>
+                    <div class="progress-bar" style="height: 12px;">
+                        <div
+                            style="width: {{ goal.progress }}%; background: {% if goal.progress >= 80 %}var(--color-success){% elif goal.progress >= 50 %}var(--color-primary){% else %}var(--color-warning){% endif %}; transition: width 0.3s;">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.875rem;">
+                    <div style="color: var(--color-text-secondary);">
+                        {% if goal.deadline %}
+                        📅 Due: {{ goal.deadline|date:"M d, Y" }}
+                        {% else %}
+                        No deadline set
+                        {% endif %}
+                    </div>
+                    <div>
+                        {% if goal.progress >= 80 %}
+                        <span style="color: var(--color-success); font-weight: 600;">✓ On Track</span>
+                        {% elif goal.progress >= 50 %}
+                        <span style="color: var(--color-primary); font-weight: 600;">→ In Progress</span>
+                        {% else %}
+                        <span style="color: var(--color-warning); font-weight: 600;">⚠ Needs Attention</span>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
             {% endfor %}
         </div>
+    </section>
+    {% else %}
+    <div class="empty-state">
+        <svg class="empty-state-icon" width="80" height="80" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+            <path fill-rule="evenodd"
+                d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clip-rule="evenodd" />
+        </svg>
+        <h3 class="empty-state-title">No active goals</h3>
+        <p class="empty-state-description">Set a goal to track your long-term progress</p>
+        <button class="btn btn-primary" data-action="add-goal">Create Your First Goal</button>
     </div>
     {% endif %}
 
-    <!-- Goal Types Guide -->
-    <div class="goal-types-section">
-        <h3 class="section-title">Goal Types</h3>
-        <div class="goal-types-grid">
-            <div class="goal-type-card">
-                <span class="goal-type-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="12" y1="20" x2="12" y2="10"></line>
-                        <line x1="18" y1="20" x2="18" y2="4"></line>
-                        <line x1="6" y1="20" x2="6" y2="16"></line>
-                    </svg>
-                </span>
-                <h4>Complete X Tasks</h4>
-                <p>Complete a specific number of tasks within a timeframe.</p>
+    <!-- Completed Goals -->
+    {% if completed_goals %}
+    <section>
+        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: var(--color-text-secondary);">
+            ✅ Completed Goals
+        </h2>
+        <div style="display: grid; gap: 0.75rem;">
+            {% for goal in completed_goals %}
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: var(--color-success-bg); border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="font-size: 1.5rem;">{{ goal.icon|default:"🏆" }}</div>
+                    <div>
+                        <div style="font-weight: 600;">{{ goal.title }}</div>
+                        <div style="font-size: 0.75rem; color: var(--color-text-secondary);">
+                            Completed {{ goal.updated_at|date:"M d, Y" }}
+                        </div>
+                    </div>
+                </div>
+                <div style="color: var(--color-success); font-weight: 600;">100%</div>
             </div>
-            <div class="goal-type-card">
-                <span class="goal-type-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path
-                            d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.1.2-2.2.5-3.3.3-1.1 1-2.2 2.5-3.2.5 1 1.5 2 2 3z">
-                        </path>
-                    </svg>
-                </span>
-                <h4>Streak Goal</h4>
-                <p>Maintain a streak for a set number of consecutive days.</p>
-            </div>
-            <div class="goal-type-card">
-                <span class="goal-type-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                        <polyline points="17 6 23 6 23 12"></polyline>
-                    </svg>
-                </span>
-                <h4>Completion Rate</h4>
-                <p>Achieve a target completion percentage over time.</p>
-            </div>
+            {% endfor %}
         </div>
-    </div>
+    </section>
+    {% endif %}
 </div>
 
-<!-- Confetti Container -->
-<canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+<style>
+    .goal-card:hover {
+        border-color: var(--color-primary);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+</style>

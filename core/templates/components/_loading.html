@@ -1,38 +1,59 @@
-<!-- Enhanced Loading Skeleton Component -->
-<div class="loading-state">
-    <!-- Header Skeleton -->
-    <div class="loading-header">
-        <div class="skeleton skeleton-title shimmer"></div>
-        <div class="skeleton skeleton-breadcrumb shimmer"></div>
+<!-- Loading Skeleton Component -->
+<div class="skeleton-container">
+    <!-- Panel Header Skeleton -->
+    <div class="skeleton-header" style="margin-bottom: 2rem;">
+        <div class="skeleton-item"
+            style="width: 200px; height: 32px; background: var(--color-border); border-radius: 8px;"></div>
+        <div class="skeleton-item"
+            style="width: 150px; height: 20px; background: var(--color-border); border-radius: 4px; margin-top: 0.5rem;">
+        </div>
     </div>
 
-    <!-- Stats Grid Skeleton -->
-    <div class="loading-stats">
-        <div class="skeleton skeleton-card shimmer"></div>
-        <div class="skeleton skeleton-card shimmer"></div>
-        <div class="skeleton skeleton-card shimmer"></div>
-        <div class="skeleton skeleton-card shimmer"></div>
+    <!-- Stats Cards Skeleton -->
+    <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div class="skeleton-item"
+            style="height: 120px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
+        </div>
+        <div class="skeleton-item"
+            style="height: 120px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
+        </div>
+        <div class="skeleton-item"
+            style="height: 120px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
+        </div>
     </div>
 
     <!-- Content List Skeleton -->
-    <div class="loading-content">
-        <div class="skeleton skeleton-list-item shimmer"></div>
-        <div class="skeleton skeleton-list-item shimmer"></div>
-        <div class="skeleton skeleton-list-item shimmer"></div>
-        <div class="skeleton skeleton-list-item shimmer"></div>
-        <div class="skeleton skeleton-list-item shimmer"></div>
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <div class="skeleton-item"
+            style="height: 60px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+        </div>
+        <div class="skeleton-item"
+            style="height: 60px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+        </div>
+        <div class="skeleton-item"
+            style="height: 60px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+        </div>
+        <div class="skeleton-item"
+            style="height: 60px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+        </div>
     </div>
 </div>
 
-<!-- Inline Button Loading State Template -->
-<template id="btn-loading-template">
-    <span class="btn-loading">
-        <span class="spinner-inline"></span>
-        <span class="btn-loading-text">Loading...</span>
-    </span>
-</template>
+<style>
+    @keyframes skeleton-pulse {
 
-<!-- Content Overlay Loading -->
-<div class="content-loading-overlay" id="content-loading-overlay" style="display: none;">
-    <div class="loading-spinner loading-spinner-lg"></div>
-</div>
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+    }
+
+    .skeleton-item {
+        animation: skeleton-pulse 1.5s ease-in-out infinite;
+    }
+</style>

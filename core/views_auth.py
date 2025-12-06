@@ -10,8 +10,23 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from rest_framework import serializers
 import json
+
+
+def get_google_client_id():
+    """Get Google Client ID from settings"""
+    try:
+        return settings.SOCIALACCOUNT_PROVIDERS.get('google', {}).get('APP', {}).get('client_id', '')
+    except Exception:
+        return ''
+
+
+def is_google_oauth_enabled():
+    """Check if Google OAuth is properly configured"""
+    client_id = get_google_client_id()
+    return bool(client_id and client_id.strip())
 
 
 # ============================================================================
@@ -268,24 +283,35 @@ def api_validate_email(request):
         return JsonResponse({'available': False, 'error': 'Invalid JSON'}, status=400)
 
 
+
 # ============================================================================
 # AUTH PAGES (Render custom templates)
 # ============================================================================
 
 def login_page(request):
-    """Render login page"""
+    """Render login page with Google OAuth context"""
     from django.shortcuts import render, redirect
     if request.user.is_authenticated:
         return redirect('/')
-    return render(request, 'auth/login.html')
+    
+    context = {
+        'google_oauth_enabled': is_google_oauth_enabled(),
+        'google_client_id': get_google_client_id(),
+    }
+    return render(request, 'auth/login.html', context)
 
 
 def signup_page(request):
-    """Render signup page"""
+    """Render signup page with Google OAuth context"""
     from django.shortcuts import render, redirect
     if request.user.is_authenticated:
         return redirect('/')
-    return render(request, 'auth/signup.html')
+    
+    context = {
+        'google_oauth_enabled': is_google_oauth_enabled(),
+        'google_client_id': get_google_client_id(),
+    }
+    return render(request, 'auth/signup.html', context)
 
 
 def forgot_password(request):

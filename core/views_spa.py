@@ -1210,15 +1210,20 @@ def panel_settings(request, section='general'):
     # Get or create user preferences
     prefs, created = UserPreferences.objects.get_or_create(user=request.user)
     
-    # Define available themes
+    # Define available themes (matching themes.css)
     themes = [
-        {'id': 'working-hard', 'name': 'Working Hard', 'color': '#0277bd', 'bg': '#0c1929'},
-        {'id': 'forest-focus', 'name': 'Forest Focus', 'color': '#2e7d32', 'bg': '#0a1f0c'},
-        {'id': 'sunset-glow', 'name': 'Sunset Glow', 'color': '#e65100', 'bg': '#1f0c0a'},
-        {'id': 'ocean-calm', 'name': 'Ocean Calm', 'color': '#00838f', 'bg': '#0a1a1f'},
-        {'id': 'purple-haze', 'name': 'Purple Haze', 'color': '#6a1b9a', 'bg': '#150a1f'},
-        {'id': 'midnight-dark', 'name': 'Midnight Dark', 'color': '#424242', 'bg': '#121212'},
-        {'id': 'light-mode', 'name': 'Light Mode', 'color': '#1976d2', 'bg': '#ffffff'},
+        {'id': 'working-hard', 'name': 'Working Hard', 'color': '#0277BD', 'bg': '#ECEFF1'},
+        {'id': 'total-dark', 'name': 'Total Dark', 'color': '#00BFA5', 'bg': '#000000'},
+        {'id': 'bloom', 'name': 'Bloom', 'color': '#66BB6A', 'bg': '#F1F8E9'},
+        {'id': 'rage', 'name': 'Rage', 'color': '#FF1744', 'bg': '#1A0000'},
+        {'id': 'blossom', 'name': 'Blossom', 'color': '#F48FB1', 'bg': '#FFF0F5'},
+        {'id': 'ocean-wave', 'name': 'Ocean Wave', 'color': '#0288D1', 'bg': '#E0F7FA'},
+        {'id': 'rising-up', 'name': 'Rising Up', 'color': '#FFA726', 'bg': '#FFF8E1'},
+        {'id': 'sprinter', 'name': 'Sprinter', 'color': '#00E676', 'bg': '#0A0A0A'},
+        {'id': 'beast-mode', 'name': 'Beast Mode', 'color': '#FF3D00', 'bg': '#0D0D0D'},
+        {'id': 'rider', 'name': 'Rider', 'color': '#FF6EC7', 'bg': '#1A0033'},
+        {'id': 'dig-deep', 'name': 'Dig Deep', 'color': '#6D4C41', 'bg': '#EFEBE9'},
+        {'id': 'cherry', 'name': 'Cherry', 'color': '#E91E63', 'bg': '#FCE4EC'},
     ]
     
     context = {
@@ -1312,13 +1317,13 @@ def modal_view(request, modal_name):
 
 def panel_error_404(request):
     """404 error panel for SPA"""
-    return render(request, 'panels/error_404.html', {
+    return render(request, 'errors/404.html', {
         'message': 'The page you are looking for could not be found.',
     }, status=404)
 
 
 def panel_error_500(request):
     """500 error panel for SPA"""
-    return render(request, 'panels/error_500.html', {
+    return render(request, 'errors/500.html', {
         'message': 'An unexpected error occurred. Please try again later.',
     }, status=500)

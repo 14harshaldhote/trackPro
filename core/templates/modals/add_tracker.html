@@ -1,138 +1,238 @@
 <!-- Add Tracker Modal -->
-<div class="modal-dialog" role="document">
+<div class="modal-dialog modal-lg">
     <div class="modal-header">
-        <h3 class="modal-title">Create New Tracker</h3>
-        <button type="button" class="modal-close" data-action="close-modal" aria-label="Close">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
+        <h2 class="modal-title">🎯 Create New Tracker</h2>
+        <button class="modal-close" data-action="close-modal" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clip-rule="evenodd" />
             </svg>
         </button>
     </div>
 
-    <form id="add-tracker-form" action="/api/tracker/create/" method="POST" data-ajax>
+    <form id="add-tracker-form" method="post">
         <div class="modal-body">
-            <!-- Tracker Name -->
-            <div class="form-group">
-                <label for="tracker-name" class="form-label">Tracker Name *</label>
-                <input type="text" id="tracker-name" name="name" class="form-input"
-                    placeholder="e.g., Morning Routine, Fitness, Study" required maxlength="100">
-                <div class="field-error" id="name-error"></div>
+            {% csrf_token %}
+
+            <!-- Step Indicator -->
+            <div class="steps" style="display: flex; justify-content: space-between; margin-bottom: 2rem;">
+                <div class="step active" data-step="1">
+                    <div class="step-number">1</div>
+                    <div class="step-label">Basic Info</div>
+                </div>
+                <div class="step" data-step="2">
+                    <div class="step-number">2</div>
+                    <div class="step-label">Tasks</div>
+                </div>
+                <div class="step" data-step="3">
+                    <div class="step-number">3</div>
+                    <div class="step-label">Schedule</div>
+                </div>
             </div>
 
-            <!-- Description -->
-            <div class="form-group">
-                <label for="tracker-description" class="form-label">Description</label>
-                <textarea id="tracker-description" name="description" class="form-input" rows="2"
-                    placeholder="What will you track?"></textarea>
+            <!-- Step 1: Basic Info -->
+            <div class="step-content" data-step-content="1">
+                <div class="form-group">
+                    <label for="name" class="form-label">Tracker Name *</label>
+                    <input type="text" id="name" name="name" class="form-input"
+                        placeholder="e.g., Morning Routine, Fitness Goals" required maxlength="100">
+                </div>
+
+                <div class="form-group">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea id="description" name="description" class="form-input" rows="3"
+                        placeholder="What is this tracker for?" maxlength="500"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="time_period" class="form-label">Time Period *</label>
+                    <select id="time_period" name="time_period" class="form-input" required>
+                        <option value="daily">Daily - Resets every day</option>
+                        <option value="weekly">Weekly - Resets every week</option>
+                        <option value="monthly">Monthly - Resets every month</option>
+                    </select>
+                </div>
             </div>
 
-            <!-- Time Period -->
-            <div class="form-group">
-                <label for="tracker-period" class="form-label">Time Period</label>
-                <select id="tracker-period" name="time_period" class="form-select">
-                    <option value="daily" selected>Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="custom">Custom Range</option>
-                </select>
+            <!-- Step 2: Tasks -->
+            <div class="step-content" data-step-content="2" style="display: none;">
+                <div style="margin-bottom: 1rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" id="add-task-field">
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        Add Task
+                    </button>
+                </div>
+
+                <div id="tasks-container" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div class="task-field">
+                        <input type="text" name="tasks[]" class="form-input" placeholder="Task description" required>
+                    </div>
+                </div>
             </div>
 
-            <!-- Quick Template -->
-            <div class="form-group">
-                <label class="form-label">Start from Template (Optional)</label>
-                <div class="template-grid">
-                    <label class="template-option">
-                        <input type="radio" name="template" value="">
-                        <span class="template-card">
-                            <span class="template-icon">🆕</span>
-                            <span class="template-name">Blank</span>
-                        </span>
+            <!-- Step 3: Schedule -->
+            <div class="step-content" data-step-content="3" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Start Date *</label>
+                    <input type="date" name="start_date" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="auto_create_tasks" checked>
+                        <span class="toggle-switch"></span>
+                        <span>Automatically create task instances</span>
                     </label>
-                    <label class="template-option">
-                        <input type="radio" name="template" value="productivity">
-                        <span class="template-card">
-                            <span class="template-icon">⚡</span>
-                            <span class="template-name">Productivity</span>
-                        </span>
-                    </label>
-                    <label class="template-option">
-                        <input type="radio" name="template" value="wellbeing">
-                        <span class="template-card">
-                            <span class="template-icon">🧘</span>
-                            <span class="template-name">Wellbeing</span>
-                        </span>
-                    </label>
-                    <label class="template-option">
-                        <input type="radio" name="template" value="fitness">
-                        <span class="template-card">
-                            <span class="template-icon">💪</span>
-                            <span class="template-name">Fitness</span>
-                        </span>
-                    </label>
-                    <label class="template-option">
-                        <input type="radio" name="template" value="study">
-                        <span class="template-card">
-                            <span class="template-icon">📚</span>
-                            <span class="template-name">Study</span>
-                        </span>
+                    <small class="form-help">Tasks will be created based on the time period</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" name="enable_reminders">
+                        <span class="toggle-switch"></span>
+                        <span>Enable reminders</span>
                     </label>
                 </div>
             </div>
         </div>
 
         <div class="modal-footer">
-            <button type="button" class="btn btn-ghost" data-action="close-modal">Cancel</button>
-            <button type="submit" class="btn btn-primary" id="create-tracker-btn">
-                Create Tracker
-            </button>
+            <button type="button" class="btn btn-secondary" id="prev-step" style="display: none;">Previous</button>
+            <button type="button" class="btn btn-secondary" data-action="close-modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="next-step">Next</button>
+            <button type="submit" class="btn btn-primary" id="submit-tracker" style="display: none;">Create
+                Tracker</button>
         </div>
     </form>
 </div>
 
 <style>
-    .template-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-        gap: 0.75rem;
+    .step {
+        flex: 1;
+        text-align: center;
+        position: relative;
     }
 
-    .template-option {
-        cursor: pointer;
+    .step::after {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        width: 100%;
+        height: 2px;
+        background: var(--color-border);
+        z-index: -1;
     }
 
-    .template-option input {
+    .step:last-child::after {
         display: none;
     }
 
-    .template-card {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 0.75rem;
+    .step-number {
+        width: 40px;
+        height: 40px;
+        margin: 0 auto 0.5rem;
+        border-radius: 50%;
+        background: var(--color-bg);
         border: 2px solid var(--color-border);
-        border-radius: 8px;
-        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
     }
 
-    .template-option input:checked+.template-card {
+    .step.active .step-number {
+        background: var(--color-primary);
         border-color: var(--color-primary);
-        background: rgba(var(--color-primary-rgb, 2, 119, 189), 0.1);
+        color: white;
     }
 
-    .template-card:hover {
-        border-color: var(--color-primary);
-    }
-
-    .template-icon {
-        font-size: 1.5rem;
-        margin-bottom: 0.25rem;
-    }
-
-    .template-name {
-        font-size: 0.75rem;
-        font-weight: 500;
+    .step-label {
+        font-size: 0.875rem;
         color: var(--color-text-secondary);
-        text-align: center;
+    }
+
+    .step.active .step-label {
+        color: var(--color-primary);
+        font-weight: 600;
     }
 </style>
+
+<script>
+    let currentStep = 1;
+    const totalSteps = 3;
+
+    document.getElementById('next-step').addEventListener('click', () => {
+        if (currentStep < totalSteps) {
+            currentStep++;
+            updateSteps();
+        }
+    });
+
+    document.getElementById('prev-step').addEventListener('click', () => {
+        if (currentStep > 1) {
+            currentStep--;
+            updateSteps();
+        }
+    });
+
+    function updateSteps() {
+        // Update step indicators
+        document.querySelectorAll('.step').forEach((step, index) => {
+            if (index + 1 <= currentStep) {
+                step.classList.add('active');
+            } else {
+                step.classList.remove('active');
+            }
+        });
+
+        // Update step content
+        document.querySelectorAll('.step-content').forEach(content => {
+            content.style.display = 'none';
+        });
+        document.querySelector(`[data-step-content="${currentStep}"]`).style.display = 'block';
+
+        // Update buttons
+        document.getElementById('prev-step').style.display = currentStep > 1 ? 'block' : 'none';
+        document.getElementById('next-step').style.display = currentStep < totalSteps ? 'block' : 'none';
+        document.getElementById('submit-tracker').style.display = currentStep === totalSteps ? 'block' : 'none';
+    }
+
+    document.getElementById('add-task-field').addEventListener('click', () => {
+        const container = document.getElementById('tasks-container');
+        const field = document.createElement('div');
+        field.className = 'task-field';
+        field.innerHTML = '<input type="text" name="tasks[]" class="form-input" placeholder="Task description">';
+        container.appendChild(field);
+    });
+
+    document.getElementById('add-tracker-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(e.target);
+
+        try {
+            const response = await fetch('/api/trackers/add/', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                document.querySelector('[data-action="close-modal"]').click();
+                showToast('Tracker created successfully', 'success');
+                window.location.href = `/tracker/${data.tracker_id}/`;
+            } else {
+                showToast(data.error || 'Failed to create tracker', 'error');
+            }
+        } catch (error) {
+            showToast('An error occurred', 'error');
+        }
+    });
+</script>

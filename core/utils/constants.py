@@ -394,3 +394,12 @@ NOTIFICATION_TYPES = {
         'duration': 4000
     }
 }
+
+# Performance thresholds
+PERFORMANCE = {
+    'MAX_QUERY_COUNT': 50,          # Max DB queries before warning
+    'SLOW_QUERY_THRESHOLD': 0.1,    # Seconds - queries slower than this are logged
+    'PAGE_LOAD_TARGET': 200,        # ms - target page load time
+    'BATCH_SIZE': 100,              # Default batch size for bulk operations
+    'PREFETCH_LIMIT': 20,           # Max items to prefetch
+}

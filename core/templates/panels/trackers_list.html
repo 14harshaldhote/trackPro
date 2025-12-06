@@ -1,490 +1,193 @@
-<!-- Tracker List Panel -->
-<div class="panel trackers-panel fade-in">
-    <!-- Page Header -->
+{% load static %}
+<div class="panel" data-panel="trackers-list">
+    <div class="breadcrumb">
+        <a href="/">Home</a>
+        <span class="breadcrumb-separator">›</span>
+        <span>Trackers</span>
+    </div>
+
     <div class="panel-header">
         <div>
-            <nav class="breadcrumb">
-                <a href="/" data-nav>Dashboard</a>
-                <span class="breadcrumb-separator">/</span>
-                <span>Trackers</span>
-            </nav>
-            <h1 class="panel-title">My Trackers</h1>
+            <h1 class="panel-title">Your Trackers</h1>
+            <p style="color: var(--color-text-secondary); margin: 0.5rem 0 0;">
+                {{ total_count }} active tracker{{ total_count|pluralize }}
+            </p>
         </div>
+
         <div class="panel-actions">
-            <button class="btn btn-primary" data-action="open-modal" data-modal="add-tracker"
-                data-modal-url="/modals/add_tracker/">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
+            <button class="btn btn-primary" data-action="add-tracker">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd"
+                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                        clip-rule="evenodd" />
                 </svg>
                 New Tracker
             </button>
         </div>
     </div>
 
-    <!-- Toolbar -->
-    <div class="panel-toolbar">
-        <div class="toolbar-left">
-            <!-- View Toggle -->
-            <div class="view-toggle" role="group" aria-label="View mode">
-                <button class="view-toggle-btn active" data-view="grid" aria-pressed="true" title="Grid view">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="14" width="7" height="7"></rect>
-                        <rect x="3" y="14" width="7" height="7"></rect>
-                    </svg>
-                </button>
-                <button class="view-toggle-btn" data-view="list" aria-pressed="false" title="List view">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="8" y1="6" x2="21" y2="6"></line>
-                        <line x1="8" y1="12" x2="21" y2="12"></line>
-                        <line x1="8" y1="18" x2="21" y2="18"></line>
-                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-
-            <!-- Filters -->
-            <div class="dropdown filter-dropdown">
-                <button class="btn btn-ghost dropdown-toggle">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                    </svg>
-                    Filter
-                    <span class="filter-count" id="filter-count" style="display:none;">0</span>
-                </button>
-                <div class="dropdown-menu filter-menu">
-                    <div class="dropdown-header">Status</div>
-                    <label class="filter-option">
-                        <input type="checkbox" name="filter-status" value="active" checked> Active
-                    </label>
-                    <label class="filter-option">
-                        <input type="checkbox" name="filter-status" value="paused"> Paused
-                    </label>
-                    <label class="filter-option">
-                        <input type="checkbox" name="filter-status" value="completed"> Completed
-                    </label>
-                    <div class="dropdown-divider"></div>
-                    <div class="dropdown-header">Period</div>
-                    <label class="filter-option">
-                        <input type="checkbox" name="filter-period" value="daily" checked> Daily
-                    </label>
-                    <label class="filter-option">
-                        <input type="checkbox" name="filter-period" value="weekly"> Weekly
-                    </label>
-                    <label class="filter-option">
-                        <input type="checkbox" name="filter-period" value="monthly"> Monthly
-                    </label>
-                    <div class="dropdown-divider"></div>
-                    <button class="btn btn-ghost btn-sm" id="clear-filters">Clear All</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="toolbar-right">
-            <!-- Sort -->
-            <div class="dropdown sort-dropdown">
-                <button class="btn btn-ghost dropdown-toggle">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="4" y1="9" x2="20" y2="9"></line>
-                        <line x1="4" y1="15" x2="14" y2="15"></line>
-                        <line x1="4" y1="3" x2="8" y2="3"></line>
-                        <line x1="4" y1="21" x2="12" y2="21"></line>
-                    </svg>
-                    Sort: <span id="current-sort">Recent</span>
-                </button>
-                <div class="dropdown-menu">
-                    <button class="dropdown-item" data-sort="recent">Most Recent</button>
-                    <button class="dropdown-item" data-sort="name">Name A-Z</button>
-                    <button class="dropdown-item" data-sort="progress">Progress</button>
-                    <button class="dropdown-item" data-sort="tasks">Task Count</button>
-                </div>
-            </div>
-
-            <!-- Search within list -->
-            <div class="toolbar-search">
-                <input type="text" id="tracker-search" placeholder="Search trackers..."
-                    class="form-input form-input-sm">
-            </div>
-        </div>
-    </div>
-
-    <!-- Tracker Grid/List -->
-    <div class="trackers-container" id="trackers-container" data-view="grid">
-        {% for tracker in trackers %}
-        <div class="tracker-item" data-tracker-id="{{ tracker.id }}" data-status="{{ tracker.status }}">
-            <!-- Grid View Card -->
-            <a href="/tracker/{{ tracker.id }}/" class="tracker-card" data-nav>
-                <div class="tracker-card-header">
-                    <span class="tracker-name">{{ tracker.name }}</span>
-                    <span class="tracker-status status-{{ tracker.status|lower }}">{{ tracker.status }}</span>
-                </div>
-                {% if tracker.description %}
-                <p class="tracker-description">{{ tracker.description|truncatewords:15 }}</p>
-                {% endif %}
-                <div class="tracker-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ tracker.progress }}%"></div>
+    <!-- Active Trackers -->
+    {% if trackers %}
+    <section style="margin-bottom: 3rem;">
+        <div class="tracker-grid"
+            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem;">
+            {% for tracker in trackers %}
+            <div class="tracker-card-detailed"
+                style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; padding: 1.5rem; transition: all 0.2s;">
+                <div class="tracker-card-header"
+                    style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                    <div>
+                        <h3 style="font-size: 1.125rem; font-weight: 600; margin: 0 0 0.25rem;">
+                            {{ tracker.name }}
+                        </h3>
+                        {% if tracker.description %}
+                        <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0;">
+                            {{ tracker.description|truncatechars:60 }}
+                        </p>
+                        {% endif %}
                     </div>
-                    <span class="progress-text">{{ tracker.progress }}% complete</span>
-                </div>
-                <div class="tracker-meta">
-                    <span class="tracker-period-badge">{{ tracker.time_period }}</span>
-                    <span class="tracker-task-count">{{ tracker.task_count }} tasks</span>
-                </div>
-                <div class="tracker-footer">
-                    <span class="tracker-date">Updated {{ tracker.updated_at|timesince }} ago</span>
-                </div>
-            </a>
 
-            <!-- Context Menu Trigger -->
-            <button class="tracker-menu-btn" data-action="context-menu" aria-label="More options">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="1"></circle>
-                    <circle cx="12" cy="5" r="1"></circle>
-                    <circle cx="12" cy="19" r="1"></circle>
-                </svg>
-            </button>
-        </div>
-        {% empty %}
-        <div class="empty-state">
-            <div class="empty-state-icon">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                </svg>
-            </div>
-            <h3 class="empty-state-title">No Trackers Yet</h3>
-            <p class="empty-state-description">Create your first tracker to start building habits and achieving goals.
-            </p>
-            <button class="btn btn-primary" data-action="open-modal" data-modal="add-tracker"
-                data-modal-url="/modals/add_tracker/">Create First
-                Tracker</button>
-        </div>
-        {% endfor %}
-    </div>
+                    <div class="dropdown">
+                        <button class="btn-icon dropdown-toggle" aria-label="More options">
+                            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+                                <path
+                                    d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="/tracker/{{ tracker.tracker_id }}/" class="dropdown-item">View Details</a>
+                            <button class="dropdown-item" data-action="edit-tracker"
+                                data-tracker-id="{{ tracker.tracker_id }}">Edit</button>
+                            <button class="dropdown-item" data-action="pause-tracker"
+                                data-tracker-id="{{ tracker.tracker_id }}">
+                                {% if tracker.status == 'paused' %}Resume{% else %}Pause{% endif %}
+                            </button>
+                            <div class="dropdown-divider"></div>
+                            <button class="dropdown-item dropdown-item-danger" data-action="delete-tracker"
+                                data-tracker-id="{{ tracker.tracker_id }}">Delete</button>
+                        </div>
+                    </div>
+                </div>
 
-    <!-- Archived Trackers Section -->
-    {% if archived_trackers %}
-    <div class="archived-section" id="archived-section">
-        <button class="section-toggle" onclick="this.parentElement.classList.toggle('expanded')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="21 8 21 21 3 21 3 8"></polyline>
-                <rect x="1" y="3" width="22" height="5"></rect>
-            </svg>
-            Archived Trackers ({{ archived_trackers|length }})
-            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2">
-                <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-        </button>
-        <div class="archived-items">
-            {% for tracker in archived_trackers %}
-            <div class="tracker-item archived" data-tracker-id="{{ tracker.id }}" data-status="archived">
-                <div class="tracker-card-compact">
-                    <span class="tracker-name">{{ tracker.name }}</span>
-                    <span class="tracker-period-badge">{{ tracker.time_period }}</span>
-                    <button class="btn btn-sm btn-ghost"
-                        onclick="App.handleTrackerAction('unarchive', '{{ tracker.id }}')">Unarchive</button>
-                    <button class="btn btn-sm btn-ghost text-danger"
-                        onclick="App.handleTrackerAction('delete', '{{ tracker.id }}')">Delete</button>
+                <div class="tracker-meta" style="display: flex; gap: 1rem; margin-bottom: 1rem; font-size: 0.875rem;">
+                    <span class="tracker-period"
+                        style="display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.5rem; background: var(--color-bg); border-radius: 6px;">
+                        {% if tracker.time_period == 'daily' %}
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                            <path
+                                d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" />
+                        </svg>
+                        {% elif tracker.time_period == 'weekly' %}
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                            <path
+                                d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm1 2h6v2H7V4zm0 4h6v2H7V8zm0 4h6v2H7v-2z" />
+                        </svg>
+                        {% else %}
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                            <path
+                                d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1z" />
+                        </svg>
+                        {% endif %}
+                        {{ tracker.time_period|title }}
+                    </span>
+
+                    {% if tracker.status == 'paused' %}
+                    <span style="color: var(--color-warning);">⏸ Paused</span>
+                    {% endif %}
+                </div>
+
+                <div class="tracker-progress-section" style="margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.875rem; color: var(--color-text-secondary);">Progress</span>
+                        <span style="font-size: 0.875rem; font-weight: 600; color: var(--color-primary);">
+                            {{ tracker.progress }}%
+                        </span>
+                    </div>
+                    <div class="progress-bar"
+                        style="height: 8px; background: var(--color-bg); border-radius: 4px; overflow: hidden;">
+                        <div class="progress-fill"
+                            style="height: 100%; background: var(--color-primary); width: {{ tracker.progress }}%; transition: width 0.3s;">
+                        </div>
+                    </div>
+                    <div
+                        style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.75rem; color: var(--color-text-tertiary);">
+                        <span>{{ tracker.completed_count }} completed</span>
+                        <span>{{ tracker.task_count }} total tasks</span>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 0.5rem;">
+                    <a href="/tracker/{{ tracker.tracker_id }}/" class="btn btn-secondary btn-sm"
+                        style="flex: 1; text-align: center; text-decoration: none;">
+                        View Details
+                    </a>
+                    <button class="btn btn-primary btn-sm" data-action="add-task"
+                        data-tracker-id="{{ tracker.tracker_id }}" style="flex: 1;">
+                        Add Task
+                    </button>
                 </div>
             </div>
             {% endfor %}
         </div>
+
+        <!-- Pagination -->
+        {% if has_more %}
+        <div style="text-align: center; margin-top: 2rem;">
+            <button class="btn btn-secondary" data-action="load-more" data-page="{{ next_page }}">
+                Load More Trackers
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style="margin-left: 0.5rem;">
+                    <path fill-rule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+        {% endif %}
+    </section>
+    {% else %}
+    <div class="empty-state">
+        <svg class="empty-state-icon" width="80" height="80" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd"
+                d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V8z"
+                clip-rule="evenodd" />
+        </svg>
+        <h3 class="empty-state-title">No trackers yet</h3>
+        <p class="empty-state-description">Create your first tracker to start monitoring your habits and goals</p>
+        <button class="btn btn-primary" data-action="add-tracker">Create Your First Tracker</button>
     </div>
     {% endif %}
 
-    <!-- Pagination -->
-    {% if has_more %}
-    <div class="pagination-container" id="pagination">
-        <button class="btn btn-ghost load-more" id="load-more" data-page="{{ next_page }}">
-            Load More
-        </button>
-        <p class="pagination-info">Showing {{ trackers|length }} of {{ total_count }} trackers</p>
-    </div>
+    <!-- Archived Trackers -->
+    {% if archived_trackers %}
+    <section>
+        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: var(--color-text-secondary);">
+            📦 Archived Trackers
+        </h2>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            {% for tracker in archived_trackers %}
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: var(--color-bg); border-radius: 8px;">
+                <div>
+                    <strong>{{ tracker.name }}</strong>
+                    <span style="margin-left: 0.5rem; font-size: 0.875rem; color: var(--color-text-secondary);">
+                        {{ tracker.time_period|title }}
+                    </span>
+                </div>
+                <button class="btn btn-sm btn-secondary" data-action="restore-tracker"
+                    data-tracker-id="{{ tracker.tracker_id }}">
+                    Restore
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
     {% endif %}
 </div>
 
-<!-- Context Menu Template -->
-<div class="context-menu" id="tracker-context-menu" style="display:none;">
-    <button class="context-menu-item" data-action="edit">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-        </svg>
-        Edit Tracker
-    </button>
-    <button class="context-menu-item" data-action="duplicate">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-        Duplicate
-    </button>
-    <button class="context-menu-item" data-action="archive">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="21 8 21 21 3 21 3 8"></polyline>
-            <rect x="1" y="3" width="22" height="5"></rect>
-            <line x1="10" y1="12" x2="14" y2="12"></line>
-        </svg>
-        Archive
-    </button>
-    <div class="context-menu-divider"></div>
-    <button class="context-menu-item context-menu-danger" data-action="delete">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-        Delete
-    </button>
-</div>
-
-<script>
-    (function () {
-        const container = document.querySelector('.trackers-panel');
-        if (!container) return;
-
-        // ===== DROPDOWN TOGGLE =====
-        // Bind dropdown toggles directly for this panel
-        container.querySelectorAll('.dropdown-toggle').forEach(toggle => {
-            toggle.addEventListener('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                const dropdown = this.closest('.dropdown');
-                const isOpen = dropdown.classList.contains('open');
-
-                // Close all other dropdowns
-                container.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
-
-                if (!isOpen) {
-                    dropdown.classList.add('open');
-                }
-            });
-        });
-
-        // Close dropdowns on outside click
-        document.addEventListener('click', function (e) {
-            if (!e.target.closest('.dropdown')) {
-                container.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
-            }
-        });
-
-        const trackerItems = container.querySelectorAll('.tracker-item');
-        const searchInput = container.querySelector('#tracker-search');
-        const sortItems = container.querySelectorAll('[data-sort]');
-        const currentSortEl = container.querySelector('#current-sort');
-        const filterCheckboxes = container.querySelectorAll('[name^="filter-"]');
-        const clearFiltersBtn = container.querySelector('#clear-filters');
-        const filterCountEl = container.querySelector('#filter-count');
-        const viewToggleBtns = container.querySelectorAll('.view-toggle-btn');
-        const trackersContainer = container.querySelector('#trackers-container');
-
-        let currentSort = 'recent';
-        let currentFilters = {
-            status: ['active'],
-            period: ['daily']
-        };
-
-        // Search functionality
-        if (searchInput) {
-            searchInput.addEventListener('input', debounce(function (e) {
-                const query = e.target.value.toLowerCase().trim();
-                filterTrackers(query);
-            }, 250));
-        }
-
-        // Sort functionality
-        sortItems.forEach(item => {
-            item.addEventListener('click', function () {
-                currentSort = this.dataset.sort;
-                if (currentSortEl) {
-                    const sortLabels = { recent: 'Recent', name: 'Name A-Z', progress: 'Progress', tasks: 'Task Count' };
-                    currentSortEl.textContent = sortLabels[currentSort] || 'Recent';
-                }
-                sortTrackers();
-            });
-        });
-
-        // Filter functionality
-        filterCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', function () {
-                updateFilters();
-                filterTrackers(searchInput?.value || '');
-            });
-        });
-
-        // Clear filters
-        if (clearFiltersBtn) {
-            clearFiltersBtn.addEventListener('click', function () {
-                filterCheckboxes.forEach(cb => cb.checked = false);
-                updateFilters();
-                filterTrackers('');
-            });
-        }
-
-        // View toggle (grid/list)
-        viewToggleBtns.forEach(btn => {
-            btn.addEventListener('click', function () {
-                viewToggleBtns.forEach(b => {
-                    b.classList.remove('active');
-                    b.setAttribute('aria-pressed', 'false');
-                });
-                this.classList.add('active');
-                this.setAttribute('aria-pressed', 'true');
-                if (trackersContainer) {
-                    trackersContainer.dataset.view = this.dataset.view;
-                }
-            });
-        });
-
-        function updateFilters() {
-            currentFilters.status = [];
-            currentFilters.period = [];
-
-            filterCheckboxes.forEach(cb => {
-                if (cb.checked) {
-                    if (cb.name === 'filter-status') {
-                        currentFilters.status.push(cb.value);
-                    } else if (cb.name === 'filter-period') {
-                        currentFilters.period.push(cb.value);
-                    }
-                }
-            });
-
-            // Update filter count badge
-            const totalFilters = currentFilters.status.length + currentFilters.period.length;
-            if (filterCountEl) {
-                filterCountEl.textContent = totalFilters;
-                filterCountEl.style.display = totalFilters > 0 ? 'inline' : 'none';
-            }
-        }
-
-        function filterTrackers(searchQuery) {
-            trackerItems.forEach(item => {
-                const card = item.querySelector('.tracker-card');
-                if (!card) return;
-
-                const name = card.querySelector('.tracker-name')?.textContent.toLowerCase() || '';
-                const description = card.querySelector('.tracker-description')?.textContent.toLowerCase() || '';
-                const status = item.dataset.status?.toLowerCase() || 'active';
-                const period = card.querySelector('.tracker-period-badge')?.textContent.toLowerCase() || 'daily';
-
-                // Check search match
-                const matchesSearch = !searchQuery ||
-                    name.includes(searchQuery) ||
-                    description.includes(searchQuery);
-
-                // Check filter match (empty array means show all)
-                const matchesStatus = currentFilters.status.length === 0 ||
-                    currentFilters.status.includes(status);
-                const matchesPeriod = currentFilters.period.length === 0 ||
-                    currentFilters.period.includes(period);
-
-                item.style.display = (matchesSearch && matchesStatus && matchesPeriod) ? '' : 'none';
-            });
-        }
-
-        function sortTrackers() {
-            const itemsArray = Array.from(trackerItems);
-
-            itemsArray.sort((a, b) => {
-                const cardA = a.querySelector('.tracker-card');
-                const cardB = b.querySelector('.tracker-card');
-
-                switch (currentSort) {
-                    case 'name':
-                        const nameA = cardA?.querySelector('.tracker-name')?.textContent || '';
-                        const nameB = cardB?.querySelector('.tracker-name')?.textContent || '';
-                        return nameA.localeCompare(nameB);
-
-                    case 'progress':
-                        const progressA = parseInt(cardA?.querySelector('.progress-text')?.textContent) || 0;
-                        const progressB = parseInt(cardB?.querySelector('.progress-text')?.textContent) || 0;
-                        return progressB - progressA; // Descending
-
-                    case 'tasks':
-                        const tasksA = parseInt(cardA?.querySelector('.tracker-task-count')?.textContent) || 0;
-                        const tasksB = parseInt(cardB?.querySelector('.tracker-task-count')?.textContent) || 0;
-                        return tasksB - tasksA; // Descending
-
-                    case 'recent':
-                    default:
-                        // Keep original order (server-side sorted by updated_at)
-                        return 0;
-                }
-            });
-
-            // Re-append in sorted order
-            if (trackersContainer) {
-                itemsArray.forEach(item => trackersContainer.appendChild(item));
-            }
-        }
-
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(this, args), wait);
-            };
-        }
-
-        // Context Menu Logic
-        const contextMenu = document.getElementById('tracker-context-menu');
-        let activeTrackerId = null;
-
-        if (contextMenu) {
-            // Close menu when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!contextMenu.contains(e.target) && !e.target.closest('[data-action="context-menu"]')) {
-                    contextMenu.style.display = 'none';
-                }
-            });
-
-            // Handle Menu Trigger
-            container.addEventListener('click', (e) => {
-                const trigger = e.target.closest('[data-action="context-menu"]');
-                if (trigger) {
-                    e.preventDefault();
-                    e.stopPropagation();
-
-                    const trackerItem = trigger.closest('.tracker-item');
-                    activeTrackerId = trackerItem.dataset.trackerId;
-
-                    // Position menu
-                    const rect = trigger.getBoundingClientRect();
-                    contextMenu.style.display = 'block';
-                    contextMenu.style.top = (rect.bottom + window.scrollY + 5) + 'px';
-                    contextMenu.style.left = (rect.right - contextMenu.offsetWidth) + 'px';
-                }
-            });
-
-            // Handle Menu Actions
-            contextMenu.addEventListener('click', (e) => {
-                const actionBtn = e.target.closest('[data-action]');
-                if (!actionBtn) return;
-
-                const action = actionBtn.dataset.action;
-                contextMenu.style.display = 'none';
-
-                if (window.App && activeTrackerId) {
-                    if (action === 'edit') {
-                        // For edit, use the centralized modal loader with correct URL
-                        window.App.loadModal(`/modals/edit_tracker/?tracker_id=${activeTrackerId}`);
-                    } else {
-                        // For archive/delete, use the handler
-                        if (typeof window.App.handleTrackerAction === 'function') {
-                            window.App.handleTrackerAction(action, activeTrackerId);
-                        } else {
-                            console.error('App.handleTrackerAction not found');
-                        }
-                    }
-                }
-            });
-        }
-
-        console.log('[TrackerList] Context menu and filter/sort handlers initialized');
-    })();
-</script>
+<style>
+    .tracker-card-detailed:hover {
+        border-color: var(--color-primary);
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+    }
+</style>
