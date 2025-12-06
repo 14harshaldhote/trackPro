@@ -1,7 +1,14 @@
 /**
  * Tracker Pro - SPA Controller
  * Handles navigation, modals, toasts, and global state
+ * With comprehensive console logging
  */
+
+// Console logging helper for App
+const appLog = (module, action, data = {}) => {
+    const emoji = data.status === 'SUCCESS' ? '✅' : data.status === 'ERROR' ? '❌' : data.status === 'WARNING' ? '⚠️' : 'ℹ️';
+    console.log(`[App/${module}] ${emoji} ${action}`, { timestamp: new Date().toISOString(), module, action, ...data });
+};
 
 // ============================================================================
 // APP STATE & CONFIG
@@ -44,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 App.init = function () {
+    appLog('Init', 'START', { status: 'INFO', message: 'Initializing Tracker Pro SPA' });
     this.initTheme();
     this.initSidebarState();
     this.bindEventDelegation();
@@ -60,6 +68,7 @@ App.init = function () {
     // Handle browser back/forward
     window.addEventListener('popstate', (e) => {
         if (e.state?.url) {
+            appLog('Navigation', 'POPSTATE', { status: 'INFO', url: e.state.url });
             this.loadPanel(e.state.url, false);
         }
     });
@@ -67,10 +76,11 @@ App.init = function () {
     // Load initial panel based on URL
     const panelContent = document.getElementById('panel-content');
     if (panelContent && !panelContent.innerHTML.trim()) {
+        appLog('Init', 'LOAD_INITIAL_PANEL', { status: 'INFO', url: window.location.pathname });
         this.loadPanel(window.location.pathname, false);
     }
 
-    console.log('🚀 Tracker Pro initialized');
+    appLog('Init', 'COMPLETE', { status: 'SUCCESS', message: 'Tracker Pro initialized' });
 };
 
 // ============================================================================
@@ -241,10 +251,12 @@ App.loadPanel = async function (url, pushState = true) {
     // Check cache first
     const cached = this.cache.panels.get(url);
     if (cached && Date.now() - cached.timestamp < this.cache.maxAge) {
+        appLog('Panel', 'CACHE_HIT', { status: 'SUCCESS', url, panelUrl, message: 'Serving from cache' });
         this.renderPanel(cached.html, url, pushState);
         return;
     }
 
+    appLog('Panel', 'LOAD_START', { status: 'INFO', url, panelUrl, method: 'GET' });
     this.state.isLoading = true;
     this.showLoading();
 
@@ -258,6 +270,7 @@ App.loadPanel = async function (url, pushState = true) {
         });
 
         if (!response.ok) {
+            appLog('Panel', 'LOAD_ERROR', { status: 'ERROR', url, panelUrl, responseStatus: response.status });
             if (response.status === 404) {
                 this.renderPanel(await this.fetchPanel('/panel/error_404/'), url, false);
             } else {
@@ -267,15 +280,12 @@ App.loadPanel = async function (url, pushState = true) {
         }
 
         const html = await response.text();
-
-        // Cache the panel
         this.cache.panels.set(url, { html, timestamp: Date.now() });
-
+        appLog('Panel', 'LOAD_SUCCESS', { status: 'SUCCESS', url, panelUrl, method: 'GET', responseStatus: response.status, htmlLength: html.length });
         this.renderPanel(html, url, pushState);
 
     } catch (error) {
-        console.error('Panel load error:', error);
-
+        appLog('Panel', 'LOAD_EXCEPTION', { status: 'ERROR', url, panelUrl, error: error.message });
         if (!navigator.onLine) {
             this.showOfflinePanel();
         } else {
@@ -933,7 +943,7 @@ App.bindKeyboardShortcuts = function () {
 
         if (e.key === '?' || (e.shiftKey && e.key === '/')) {
             e.preventDefault();
-            this.openModal('shortcuts');
+            this.showShortcutsModal();
             return;
         }
 
@@ -965,6 +975,26 @@ App.bindKeyboardShortcuts = function () {
 
         this.handleKeySequence(e.key);
     });
+
+    // Bind shortcuts button in header
+    document.getElementById('shortcuts-btn')?.addEventListener('click', () => {
+        appLog('Keyboard', 'SHORTCUTS_BTN_CLICK', { status: 'INFO', message: 'Opening shortcuts modal' });
+        this.showShortcutsModal();
+    });
+};
+
+// Show shortcuts modal
+App.showShortcutsModal = function () {
+    const modal = document.getElementById('shortcuts-modal');
+    if (modal) {
+        appLog('Modal', 'SHORTCUTS_OPEN', { status: 'SUCCESS', message: 'Showing keyboard shortcuts modal' });
+        modal.classList.add('active');
+        modal.setAttribute('aria-hidden', 'false');
+        this.state.activeModal = modal;
+        document.body.style.overflow = 'hidden';
+    } else {
+        appLog('Modal', 'SHORTCUTS_NOT_FOUND', { status: 'ERROR', message: 'Shortcuts modal element not found' });
+    }
 };
 
 App.handleKeySequence = function (key) {
@@ -1053,18 +1083,22 @@ App.handleSearch = async function (query) {
         return;
     }
 
+    const url = `/api/search/?q=${encodeURIComponent(query)}`;
+    appLog('Search', 'QUERY_START', { status: 'INFO', url, method: 'GET', query });
+
     try {
-        const response = await fetch(`/api/search/?q=${encodeURIComponent(query)}`, {
+        const response = await fetch(url, {
             headers: { 'X-CSRFToken': this.getCsrfToken() }
         });
 
         if (!response.ok) throw new Error('Search failed');
 
         const data = await response.json();
+        appLog('Search', 'QUERY_SUCCESS', { status: 'SUCCESS', url, method: 'GET', resultCount: (data.trackers?.length || 0) + (data.tasks?.length || 0), responseStatus: response.status });
         this.renderSearchResults(data);
 
     } catch (error) {
-        // Fallback: show quick links matching query
+        appLog('Search', 'QUERY_ERROR', { status: 'WARNING', url, method: 'GET', error: error.message, message: 'Using fallback search' });
         this.renderSearchFallback(query);
     }
 };
@@ -1195,8 +1229,10 @@ App.bindTaskToggles = function () {
 };
 
 App.toggleTask = async function (taskId, rowElement) {
+    const url = `${this.config.apiBase}task/${taskId}/toggle/`;
+    appLog('Task', 'TOGGLE_START', { status: 'INFO', url, method: 'POST', taskId });
     try {
-        const response = await fetch(`${this.config.apiBase}task/${taskId}/toggle/`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1207,6 +1243,7 @@ App.toggleTask = async function (taskId, rowElement) {
         if (!response.ok) throw new Error('Toggle failed');
 
         const data = await response.json();
+        appLog('Task', 'TOGGLE_SUCCESS', { status: 'SUCCESS', url, method: 'POST', taskId, newStatus: data.new_status, responseStatus: response.status });
 
         rowElement.dataset.status = data.new_status;
         const icon = rowElement.querySelector('.status-icon');
@@ -1217,7 +1254,7 @@ App.toggleTask = async function (taskId, rowElement) {
         this.showToast('success', 'Task updated', `Status: ${data.new_status}`);
 
     } catch (error) {
-        console.error('Task toggle error:', error);
+        appLog('Task', 'TOGGLE_ERROR', { status: 'ERROR', url, method: 'POST', taskId, error: error.message });
         this.showToast('error', 'Failed to update task', error.message);
     }
 };

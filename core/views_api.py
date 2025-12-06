@@ -15,6 +15,8 @@ from django.utils import timezone
 
 from .models import TrackerDefinition, TrackerInstance, TaskInstance, DayNote, TaskTemplate
 from .services import instance_service as services
+from .utils.response_helpers import UXResponse
+from .utils.constants import HAPTIC_FEEDBACK, UI_COLORS
 
 
 # ============================================================================
@@ -24,7 +26,7 @@ from .services import instance_service as services
 @login_required
 @require_POST
 def api_task_toggle(request, task_id):
-    """Toggle task status with optimistic UI support"""
+    """Toggle task status with UX-optimized response including celebration feedback"""
     try:
         task = get_object_or_404(
             TaskInstance, 
@@ -49,32 +51,87 @@ def api_task_toggle(request, task_id):
         
         # Update completed_at timestamp
         if new_status == 'DONE':
-            from django.utils import timezone
             task.completed_at = timezone.now()
         else:
             task.completed_at = None
             
         task.save()
         
-        return JsonResponse({
-            'success': True,
-            'old_status': old_status,
-            'new_status': new_status,
-            'task_id': task_id,
-            'can_undo': True
-        })
+        # Calculate remaining tasks for stats delta
+        tracker_instance = task.tracker_instance
+        remaining = TaskInstance.objects.filter(
+            tracker_instance=tracker_instance,
+            status__in=['TODO', 'IN_PROGRESS']
+        ).count()
         
+        # Determine feedback type based on action
+        feedback = None
+        if new_status == 'DONE':
+            if remaining == 0:
+                # All tasks complete - celebration!
+                feedback = UXResponse.celebration(
+                    "All tasks complete! 🎉",
+                    animation="confetti"
+                )
+            else:
+                feedback = {
+                    'type': 'success',
+                    'message': UXResponse.get_completion_message('DONE'),
+                    'haptic': 'success',
+                    'animation': 'checkmark',
+                    'toast': True
+                }
+        elif new_status == 'SKIPPED':
+            feedback = {
+                'type': 'info',
+                'message': 'Task skipped',
+                'haptic': 'warning',
+                'toast': False
+            }
+        else:
+            feedback = {
+                'type': 'info',
+                'message': 'Task reopened',
+                'haptic': 'light',
+                'toast': False
+            }
+        
+        return UXResponse.success(
+            message=f"Task {new_status.lower()}",
+            data=UXResponse.with_undo(
+                {
+                    'task_id': task_id,
+                    'old_status': old_status,
+                    'new_status': new_status,
+                },
+                undo_data={'task_id': task_id, 'old_status': old_status}
+            ),
+            feedback=feedback,
+            stats_delta={
+                'remaining_tasks': remaining,
+                'all_complete': remaining == 0,
+                'tracker_id': str(tracker_instance.tracker.tracker_id)
+            }
+        )
+        
+    except TaskInstance.DoesNotExist:
+        return UXResponse.error(
+            message="Task not found. It may have been deleted.",
+            error_code="TASK_NOT_FOUND",
+            retry=False
+        )
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
+        return UXResponse.error(
+            message="Unable to update task. Please try again.",
+            error_code="UPDATE_FAILED",
+            retry=True
+        )
 
 
 @login_required
 @require_POST
 def api_task_delete(request, task_id):
-    """Delete a single task instance"""
+    """Delete a single task instance with UX feedback"""
     try:
         task = get_object_or_404(
             TaskInstance,
@@ -82,25 +139,47 @@ def api_task_delete(request, task_id):
             tracker_instance__tracker__user=request.user
         )
         
+        # Store info for undo before deletion
+        task_info = {
+            'description': task.template.description,
+            'tracker_id': str(task.tracker_instance.tracker.tracker_id)
+        }
+        
         task.delete()
         
-        return JsonResponse({
-            'success': True,
-            'message': 'Task deleted successfully',
-            'task_id': task_id
-        })
+        return UXResponse.success(
+            message='Task deleted',
+            data={
+                'task_id': task_id,
+                'deleted': True,
+                **task_info
+            },
+            feedback={
+                'type': 'info',
+                'message': 'Task deleted',
+                'haptic': 'light',
+                'toast': True
+            }
+        )
         
+    except TaskInstance.DoesNotExist:
+        return UXResponse.error(
+            message="Task not found",
+            error_code="TASK_NOT_FOUND",
+            retry=False
+        )
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
+        return UXResponse.error(
+            message="Unable to delete task. Please try again.",
+            error_code="DELETE_FAILED",
+            retry=True
+        )
 
 
 @login_required
 @require_POST
 def api_task_status(request, task_id):
-    """Set specific task status and update notes"""
+    """Set specific task status and update notes with UX feedback"""
     try:
         data = json.loads(request.body)
         status = data.get('status')
@@ -113,6 +192,15 @@ def api_task_status(request, task_id):
         )
         
         old_status = task.status
+        
+        # Validate status if provided
+        valid_statuses = ['TODO', 'IN_PROGRESS', 'DONE', 'SKIPPED', 'MISSED', 'BLOCKED']
+        if status and status not in valid_statuses:
+            return UXResponse.error(
+                message=f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
+                error_code="INVALID_STATUS",
+                retry=False
+            )
         
         # Update fields if provided
         if status:
@@ -127,18 +215,52 @@ def api_task_status(request, task_id):
         
         task.save()
         
-        return JsonResponse({
-            'success': True,
-            'old_status': old_status,
-            'new_status': task.status,
-            'message': 'Task updated successfully'
-        })
+        # Determine haptic feedback based on new status
+        haptic_map = {
+            'DONE': 'success',
+            'SKIPPED': 'warning',
+            'TODO': 'light',
+            'IN_PROGRESS': 'medium',
+            'MISSED': 'warning',
+            'BLOCKED': 'warning'
+        }
         
+        return UXResponse.success(
+            message=UXResponse.get_completion_message(task.status),
+            data=UXResponse.with_undo(
+                {
+                    'task_id': task_id,
+                    'old_status': old_status,
+                    'new_status': task.status,
+                },
+                undo_data={'task_id': task_id, 'old_status': old_status}
+            ),
+            feedback={
+                'type': 'success' if task.status == 'DONE' else 'info',
+                'message': UXResponse.get_completion_message(task.status),
+                'haptic': haptic_map.get(task.status, 'light'),
+                'toast': task.status == 'DONE'
+            }
+        )
+        
+    except json.JSONDecodeError:
+        return UXResponse.error(
+            message="Invalid request format",
+            error_code="INVALID_JSON",
+            retry=False
+        )
+    except TaskInstance.DoesNotExist:
+        return UXResponse.error(
+            message="Task not found",
+            error_code="TASK_NOT_FOUND",
+            retry=False
+        )
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=400)
+        return UXResponse.error(
+            message="Unable to update task. Please try again.",
+            error_code="UPDATE_FAILED",
+            retry=True
+        )
 
 
 @login_required
@@ -510,63 +632,135 @@ def api_tracker_update(request, tracker_id):
 
 
 # ============================================================================
-# SEARCH ENDPOINT
+# SEARCH ENDPOINT (Enhanced with suggestions)
 # ============================================================================
 
 @login_required
 @require_GET
 def api_search(request):
-    """Global search across trackers and tasks"""
+    """
+    Enhanced global search with:
+    - Quick commands (keyboard shortcuts)
+    - Recent search suggestions
+    - Search across trackers, tasks, and goals
+    - Search history saving
+    """
+    from .models import Goal, SearchHistory
+    
+    query = request.GET.get('q', '').strip()
+    save_history = request.GET.get('save', 'true') == 'true'
+    
+    # Quick commands (keyboard shortcuts)
+    commands = [
+        {'shortcut': 'Ctrl+N', 'label': 'New Tracker', 'action': 'modal', 'url': '/modals/add-tracker/'},
+        {'shortcut': 'T', 'label': 'Today', 'action': 'navigate', 'url': '/today/'},
+        {'shortcut': 'W', 'label': 'Week View', 'action': 'navigate', 'url': '/week/'},
+        {'shortcut': 'D', 'label': 'Dashboard', 'action': 'navigate', 'url': '/'},
+        {'shortcut': 'A', 'label': 'Analytics', 'action': 'navigate', 'url': '/analytics/'},
+    ]
+    
+    # For empty query, return suggestions
+    if len(query) < 2:
+        # Get recent searches
+        recent_queries = list(SearchHistory.get_recent_searches(request.user, limit=5))
+        recent_searches = [{'query': item['query'], 'type': 'recent'} for item in recent_queries]
+        
+        return JsonResponse({
+            'suggestions': recent_searches,
+            'commands': commands,
+            'trackers': [],
+            'tasks': [],
+            'goals': []
+        })
+    
+    results = {
+        'query': query,
+        'trackers': [],
+        'tasks': [],
+        'goals': [],
+        'suggestions': [],
+        'commands': commands
+    }
+    
     try:
-        query = request.GET.get('q', '').strip()
-        
-        if len(query) < 2:
-            return JsonResponse({
-                'trackers': [],
-                'tasks': []
-            })
-        
         # Search trackers
         trackers = TrackerDefinition.objects.filter(
             user=request.user,
             name__icontains=query
-        )[:5]
+        ).exclude(status='archived')[:5]
         
-        # Search tasks
-        tasks = TrackerInstance.objects.filter(
-            tracker_definition__user=request.user,
+        results['trackers'] = [
+            {
+                'id': str(t.tracker_id),
+                'name': t.name,
+                'type': 'tracker',
+                'description': t.description[:100] if t.description else '',
+                'url': f'/tracker/{t.tracker_id}/',
+                'status': t.status,
+                'task_count': t.task_count
+            }
+            for t in trackers
+        ]
+        
+        # Search task templates
+        task_templates = TaskTemplate.objects.filter(
+            tracker__user=request.user,
             description__icontains=query
-        ).select_related('tracker_definition')[:10]
+        ).select_related('tracker')[:10]
         
-        return JsonResponse({
-            'trackers': [
-                {
-                    'id': str(t.id),
-                    'name': t.name,
-                    'task_count': TrackerInstance.objects.filter(
-                        tracker_definition=t,
-                        date=date.today()
-                    ).count()
-                }
-                for t in trackers
-            ],
-            'tasks': [
-                {
-                    'id': str(t.id),
-                    'description': t.description,
-                    'tracker_id': str(t.tracker_definition.id),
-                    'tracker_name': t.tracker_definition.name,
-                    'category': t.category or ''
-                }
-                for t in tasks
-            ]
-        })
+        results['tasks'] = [
+            {
+                'id': str(t.template_id),
+                'name': t.description,
+                'type': 'task',
+                'tracker_name': t.tracker.name,
+                'category': t.category,
+                'url': f'/tracker/{t.tracker.tracker_id}/?highlight={t.template_id}'
+            }
+            for t in task_templates
+        ]
+        
+        # Search goals
+        goals = Goal.objects.filter(
+            user=request.user,
+            title__icontains=query
+        ).exclude(status='abandoned')[:5]
+        
+        results['goals'] = [
+            {
+                'id': str(g.goal_id),
+                'name': g.title,
+                'type': 'goal',
+                'icon': g.icon,
+                'progress': g.progress,
+                'url': '/goals/'
+            }
+            for g in goals
+        ]
+        
+        # Calculate total results
+        total_count = len(results['trackers']) + len(results['tasks']) + len(results['goals'])
+        results['total_count'] = total_count
+        
+        # Save search history (if results found and saving enabled)
+        if save_history and total_count > 0:
+            SearchHistory.objects.create(
+                user=request.user,
+                query=query,
+                result_count=total_count,
+                search_context='global'
+            )
+        
+        return JsonResponse(results)
         
     except Exception as e:
         return JsonResponse({
             'error': str(e),
+            'query': query,
             'trackers': [],
-            'tasks': []
+            'tasks': [],
+            'goals': [],
+            'total_count': 0
         })
 
 
@@ -1314,3 +1508,271 @@ def api_notifications(request):
                 
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+# ============================================================================
+# PREFETCH API - For SPA navigation (Phase 3)
+# ============================================================================
+
+@login_required
+@require_GET
+def api_prefetch(request):
+    """
+    Prefetch data for likely next navigations.
+    Used by SPA to preload adjacent panel data for instant navigation.
+    
+    Query params:
+        panels: comma-separated list of panels to prefetch
+        
+    Example: /api/prefetch/?panels=today,dashboard
+    """
+    from django.utils import timezone as dj_timezone
+    
+    panels = request.GET.get('panels', 'today,dashboard').split(',')
+    today = date.today()
+    user = request.user
+    
+    prefetch_data = {}
+    
+    for panel in panels:
+        panel = panel.strip()
+        
+        if panel == 'today':
+            # Prefetch today's task count for quick display
+            today_tasks = TaskInstance.objects.filter(
+                tracker_instance__tracker__user=user,
+                tracker_instance__period_start__lte=today,
+                tracker_instance__period_end__gte=today
+            )
+            prefetch_data['today'] = {
+                'total_count': today_tasks.count(),
+                'done_count': today_tasks.filter(status='DONE').count(),
+                'pending_count': today_tasks.filter(status__in=['TODO', 'IN_PROGRESS']).count()
+            }
+            
+        elif panel == 'dashboard':
+            # Prefetch active trackers count
+            active_trackers = TrackerDefinition.objects.filter(user=user, status='active')
+            prefetch_data['dashboard'] = {
+                'tracker_count': active_trackers.count(),
+                'has_tasks_today': TaskInstance.objects.filter(
+                    tracker_instance__tracker__user=user,
+                    tracker_instance__period_start__lte=today,
+                    tracker_instance__period_end__gte=today
+                ).exists()
+            }
+            
+        elif panel == 'week':
+            # Prefetch week summary
+            start_of_week = today - timedelta(days=today.weekday())
+            end_of_week = start_of_week + timedelta(days=6)
+            week_tasks = TaskInstance.objects.filter(
+                tracker_instance__tracker__user=user,
+                tracker_instance__period_start__gte=start_of_week,
+                tracker_instance__period_end__lte=end_of_week
+            )
+            prefetch_data['week'] = {
+                'total': week_tasks.count(),
+                'done': week_tasks.filter(status='DONE').count()
+            }
+    
+    return JsonResponse({
+        'success': True,
+        'data': prefetch_data,
+        'timestamp': dj_timezone.now().isoformat()
+    })
+
+
+# ============================================================================
+# INFINITE SCROLL API - For task lists (Phase 3)
+# ============================================================================
+
+@login_required
+@require_GET
+def api_tasks_infinite(request):
+    """
+    Cursor-based paginated task list for infinite scroll.
+    
+    Query params:
+        cursor: ISO datetime cursor from previous page
+        limit: number of items per page (default: 20, max: 100)
+        tracker_id: optional filter by tracker
+        status: optional filter by status
+        period: 'today', 'week', 'month', 'all'
+    """
+    from .utils.pagination_helpers import CursorPaginator, paginated_response
+    
+    cursor = request.GET.get('cursor')
+    limit = min(int(request.GET.get('limit', 20)), 100)
+    tracker_id = request.GET.get('tracker_id')
+    status_filter = request.GET.get('status')
+    period = request.GET.get('period', 'today')
+    
+    today = date.today()
+    
+    # Build base queryset
+    queryset = TaskInstance.objects.filter(
+        tracker_instance__tracker__user=request.user
+    ).select_related('template', 'tracker_instance__tracker')
+    
+    # Apply period filter
+    if period == 'today':
+        queryset = queryset.filter(
+            tracker_instance__period_start__lte=today,
+            tracker_instance__period_end__gte=today
+        )
+    elif period == 'week':
+        start = today - timedelta(days=today.weekday())
+        queryset = queryset.filter(
+            tracker_instance__period_start__gte=start
+        )
+    elif period == 'month':
+        start = today.replace(day=1)
+        queryset = queryset.filter(
+            tracker_instance__period_start__gte=start
+        )
+    
+    # Apply optional filters
+    if tracker_id:
+        queryset = queryset.filter(tracker_instance__tracker__tracker_id=tracker_id)
+    if status_filter:
+        queryset = queryset.filter(status=status_filter)
+    
+    # Order by creation time (newest first)
+    queryset = queryset.order_by('-created_at')
+    
+    # Cursor pagination
+    paginator = CursorPaginator(queryset, cursor_field='created_at', page_size=limit)
+    result = paginator.paginate(cursor=cursor)
+    
+    # Serialize tasks
+    def serialize_task(task):
+        return {
+            'id': task.task_instance_id,
+            'description': task.template.description,
+            'status': task.status,
+            'category': task.template.category,
+            'weight': task.template.weight,
+            'time_of_day': task.template.time_of_day,
+            'tracker_name': task.tracker_instance.tracker.name,
+            'tracker_id': str(task.tracker_instance.tracker.tracker_id),
+            'created_at': task.created_at.isoformat() if task.created_at else None,
+            'completed_at': task.completed_at.isoformat() if task.completed_at else None
+        }
+    
+    return paginated_response(
+        items=result['items'],
+        serializer_func=serialize_task,
+        has_more=result['pagination']['has_more'],
+        next_cursor=result['pagination']['next_cursor'],
+        meta={'period': period, 'limit': limit}
+    )
+
+
+# ============================================================================
+# SMART SUGGESTIONS API (Phase 5)
+# ============================================================================
+
+@login_required
+@require_GET
+def api_smart_suggestions(request):
+    """
+    Get smart suggestions based on user behavior.
+    Returns insights like "You perform best on Mondays" or "Your optimal task time is morning".
+    """
+    from django.db.models import Count
+    from django.db.models.functions import ExtractWeekDay, ExtractHour
+    
+    user = request.user
+    today = date.today()
+    
+    suggestions = []
+    
+    # Analyze completion by day of week
+    try:
+        # Get completed tasks by day of week (1=Sunday, 7=Saturday in Django)
+        day_stats = TaskInstance.objects.filter(
+            tracker_instance__tracker__user=user,
+            status='DONE',
+            completed_at__isnull=False
+        ).annotate(
+            weekday=ExtractWeekDay('completed_at')
+        ).values('weekday').annotate(
+            count=Count('task_instance_id')
+        ).order_by('-count')[:2]
+        
+        day_names = {1: 'Sunday', 2: 'Monday', 3: 'Tuesday', 4: 'Wednesday', 
+                     5: 'Thursday', 6: 'Friday', 7: 'Saturday'}
+        
+        if day_stats:
+            best_day = day_stats[0]
+            suggestions.append({
+                'type': 'best_day',
+                'icon': '📅',
+                'message': f"You're most productive on {day_names.get(best_day['weekday'], 'Unknown')}s",
+                'detail': f"{best_day['count']} tasks completed",
+                'action': None
+            })
+    except Exception:
+        pass
+    
+    # Analyze completion by time of day
+    try:
+        time_stats = TaskInstance.objects.filter(
+            tracker_instance__tracker__user=user,
+            status='DONE'
+        ).values('template__time_of_day').annotate(
+            count=Count('task_instance_id')
+        ).order_by('-count')[:1]
+        
+        if time_stats:
+            best_time = time_stats[0]
+            time_name = best_time['template__time_of_day'] or 'anytime'
+            suggestions.append({
+                'type': 'best_time',
+                'icon': '⏰',
+                'message': f"Your optimal task time is {time_name}",
+                'detail': f"{best_time['count']} tasks completed during this period",
+                'action': None
+            })
+    except Exception:
+        pass
+    
+    # Current streak
+    try:
+        from core import analytics
+        streak = analytics.compute_user_streak(user) if hasattr(analytics, 'compute_user_streak') else 0
+        if streak > 0:
+            suggestions.append({
+                'type': 'streak',
+                'icon': '🔥',
+                'message': f"You're on a {streak}-day streak!",
+                'detail': "Keep it going",
+                'action': {'label': 'View Stats', 'url': '/analytics/'}
+            })
+    except Exception:
+        pass
+    
+    # Pending tasks reminder
+    pending_count = TaskInstance.objects.filter(
+        tracker_instance__tracker__user=user,
+        tracker_instance__period_start__lte=today,
+        tracker_instance__period_end__gte=today,
+        status__in=['TODO', 'IN_PROGRESS']
+    ).count()
+    
+    if pending_count > 0:
+        suggestions.append({
+            'type': 'pending',
+            'icon': '📋',
+            'message': f"{pending_count} tasks waiting for you today",
+            'detail': None,
+            'action': {'label': 'View Tasks', 'url': '/today/'}
+        })
+    
+    return JsonResponse({
+        'success': True,
+        'suggestions': suggestions,
+        'generated_at': timezone.now().isoformat()
+    })
+

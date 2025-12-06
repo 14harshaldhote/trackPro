@@ -241,3 +241,75 @@ def get_status_display(status: str, entity_type: str = "task") -> str:
 def get_status_emoji(status: str) -> str:
     """Get emoji representation of task status."""
     return TASK_STATUS_EMOJI.get(status, "")
+
+
+# ============================================
+# HAPTIC FEEDBACK (iOS UIImpactFeedbackGenerator)
+# ============================================
+
+HAPTIC_SUCCESS = 'success'        # UINotificationFeedbackGenerator.success
+HAPTIC_WARNING = 'warning'        # UINotificationFeedbackGenerator.warning
+HAPTIC_ERROR = 'error'            # UINotificationFeedbackGenerator.error
+HAPTIC_LIGHT = 'light'            # UIImpactFeedbackGenerator.light
+HAPTIC_MEDIUM = 'medium'          # UIImpactFeedbackGenerator.medium
+HAPTIC_HEAVY = 'heavy'            # UIImpactFeedbackGenerator.heavy
+HAPTIC_RIGID = 'rigid'            # UIImpactFeedbackGenerator.rigid
+HAPTIC_SELECTION = 'selection'    # UISelectionFeedbackGenerator
+
+# Action to haptic mapping
+HAPTIC_FEEDBACK = {
+    'task_complete': HAPTIC_SUCCESS,
+    'task_skip': HAPTIC_WARNING,
+    'task_delete': HAPTIC_ERROR,
+    'task_toggle': HAPTIC_MEDIUM,
+    'button_tap': HAPTIC_LIGHT,
+    'drag_drop': HAPTIC_RIGID,
+    'selection_change': HAPTIC_SELECTION,
+    'streak_milestone': HAPTIC_HEAVY,
+    'celebration': HAPTIC_HEAVY,
+    'error': HAPTIC_ERROR,
+}
+
+# Actions that trigger haptic feedback
+HAPTIC_ACTIONS = [
+    'task_toggle',
+    'task_delete',
+    'tracker_create',
+    'goal_achieved',
+    'streak_continued',
+]
+
+
+# ============================================
+# UI COLORS (iOS/Web design system)
+# ============================================
+
+UI_COLORS = {
+    'success': '#22c55e',       # Green - task complete
+    'warning': '#f59e0b',       # Amber - skip/caution
+    'error': '#ef4444',         # Red - delete/destructive
+    'info': '#3b82f6',          # Blue - informational
+    'primary': '#6366f1',       # Indigo - primary actions
+    'secondary': '#64748b',     # Slate - secondary
+}
+
+
+# ============================================
+# SWIPE ACTION CONFIGURATION
+# ============================================
+
+# Minimum touch target size per Apple HIG (44pt)
+TOUCH_TARGET_MIN_SIZE = 44
+
+# Default swipe action button widths
+SWIPE_ACTION_WIDTHS = {
+    'complete': 44,
+    'skip': 60,
+    'delete': 70,
+    'archive': 70,
+}
+
+
+def get_haptic_for_action(action: str) -> str:
+    """Get haptic feedback type for an action."""
+    return HAPTIC_FEEDBACK.get(action, HAPTIC_LIGHT)

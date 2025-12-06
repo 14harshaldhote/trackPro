@@ -1,7 +1,14 @@
 /**
  * Tracker Pro - Analytics & Charts
  * Chart.js integration with interactive features
+ * With comprehensive console logging
  */
+
+// Console logging helper
+const analyticsLog = (module, action, data = {}) => {
+    const emoji = data.status === 'SUCCESS' ? '✅' : data.status === 'ERROR' ? '❌' : data.status === 'WARNING' ? '⚠️' : 'ℹ️';
+    console.log(`[Analytics/${module}] ${emoji} ${action}`, { timestamp: new Date().toISOString(), module, action, ...data });
+};
 
 // ============================================================================
 // CHART.JS CONFIGURATION
@@ -53,21 +60,31 @@ const ChartManager = {
     charts: {},
 
     init() {
+        analyticsLog('ChartManager', 'INIT_START', { status: 'INFO', message: 'Loading Chart.js and initializing charts' });
         this.loadChartJS().then(() => {
+            analyticsLog('ChartManager', 'CHARTJS_LOADED', { status: 'SUCCESS', message: 'Chart.js loaded' });
             this.initAllCharts();
             this.bindTimeRangeSelector();
             this.bindChartTypeToggle();
             this.bindComparison();
             this.bindExport();
+            analyticsLog('ChartManager', 'INIT_COMPLETE', { status: 'SUCCESS', message: 'All charts initialized' });
+        }).catch(err => {
+            analyticsLog('ChartManager', 'INIT_ERROR', { status: 'ERROR', error: err.message });
         });
     },
 
     async loadChartJS() {
-        if (window.Chart) return;
+        if (window.Chart) {
+            analyticsLog('ChartManager', 'CHARTJS_CACHED', { status: 'INFO', message: 'Chart.js already loaded' });
+            return;
+        }
 
+        const cdnUrl = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+        analyticsLog('ChartManager', 'CHARTJS_LOADING', { status: 'INFO', url: cdnUrl, method: 'GET' });
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+            script.src = cdnUrl;
             script.onload = resolve;
             script.onerror = reject;
             document.head.appendChild(script);
@@ -487,7 +504,7 @@ const ChartManager = {
     // DRILL DOWN
     // =========================================================================
     drillDown(date) {
-        // Navigate to day view
+        analyticsLog('Charts', 'DRILL_DOWN', { status: 'INFO', date, url: `/today/?date=${date}` });
         App.loadPanel(`/today/?date=${date}`);
     },
 

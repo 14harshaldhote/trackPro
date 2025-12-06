@@ -1,7 +1,14 @@
 /**
  * Tracker Pro - Interactive Components
  * Optimistic UI, Undo, Form Validation, Auto-save
+ * With comprehensive console logging
  */
+
+// Console logging helper
+const interactiveLog = (module, action, data = {}) => {
+    const emoji = data.status === 'SUCCESS' ? '✅' : data.status === 'ERROR' ? '❌' : data.status === 'WARNING' ? '⚠️' : 'ℹ️';
+    console.log(`[Interactive/${module}] ${emoji} ${action}`, { timestamp: new Date().toISOString(), module, action, ...data });
+};
 
 // ============================================================================
 // OPTIMISTIC UI UPDATES
@@ -11,35 +18,21 @@ App.optimisticToggle = async function (taskId, rowElement) {
     const statusIcon = rowElement.querySelector('.status-icon');
     const description = rowElement.querySelector('.task-description');
 
-    // Determine new status
-    const statusCycle = {
-        'PENDING': 'DONE',
-        'DONE': 'SKIPPED',
-        'SKIPPED': 'PENDING',
-        'MISSED': 'DONE'
-    };
+    const statusCycle = { 'PENDING': 'DONE', 'DONE': 'SKIPPED', 'SKIPPED': 'PENDING', 'MISSED': 'DONE' };
     const newStatus = statusCycle[oldStatus] || 'DONE';
 
-    // Optimistic update
+    interactiveLog('OptimisticUI', 'TOGGLE_START', { status: 'INFO', taskId, oldStatus, newStatus });
+
     rowElement.dataset.status = newStatus;
     statusIcon.className = `status-icon status-${newStatus.toLowerCase()}`;
-
-    if (newStatus === 'DONE') {
-        description?.classList.add('completed');
-    } else {
-        description?.classList.remove('completed');
-    }
-
-    // Add visual feedback
+    if (newStatus === 'DONE') { description?.classList.add('completed'); } else { description?.classList.remove('completed'); }
     rowElement.classList.add('updating');
 
+    const url = `${this.config.apiBase}task/${taskId}/toggle/`;
     try {
-        const response = await fetch(`${this.config.apiBase}task/${taskId}/toggle/`, {
+        const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': this.getCsrfToken()
-            }
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCsrfToken() }
         });
 
         const data = await response.json();
@@ -48,30 +41,20 @@ App.optimisticToggle = async function (taskId, rowElement) {
             throw new Error(data.error || 'Failed');
         }
 
-        // Show undo toast
-        this.showUndoToast('Task updated', {
-            type: 'task_toggle',
-            data: { task_id: taskId, old_status: oldStatus }
-        });
+        interactiveLog('OptimisticUI', 'TOGGLE_SUCCESS', { status: 'SUCCESS', url, method: 'POST', taskId, newStatus, responseStatus: response.status });
+        this.showUndoToast('Task updated', { type: 'task_toggle', data: { task_id: taskId, old_status: oldStatus } });
 
     } catch (error) {
-        // Rollback on error
+        interactiveLog('OptimisticUI', 'TOGGLE_ERROR', { status: 'ERROR', url, method: 'POST', taskId, error: error.message });
         rowElement.dataset.status = oldStatus;
         statusIcon.className = `status-icon status-${oldStatus.toLowerCase()}`;
-
-        if (oldStatus === 'DONE') {
-            description?.classList.add('completed');
-        } else {
-            description?.classList.remove('completed');
-        }
-
+        if (oldStatus === 'DONE') { description?.classList.add('completed'); } else { description?.classList.remove('completed'); }
         this.showToast('error', 'Failed to update', error.message);
     } finally {
         rowElement.classList.remove('updating');
     }
 };
 
-// Override default toggle with optimistic version
 App.toggleTask = App.optimisticToggle;
 
 
@@ -125,26 +108,26 @@ App.showUndoToast = function (message, undoData) {
 };
 
 App.performUndo = async function (undoData) {
+    const url = `${this.config.apiBase}undo/`;
+    interactiveLog('Undo', 'PERFORM_START', { status: 'INFO', url, method: 'POST', undoData });
     try {
-        const response = await fetch(`${this.config.apiBase}undo/`, {
+        const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': this.getCsrfToken()
-            },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCsrfToken() },
             body: JSON.stringify(undoData)
         });
 
         const data = await response.json();
 
         if (response.ok && data.success) {
+            interactiveLog('Undo', 'PERFORM_SUCCESS', { status: 'SUCCESS', url, method: 'POST', responseStatus: response.status });
             this.showToast('success', 'Action undone');
             this.loadPanel(window.location.pathname, false);
         } else {
             throw new Error(data.error || 'Undo failed');
         }
-
     } catch (error) {
+        interactiveLog('Undo', 'PERFORM_ERROR', { status: 'ERROR', url, method: 'POST', error: error.message });
         this.showToast('error', 'Could not undo', error.message);
     }
 };

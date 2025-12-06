@@ -1,7 +1,14 @@
 /**
  * Tracker Pro - Phase 2 Enhancements
  * Panel-specific functionality: filters, bulk actions, drag-drop, context menus
+ * With comprehensive console logging
  */
+
+// Console logging helper for panels
+const panelLog = (module, action, data = {}) => {
+    const emoji = data.status === 'SUCCESS' ? '✅' : data.status === 'ERROR' ? '❌' : data.status === 'WARNING' ? '⚠️' : 'ℹ️';
+    console.log(`[Panels/${module}] ${emoji} ${action}`, { timestamp: new Date().toISOString(), module, action, ...data });
+};
 
 // ============================================================================
 // VIEW TOGGLE (Grid/List)
@@ -193,8 +200,10 @@ App.updateBulkToolbar = function () {
 };
 
 App.handleBulkAction = async function (action, taskIds) {
+    const url = `${this.config.apiBase}tasks/bulk/`;
+    panelLog('BulkAction', 'REQUEST_START', { status: 'INFO', url, method: 'POST', action, taskCount: taskIds.length });
     try {
-        const response = await fetch(`${this.config.apiBase}tasks/bulk/`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -206,13 +215,14 @@ App.handleBulkAction = async function (action, taskIds) {
         const data = await response.json();
 
         if (response.ok && data.success) {
+            panelLog('BulkAction', 'REQUEST_SUCCESS', { status: 'SUCCESS', url, method: 'POST', action, responseStatus: response.status });
             this.showToast('success', `${taskIds.length} tasks updated`);
             this.loadPanel(window.location.pathname, false);
         } else {
             throw new Error(data.error || 'Action failed');
         }
     } catch (error) {
-        console.error('Bulk action error:', error);
+        panelLog('BulkAction', 'REQUEST_ERROR', { status: 'ERROR', url, method: 'POST', action, error: error.message });
         this.showToast('error', 'Failed to perform action', error.message);
     }
 };
@@ -316,8 +326,10 @@ App.handleContextAction = function (action, id, element) {
 };
 
 App.updateTaskStatus = async function (taskId, status) {
+    const url = `${this.config.apiBase}task/${taskId}/status/`;
+    panelLog('TaskStatus', 'UPDATE_START', { status: 'INFO', url, method: 'POST', taskId, newStatus: status });
     try {
-        const response = await fetch(`${this.config.apiBase}task/${taskId}/status/`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -327,10 +339,14 @@ App.updateTaskStatus = async function (taskId, status) {
         });
 
         if (response.ok) {
+            panelLog('TaskStatus', 'UPDATE_SUCCESS', { status: 'SUCCESS', url, method: 'POST', taskId, responseStatus: response.status });
             this.showToast('success', 'Task updated');
             this.loadPanel(window.location.pathname, false);
+        } else {
+            panelLog('TaskStatus', 'UPDATE_ERROR', { status: 'ERROR', url, method: 'POST', responseStatus: response.status });
         }
     } catch (error) {
+        panelLog('TaskStatus', 'UPDATE_ERROR', { status: 'ERROR', url, method: 'POST', error: error.message });
         this.showToast('error', 'Failed to update task');
     }
 };
@@ -394,12 +410,12 @@ App.getDragAfterElement = function (container, y) {
 };
 
 App.saveTaskOrder = async function (container) {
-    const taskIds = [...container.querySelectorAll('.task-row')]
-        .map(row => row.dataset.taskId);
-
+    const taskIds = [...container.querySelectorAll('.task-row')].map(row => row.dataset.taskId);
+    const trackerId = container.dataset.trackerId;
+    const url = `${this.config.apiBase}tracker/${trackerId}/reorder/`;
+    panelLog('DragDrop', 'SAVE_ORDER_START', { status: 'INFO', url, method: 'POST', trackerId, taskCount: taskIds.length });
     try {
-        const trackerId = container.dataset.trackerId;
-        await fetch(`${this.config.apiBase}tracker/${trackerId}/reorder/`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -407,10 +423,10 @@ App.saveTaskOrder = async function (container) {
             },
             body: JSON.stringify({ order: taskIds })
         });
-
+        panelLog('DragDrop', 'SAVE_ORDER_SUCCESS', { status: 'SUCCESS', url, method: 'POST', responseStatus: response.status });
         this.showToast('success', 'Order saved');
     } catch (error) {
-        console.error('Reorder failed:', error);
+        panelLog('DragDrop', 'SAVE_ORDER_ERROR', { status: 'ERROR', url, method: 'POST', error: error.message });
     }
 };
 
@@ -476,10 +492,12 @@ App.bindPagination = function () {
 
 App.loadMore = async function (btn, type) {
     const page = parseInt(btn.dataset.page);
+    const url = `${window.location.pathname}?page=${page}`;
+    panelLog('Pagination', 'LOAD_MORE_START', { status: 'INFO', url, method: 'GET', type, page });
     this.setButtonLoading(btn, true);
 
     try {
-        const response = await fetch(`${window.location.pathname}?page=${page}`, {
+        const response = await fetch(url, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         });
 
@@ -487,15 +505,14 @@ App.loadMore = async function (btn, type) {
         const temp = document.createElement('div');
         temp.innerHTML = html;
 
-        // Get items from response
         const container = type === 'trackers'
             ? document.getElementById('trackers-container')
             : document.getElementById('task-list');
 
         const newItems = temp.querySelectorAll(type === 'trackers' ? '.tracker-item' : '.task-row');
+        panelLog('Pagination', 'LOAD_MORE_SUCCESS', { status: 'SUCCESS', url, method: 'GET', type, newItemCount: newItems.length, responseStatus: response.status });
         newItems.forEach(item => container.appendChild(item));
 
-        // Update button
         const newLoadMore = temp.querySelector(`#load-more${type === 'tasks' ? '-tasks' : ''}`);
         if (newLoadMore) {
             btn.dataset.page = newLoadMore.dataset.page;
@@ -503,10 +520,9 @@ App.loadMore = async function (btn, type) {
             btn.parentElement.remove();
         }
 
-        // Rebind events
         this.bindPanelEvents();
-
     } catch (error) {
+        panelLog('Pagination', 'LOAD_MORE_ERROR', { status: 'ERROR', url, method: 'GET', error: error.message });
         this.showToast('error', 'Failed to load more');
     } finally {
         this.setButtonLoading(btn, false);
@@ -620,9 +636,11 @@ App.bindDayNote = function () {
 App.saveDayNote = async function (textarea) {
     const date = textarea.dataset.date;
     const note = textarea.value;
+    const url = `${this.config.apiBase}notes/${date}/`;
+    panelLog('DayNote', 'SAVE_START', { status: 'INFO', url, method: 'POST', date, noteLength: note.length });
 
     try {
-        await fetch(`${this.config.apiBase}notes/${date}/`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -630,9 +648,10 @@ App.saveDayNote = async function (textarea) {
             },
             body: JSON.stringify({ note })
         });
-
+        panelLog('DayNote', 'SAVE_SUCCESS', { status: 'SUCCESS', url, method: 'POST', date, responseStatus: response.status });
         this.showToast('success', 'Note saved', '', 2000);
     } catch (error) {
+        panelLog('DayNote', 'SAVE_ERROR', { status: 'ERROR', url, method: 'POST', error: error.message });
         this.showToast('error', 'Failed to save note');
     }
 };

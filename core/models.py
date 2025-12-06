@@ -547,3 +547,48 @@ class ShareLink(models.Model):
         if self.max_uses and self.use_count >= self.max_uses:
             return False
         return True
+
+
+class SearchHistory(models.Model):
+    """
+    Tracks user search queries for:
+    - Recent search suggestions
+    - Search analytics
+    - Personalized results ranking
+    """
+    
+    search_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='search_history')
+    query = models.CharField(max_length=200)
+    result_count = models.IntegerField(default=0)
+    clicked_result_type = models.CharField(max_length=50, blank=True, default='')
+    clicked_result_id = models.CharField(max_length=36, blank=True, default='')
+    search_context = models.CharField(max_length=50, default='global')  # 'global', 'trackers', 'tasks'
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'search_history'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['user', 'query']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username}: '{self.query}' ({self.result_count} results)"
+    
+    @classmethod
+    def get_recent_searches(cls, user, limit=5):
+        """Get user's most recent distinct searches."""
+        return cls.objects.filter(user=user).values('query').annotate(
+            latest=models.Max('created_at')
+        ).order_by('-latest')[:limit]
+    
+    @classmethod
+    def get_popular_searches(cls, user, limit=5):
+        """Get user's most frequently used searches."""
+        from django.db.models import Count
+        return cls.objects.filter(user=user).values('query').annotate(
+            count=Count('search_id')
+        ).order_by('-count')[:limit]
+

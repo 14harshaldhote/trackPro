@@ -89,6 +89,11 @@ urlpatterns = [
     path('api/preferences/', views_api.api_preferences, name='api_preferences'),
     path('api/notifications/', views_api.api_notifications, name='api_notifications'),
     
+    # UX Optimization API (Phase 3)
+    path('api/prefetch/', views_api.api_prefetch, name='api_prefetch'),
+    path('api/tasks/infinite/', views_api.api_tasks_infinite, name='api_tasks_infinite'),
+    path('api/suggestions/', views_api.api_smart_suggestions, name='api_smart_suggestions'),
+    
     # =========================================================================
     # AUTHENTICATION
     # =========================================================================

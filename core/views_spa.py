@@ -7,12 +7,46 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.template.loader import render_to_string
 from datetime import date, timedelta
+from functools import wraps
 import json
 
 from core.models import TrackerDefinition, TrackerInstance, TaskInstance, Goal
 from core.repositories import base_repository as crud
 from core.services import instance_service as services
 from core import analytics
+from core.utils.skeleton_helpers import generate_panel_skeleton, get_modal_config
+from core.utils.constants import UI_COLORS, TOUCH_TARGET_MIN_SIZE
+
+
+# ============================================================================
+# SKELETON SUPPORT DECORATOR
+# ============================================================================
+
+def supports_skeleton(default_item_count=5):
+    """
+    Decorator to add skeleton support to panel views.
+    When request contains ?skeleton=true, returns skeleton structure instead of full data.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            # Check if skeleton-only request
+            if request.GET.get('skeleton') == 'true':
+                panel_type = view_func.__name__.replace('panel_', '')
+                item_count = int(request.GET.get('count', default_item_count))
+                
+                skeleton = generate_panel_skeleton(panel_type, item_count)
+                
+                return JsonResponse({
+                    'skeleton': True,
+                    'structure': skeleton,
+                    'estimated_load_time': 300  # ms
+                })
+            
+            # Normal request - proceed with view
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # ============================================================================
@@ -40,8 +74,9 @@ def spa_shell(request, **kwargs):
 # ============================================================================
 
 @login_required
+@supports_skeleton(default_item_count=8)
 def panel_dashboard(request):
-    """Dashboard panel with quick stats and filtering"""
+    """Dashboard panel with quick stats, filtering, and skeleton support"""
     from datetime import datetime
     import calendar
     
@@ -181,9 +216,10 @@ def panel_dashboard(request):
     return render(request, 'panels/dashboard.html', context)
 
 
-@login_required  
+@login_required
+@supports_skeleton(default_item_count=10)  
 def panel_today(request):
-    """Today's tasks panel"""
+    """Today's tasks panel with iOS swipe actions and skeleton support"""
     today = date.today()
     date_str = request.GET.get('date')
     if date_str:
@@ -213,13 +249,86 @@ def panel_today(request):
                 if hasattr(raw_tasks, 'all'):
                     raw_tasks = list(raw_tasks)
                 
-                # Filter/process tasks
+                # Filter/process tasks with iOS swipe actions
                 for task in raw_tasks:
                     # Handle both object and dict access
-                    status = getattr(task, 'status', None) or task.get('status') if isinstance(task, dict) else None
-                    if not status: continue
+                    if isinstance(task, dict):
+                        status = task.get('status')
+                        task_id = task.get('task_instance_id')
+                        description = task.get('description', '')
+                        category = task.get('category', '')
+                        time_of_day = task.get('time_of_day', 'anytime')
+                        weight = task.get('weight', 1)
+                    else:
+                        status = getattr(task, 'status', None)
+                        task_id = getattr(task, 'task_instance_id', None)
+                        description = getattr(task.template, 'description', '') if hasattr(task, 'template') else ''
+                        category = getattr(task.template, 'category', '') if hasattr(task, 'template') else ''
+                        time_of_day = getattr(task.template, 'time_of_day', 'anytime') if hasattr(task, 'template') else 'anytime'
+                        weight = getattr(task.template, 'weight', 1) if hasattr(task, 'template') else 1
                     
-                    tasks.append(task)
+                    if not status: 
+                        continue
+                    
+                    # Build enhanced task with iOS swipe actions
+                    enhanced_task = {
+                        'task_instance_id': task_id,
+                        'status': status,
+                        'description': description,
+                        'category': category,
+                        'time_of_day': time_of_day,
+                        'weight': weight,
+                        'tracker_name': tracker.name,
+                        'tracker_id': str(tracker.tracker_id),
+                        # Original object for template compatibility
+                        '_obj': task,
+                        
+                        # iOS swipe actions (44pt minimum per Apple HIG)
+                        'ios_swipe_actions': {
+                            'leading': [{
+                                'id': 'complete',
+                                'title': '✓',
+                                'style': 'normal',
+                                'backgroundColor': UI_COLORS['success'],
+                                'endpoint': f'/api/task/{task_id}/toggle/',
+                                'haptic': 'success',
+                                'minWidth': TOUCH_TARGET_MIN_SIZE
+                            }] if status != 'DONE' else [],
+                            
+                            'trailing': [
+                                {
+                                    'id': 'skip',
+                                    'title': 'Skip',
+                                    'style': 'normal',
+                                    'backgroundColor': UI_COLORS['warning'],
+                                    'endpoint': f'/api/task/{task_id}/status/',
+                                    'payload': {'status': 'SKIPPED'},
+                                    'haptic': 'warning',
+                                    'minWidth': 60
+                                },
+                                {
+                                    'id': 'delete',
+                                    'title': 'Delete',
+                                    'style': 'destructive',
+                                    'backgroundColor': UI_COLORS['error'],
+                                    'endpoint': f'/api/task/{task_id}/delete/',
+                                    'confirmRequired': True,
+                                    'haptic': 'error',
+                                    'minWidth': 70
+                                }
+                            ]
+                        },
+                        
+                        # Long-press context menu for iOS
+                        'ios_context_menu': [
+                            {'title': 'Edit', 'icon': 'pencil', 'action': 'edit'},
+                            {'title': 'Add Note', 'icon': 'note.text', 'action': 'note'},
+                            {'title': 'Move to Tomorrow', 'icon': 'arrow.forward', 'action': 'reschedule'},
+                            {'title': 'Delete', 'icon': 'trash', 'destructive': True, 'action': 'delete'}
+                        ]
+                    }
+                    
+                    tasks.append(enhanced_task)
                     
                     # Update counts
                     total_count += 1
@@ -233,9 +342,9 @@ def panel_today(request):
         if tasks:
             # Sort by time of day
             time_order = {'morning': 0, 'afternoon': 1, 'evening': 2, 'anytime': 3}
-            tasks.sort(key=lambda t: time_order.get((getattr(t, 'template', None) and getattr(t.template, 'time_of_day', 'anytime')) if hasattr(t, 'template') else (t.get('time_of_day', 'anytime') if isinstance(t, dict) else 'anytime'), 3))
+            tasks.sort(key=lambda t: time_order.get(t.get('time_of_day', 'anytime'), 3))
             
-            group_completed = sum(1 for t in tasks if (getattr(t, 'status', '') == 'DONE' or (isinstance(t, dict) and t.get('status') == 'DONE')))
+            group_completed = sum(1 for t in tasks if t.get('status') == 'DONE')
             
             task_groups.append({
                 'tracker': tracker,
