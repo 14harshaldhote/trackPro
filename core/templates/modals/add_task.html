@@ -1,160 +1,59 @@
-<!-- Add Task Modal -->
-<div class="modal-dialog">
+<div class="modal w-full max-w-lg">
     <div class="modal-header">
-        <h2 class="modal-title">➕ Add New Task</h2>
-        <button class="modal-close" data-action="close-modal" aria-label="Close">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clip-rule="evenodd" />
+        <h2 class="text-xl font-bold">Add New Task</h2>
+        <button class="btn-icon" data-action="close-modal">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
         </button>
     </div>
 
-    <form id="add-task-form" method="post">
-        <div class="modal-body">
+    <div class="modal-body p-6">
+        <form id="add-task-form" method="post" action="/api/tasks/">
             {% csrf_token %}
-
-            <div class="form-group">
-                <label for="tracker" class="form-label">Tracker *</label>
-                <select id="tracker" name="tracker_id" class="form-input" required>
-                    <option value="">Select a tracker...</option>
-                    {% for tracker in trackers %}
-                    <option value="{{ tracker.tracker_id }}">{{ tracker.name }}</option>
-                    {% endfor %}
-                </select>
+            <div class="form-group mb-4">
+                <label class="form-label">Task Description</label>
+                <input type="text" name="description" class="form-input w-full" placeholder="What needs to be done?"
+                    required autofocus>
             </div>
 
-            <div class="form-group">
-                <label for="description" class="form-label">Task Description *</label>
-                <input type="text" id="description" name="description" class="form-input"
-                    placeholder="What needs to be done?" required maxlength="200">
-            </div>
-
-            <div class="form-group">
-                <label for="category" class="form-label">Category</label>
-                <select id="category" name="category" class="form-input">
-                    <option value="">Select category...</option>
-                    {% for category in categories %}
-                    <option value="{{ category }}">{{ category }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="time_of_day" class="form-label">Time of Day</label>
-                <select id="time_of_day" name="time_of_day" class="form-input">
-                    <option value="anytime">⏰ Anytime</option>
-                    <option value="morning">🌅 Morning</option>
-                    <option value="afternoon">☀️ Afternoon</option>
-                    <option value="evening">🌙 Evening</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="weight" class="form-label">Weight (Importance)</label>
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <input type="range" id="weight" name="weight" class="form-range" min="1" max="10" value="5"
-                        style="flex: 1;">
-                    <span id="weight-value" style="min-width: 2rem; text-align: center; font-weight: 600;">5</span>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="form-group">
+                    <label class="form-label">Tracker Context</label>
+                    <select name="tracker" class="form-input w-full">
+                        <option value="">-- No specific tracker --</option>
+                        {% for tracker in trackers %}
+                        <option value="{{ tracker.id }}">{{ tracker.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <small class="form-help">Higher weight = more important (1-10)</small>
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" name="scheduled_date" class="form-input w-full" value="{{ today|date:'Y-m-d' }}">
+                </div>
             </div>
-        </div>
 
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-action="close-modal">Cancel</button>
-            <button type="submit" class="btn btn-primary">
-                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style="margin-right: 0.5rem;">
-                    <path fill-rule="evenodd"
-                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                        clip-rule="evenodd" />
-                </svg>
-                Add Task
-            </button>
-        </div>
-    </form>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="form-group">
+                    <label class="form-label">Time of Day</label>
+                    <select name="time_of_day" class="form-input w-full">
+                        <option value="morning">Morning</option>
+                        <option value="afternoon">Afternoon</option>
+                        <option value="evening">Evening</option>
+                        <option value="anytime" selected>Anytime</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Duration (mins)</label>
+                    <input type="number" name="duration" class="form-input w-full" placeholder="30" min="5" step="5">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button type="button" class="btn" data-action="close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Task</button>
+            </div>
+        </form>
+    </div>
 </div>
-
-<script>
-    document.getElementById('weight').addEventListener('input', (e) => {
-        document.getElementById('weight-value').textContent = e.target.value;
-    });
-
-    document.getElementById('add-task-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const formData = new FormData(e.target);
-        const trackerId = formData.get('tracker_id');
-
-        try {
-            const response = await fetch(`/api/tracker/${trackerId}/task/add/`, {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Close modal
-                document.querySelector('[data-action="close-modal"]').click();
-
-                // Show success toast
-                showToast(data.message || 'Task added successfully', 'success');
-
-                // Reload current panel
-                if (window.loadCurrentPanel) {
-                    window.loadCurrentPanel();
-                }
-            } else {
-                showToast(data.error || 'Failed to add task', 'error');
-            }
-        } catch (error) {
-            showToast('An error occurred. Please try again.', 'error');
-        }
-    });
-</script>
-
-<style>
-    .form-group {
-        margin-bottom: 1.25rem;
-    }
-
-    .form-label {
-        display: block;
-        font-size: 0.875rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-        color: var(--color-text-primary);
-    }
-
-    .form-input,
-    .form-range {
-        width: 100%;
-        padding: 0.75rem 1rem;
-        border: 1px solid var(--color-border);
-        border-radius: 8px;
-        font-size: 0.875rem;
-        transition: all 0.2s;
-        background: var(--color-surface);
-        color: var(--color-text-primary);
-    }
-
-    .form-input:focus,
-    .form-range:focus {
-        outline: none;
-        border-color: var(--color-primary);
-        box-shadow: 0 0 0 3px var(--color-focus-ring);
-    }
-
-    .form-help {
-        display: block;
-        margin-top: 0.25rem;
-        font-size: 0.75rem;
-        color: var(--color-text-tertiary);
-    }
-
-    select.form-input {
-        cursor: pointer;
-    }
-</style>

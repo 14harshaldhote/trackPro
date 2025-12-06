@@ -1,59 +1,13 @@
-<!-- Loading Skeleton Component -->
-<div class="skeleton-container">
-    <!-- Panel Header Skeleton -->
-    <div class="skeleton-header" style="margin-bottom: 2rem;">
-        <div class="skeleton-item"
-            style="width: 200px; height: 32px; background: var(--color-border); border-radius: 8px;"></div>
-        <div class="skeleton-item"
-            style="width: 150px; height: 20px; background: var(--color-border); border-radius: 4px; margin-top: 0.5rem;">
-        </div>
+<div class="flex flex-col items-center justify-center p-12 min-h-[50vh]">
+    <div class="relative w-16 h-16 mb-4">
+        <!-- Spinner Ring -->
+        <svg class="animate-spin w-full h-full text-primary" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+        </svg>
     </div>
-
-    <!-- Stats Cards Skeleton -->
-    <div
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-        <div class="skeleton-item"
-            style="height: 120px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
-        </div>
-        <div class="skeleton-item"
-            style="height: 120px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
-        </div>
-        <div class="skeleton-item"
-            style="height: 120px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
-        </div>
-    </div>
-
-    <!-- Content List Skeleton -->
-    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-        <div class="skeleton-item"
-            style="height: 60px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
-        </div>
-        <div class="skeleton-item"
-            style="height: 60px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
-        </div>
-        <div class="skeleton-item"
-            style="height: 60px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
-        </div>
-        <div class="skeleton-item"
-            style="height: 60px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
-        </div>
-    </div>
+    <div class="text-xl font-bold text-secondary animate-pulse">Loading...</div>
 </div>
-
-<style>
-    @keyframes skeleton-pulse {
-
-        0%,
-        100% {
-            opacity: 1;
-        }
-
-        50% {
-            opacity: 0.5;
-        }
-    }
-
-    .skeleton-item {
-        animation: skeleton-pulse 1.5s ease-in-out infinite;
-    }
-</style>

@@ -1,250 +1,175 @@
-{% load static %}
-<div class="panel" data-panel="today">
-    <!-- Breadcrumb -->
-    <div class="breadcrumb">
-        <a href="/">Home</a>
-        <span class="breadcrumb-separator">›</span>
-        <span>Today</span>
-    </div>
+{% extends 'base.html' %}
 
-    <!-- Panel Header -->
-    <div class="panel-header">
-        <div>
-            <h1 class="panel-title">{{ today|date:"F d, Y" }}</h1>
-            <p style="color: var(--color-text-secondary); margin: 0.5rem 0 0;">
-                {% if is_today %}Today{% else %}{{ today|date:"l" }}{% endif %} •
-                {{ completed_count }} of {{ total_count }} complete
-            </p>
-        </div>
-
-        <div class="panel-actions">
-            <!-- Date Navigation -->
-            <div class="btn-group">
-                <button class="btn btn-secondary btn-icon" data-action="prev-day" aria-label="Previous day">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                            clip-rule="evenodd" />
+{% block content %}
+<div class="panel fade-in">
+    <!-- Enhanced Header with Sticky Navigation -->
+    <header class="today-header">
+        <div class="today-header-content">
+            <div class="today-nav-controls">
+                <a href="/today/?date={{ prev_day|date:'Y-m-d' }}" class="today-nav-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
                     </svg>
-                </button>
-                <button class="btn btn-secondary" data-action="goto-today">Today</button>
-                <button class="btn btn-secondary btn-icon" data-action="next-day" aria-label="Next day">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                            clip-rule="evenodd" />
-                    </svg>
-                </button>
-            </div>
-
-            <button class="btn btn-primary" data-action="add-task">
-                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd"
-                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                        clip-rule="evenodd" />
-                </svg>
-                Add Task
-            </button>
-        </div>
-    </div>
-
-    <!-- Progress Ring -->
-    <div class="progress-section" style="margin-bottom: 2rem;">
-        <div class="progress-ring-container" style="text-align: center;">
-            <div class="circular-progress" style="position: relative; display: inline-block;">
-                <svg width="120" height="120" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="54" fill="none" stroke="var(--color-bg)" stroke-width="8" />
-                    <circle cx="60" cy="60" r="54" fill="none" stroke="var(--color-primary)" stroke-width="8"
-                        stroke-dasharray="{{ progress }} 340" stroke-dashoffset="85" transform="rotate(-90 60 60)"
-                        stroke-linecap="round" />
-                </svg>
-                <div
-                    style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
-                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-primary);">{{ progress }}%</div>
-                    <div style="font-size: 0.75rem; color: var(--color-text-secondary);">Complete</div>
+                </a>
+                <div class="today-date-info">
+                    <h2 class="today-title">
+                        {% if is_today %}Today{% else %}{{ today|date:"l" }}{% endif %}
+                    </h2>
+                    <p class="today-subtitle">{{ today|date:"F j, Y" }}</p>
                 </div>
+                <a href="/today/?date={{ next_day|date:'Y-m-d' }}" class="today-nav-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </a>
+            </div>
+
+            <!-- Enhanced Progress Ring -->
+            <div class="today-progress-ring">
+                <svg class="progress-svg" viewBox="0 0 48 48">
+                    <circle class="progress-bg" cx="24" cy="24" r="20" />
+                    <circle class="progress-bar" cx="24" cy="24" r="20"
+                        style="stroke-dashoffset: calc(126 - (126 * {{ progress }} / 100))" />
+                </svg>
+                <span class="progress-text">{{ progress }}%</span>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!-- Task Groups -->
     {% if task_groups %}
-    {% for group in task_groups %}
-    <section class="task-group" style="margin-bottom: 2rem;">
-        <div class="task-group-header"
-            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h2 style="font-size: 1rem; font-weight: 600; margin: 0;">
-                {{ group.tracker.name }}
-            </h2>
-            <span style="font-size: 0.875rem; color: var(--color-text-secondary);">
-                {{ group.completed }}/{{ group.total }}
-            </span>
-        </div>
-
-        <div class="task-list">
-            {% for task in group.tasks %}
-            <div class="task-item swipeable" data-task-id="{{ task.task_instance_id }}" data-status="{{ task.status }}">
-
-                <!-- Swipe Actions Background -->
-                <div class="swipe-actions-left">
-                    {% for action in task.ios_swipe_actions.leading %}
-                    <button class="swipe-action"
-                        style="background-color: {{ action.backgroundColor }}; min-width: {{ action.minWidth }}pt;"
-                        data-action="{{ action.id }}" data-endpoint="{{ action.endpoint }}">
-                        {{ action.title }}
-                    </button>
-                    {% endfor %}
+    <div class="today-task-groups">
+        {% for group in task_groups %}
+        <div class="task-group-container">
+            <div class="task-group-header">
+                <h3 class="task-group-title">
+                    <span class="task-group-icon">📝</span>
+                    {{ group.tracker.name }}
+                </h3>
+                <div class="task-group-stats">
+                    <span class="task-group-count">{{ group.completed }}/{{ group.total }}</span>
+                    <div class="task-group-progress-mini">
+                        <div class="task-group-progress-fill"
+                            style="width: {% widthratio group.completed group.total 100 %}%"></div>
+                    </div>
                 </div>
+            </div>
 
-                <div class="swipe-actions-right">
-                    {% for action in task.ios_swipe_actions.trailing %}
-                    <button class="swipe-action"
-                        style="background-color: {{ action.backgroundColor }}; min-width: {{ action.minWidth }}pt;"
-                        data-action="{{ action.id }}" data-endpoint="{{ action.endpoint }}" {% if action.confirmRequired %}data-confirm="true" {% endif %}>
-                        {{ action.title }}
+            <div class="task-group-card">
+                {% for task in group.tasks %}
+                <div class="today-task-item {% if task.status == 'DONE' %}task-done{% endif %}"
+                    data-task-id="{{ task.task_instance_id }}">
+
+                    <!-- Checkbox Button -->
+                    <button class="task-checkbox-btn {% if task.status == 'DONE' %}checked{% endif %}"
+                        onclick="toggleTask('{{ task.task_instance_id }}')">
+                        {% if task.status == 'DONE' %}
+                        <svg class="checkmark" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="3">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        {% endif %}
                     </button>
-                    {% endfor %}
-                </div>
 
-                <!-- Task Content -->
-                <div class="task-content-wrapper">
-                    <label class="task-checkbox"
-                        style="min-width: 44pt; min-height: 44pt; display: flex; align-items: center;">
-                        <input type="checkbox" {% if task.status == 'DONE' %}checked{% endif %}
-                            data-task-id="{{ task.task_instance_id }}">
-                        <span class="checkbox-mark"></span>
-                    </label>
-
-                    <div class="task-content" style="flex: 1;">
-                        <div class="task-description" style="font-weight: 500;">
+                    <!-- Task Content -->
+                    <div class="task-content-area"
+                        onclick="window.openModal('edit-task', {task_id: '{{ task.task_instance_id }}'})">
+                        <div class="task-description {% if task.status == 'DONE' %}completed{% endif %}">
                             {{ task.description }}
                         </div>
-                        <div class="task-meta"
-                            style="display: flex; gap: 0.75rem; font-size: 0.75rem; color: var(--color-text-secondary); margin-top: 0.25rem;">
-                            {% if task.category %}
-                            <span class="task-category">{{ task.category }}</span>
-                            {% endif %}
+                        <div class="task-metadata">
                             {% if task.time_of_day %}
-                            <span class="task-time">
-                                {% if task.time_of_day == 'morning' %}🌅 Morning
-                                {% elif task.time_of_day == 'afternoon' %}☀️ Afternoon
-                                {% elif task.time_of_day == 'evening' %}🌙 Evening
-                                {% else %}⏰ Anytime
+                            <span class="task-time-badge">
+                                {% if task.time_of_day == 'morning' %}🌅
+                                {% elif task.time_of_day == 'afternoon' %}☀️
+                                {% elif task.time_of_day == 'evening' %}🌙
+                                {% elif task.time_of_day == 'night' %}🌃
                                 {% endif %}
+                                <span>{{ task.time_of_day|capfirst }}</span>
                             </span>
                             {% endif %}
-                            <span class="task-weight">Weight: {{ task.weight }}</span>
+                            {% if task.category %}
+                            <span class="task-category-badge">{{ task.category }}</span>
+                            {% endif %}
+                            {% if task.weight > 1 %}
+                            <span class="task-weight-badge">{{ task.weight }}×</span>
+                            {% endif %}
                         </div>
                     </div>
 
-                    <button class="btn-icon context-menu-btn" style="min-width: 44pt; min-height: 44pt;"
-                        data-task-id="{{ task.task_instance_id }}" aria-label="More options">
-                        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                            <path
-                                d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                        </svg>
-                    </button>
+                    <!-- Actions Dropdown -->
+                    <div class="task-actions">
+                        <div class="dropdown relative">
+                            <button class="task-menu-btn" data-dropdown-toggle="task-{{ task.task_instance_id }}">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="1"></circle>
+                                    <circle cx="12" cy="5" r="1"></circle>
+                                    <circle cx="12" cy="19" r="1"></circle>
+                                </svg>
+                            </button>
+                            <div class="dropdown-menu right" id="dropdown-task-{{ task.task_instance_id }}">
+                                <button class="dropdown-item"
+                                    onclick="window.openModal('edit-task', {task_id: '{{ task.task_instance_id }}'})">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M12 20h9"></path>
+                                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                                    </svg>
+                                    Edit
+                                </button>
+                                <button class="dropdown-item"
+                                    onclick="rescheduleTask('{{ task.task_instance_id }}', 'tomorrow')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    Tomorrow
+                                </button>
+                                <button class="dropdown-item text-error"
+                                    onclick="deleteTask('{{ task.task_instance_id }}')">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path
+                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                                        </path>
+                                    </svg>
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
-    </section>
-    {% endfor %}
+        {% endfor %}
+    </div>
     {% else %}
-    <div class="empty-state">
-        <svg class="empty-state-icon" width="80" height="80" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd"
-                d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
-                clip-rule="evenodd" />
-        </svg>
-        <h3 class="empty-state-title">No tasks for today</h3>
-        <p class="empty-state-description">Enjoy your free day or add some tasks to track</p>
-        <button class="btn btn-primary" data-action="add-task">Add Task</button>
+    <!-- Enhanced Empty State -->
+    <div class="today-empty-state">
+        <div class="empty-icon-container">
+            <span class="empty-icon">📅</span>
+        </div>
+        <h3 class="empty-title">All clear for today!</h3>
+        <p class="empty-description">No tasks scheduled. Add a new task or check your trackers.</p>
+        <button class="btn btn-primary btn-lg" onclick="window.openModal('add-task')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Task
+        </button>
     </div>
     {% endif %}
 
-    <!-- Day Note -->
-    <section style="margin-top: 2rem;">
-        <div class="day-note-card"
-            style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
-            <label for="day-note" style="display: block; font-weight: 600; margin-bottom: 0.5rem;">
-                📝 Day Note
-            </label>
-            <textarea id="day-note" rows="3" placeholder="How's your day going? Add a note..."
-                style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-family: inherit; resize: vertical;">{{ day_note|default:"" }}</textarea>
-            <button class="btn btn-sm btn-primary" data-action="save-note" style="margin-top: 0.5rem;">Save
-                Note</button>
-        </div>
-    </section>
+    <!-- FAB -->
+    <button class="today-fab" onclick="window.openModal('add-task')" title="Add task">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+    </button>
 </div>
-
-<style>
-    .task-item.swipeable {
-        position: relative;
-        overflow: hidden;
-    }
-
-    .swipe-actions-left,
-    .swipe-actions-right {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        display: flex;
-        align-items: center;
-    }
-
-    .swipe-actions-left {
-        left: 0;
-    }
-
-    .swipe-actions-right {
-        right: 0;
-    }
-
-    .swipe-action {
-        height: 100%;
-        color: white;
-        border: none;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .task-content-wrapper {
-        position: relative;
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        background: var(--color-surface);
-        transition: transform 0.2s;
-    }
-
-    /* Checkbox Styling */
-    .task-checkbox input {
-        position: absolute;
-        opacity: 0;
-    }
-
-    .checkbox-mark {
-        display: block;
-        width: 24px;
-        height: 24px;
-        border: 2px solid var(--color-border);
-        border-radius: 6px;
-        transition: all 0.2s;
-    }
-
-    .task-checkbox input:checked+.checkbox-mark {
-        background: var(--color-success);
-        border-color: var(--color-success);
-    }
-
-    .task-checkbox input:checked+.checkbox-mark::after {
-        content: '✓';
-        display: block;
-        color: white;
-        text-align: center;
-        line-height: 20px;
-        font-weight: bold;
-    }
-</style>
+{% endblock %}

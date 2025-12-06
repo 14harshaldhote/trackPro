@@ -1,168 +1,89 @@
-{% load static %}
-<div class="panel" data-panel="goals">
-    <div class="breadcrumb">
-        <a href="/">Home</a>
-        <span class="breadcrumb-separator">›</span>
-        <span>Goals</span>
-    </div>
+{% extends 'base.html' %}
 
-    <div class="panel-header">
-        <h1 class="panel-title">🎯 Your Goals</h1>
-        <div class="panel-actions">
-            <button class="btn btn-primary" data-action="add-goal">
-                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd"
-                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                        clip-rule="evenodd" />
-                </svg>
-                New Goal
-            </button>
+
+{% block content %}
+<div class="panel fade-in">
+    <header class="panel-header mb-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold">Goals</h1>
+            <p class="text-secondary">Set bigger targets and track milestones</p>
         </div>
-    </div>
+        <button class="btn btn-primary" onclick="window.openModal('add-goal')">
+            Add Goal
+        </button>
+    </header>
 
     <!-- Goal Stats -->
-    <div
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-        <div class="stat-card">
+    <div class="grid-responsive mb-8">
+        <div class="card stat-card">
             <div class="stat-value">{{ goal_stats.total_active }}</div>
             <div class="stat-label">Active Goals</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-value">{{ goal_stats.avg_progress }}%</div>
-            <div class="stat-label">Average Progress</div>
-        </div>
-        <div class="stat-card">
+        <div class="card stat-card">
             <div class="stat-value">{{ goal_stats.on_track }}</div>
             <div class="stat-label">On Track</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-value">{{ goal_stats.at_risk }}</div>
-            <div class="stat-label">At Risk</div>
+        <div class="card stat-card">
+            <div class="stat-value">{{ goal_stats.avg_progress }}%</div>
+            <div class="stat-label">Avg Progress</div>
         </div>
     </div>
 
-    <!-- Active Goals -->
+    <!-- Goals List -->
     {% if active_goals %}
-    <section style="margin-bottom: 3rem;">
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Active Goals</h2>
-        <div style="display: grid; gap: 1rem;">
-            {% for goal in active_goals %}
-            <div class="goal-card"
-                style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; padding: 1.5rem; transition: all 0.2s;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
-                    <div style="flex: 1;">
-                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-                            <div style="font-size: 2rem;">{{ goal.icon|default:"🎯" }}</div>
-                            <h3 style="font-size: 1.125rem; font-weight: 600; margin: 0;">{{ goal.title }}</h3>
-                        </div>
-                        {% if goal.description %}
-                        <p style="color: var(--color-text-secondary); margin: 0 0 0 3.5rem; font-size: 0.875rem;">
-                            {{ goal.description }}
-                        </p>
-                        {% endif %}
-                    </div>
-
-                    <div class="dropdown">
-                        <button class="btn-icon dropdown-toggle" aria-label="More options">
-                            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                                <path
-                                    d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                            </svg>
-                        </button>
-                        <div class="dropdown-menu">
-                            <button class="dropdown-item" data-action="edit-goal"
-                                data-goal-id="{{ goal.goal_id }}">Edit</button>
-                            <button class="dropdown-item" data-action="complete-goal"
-                                data-goal-id="{{ goal.goal_id }}">Mark Complete</button>
-                            <div class="dropdown-divider"></div>
-                            <button class="dropdown-item dropdown-item-danger" data-action="delete-goal"
-                                data-goal-id="{{ goal.goal_id }}">Delete</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin-bottom: 1rem;">
-                    <div
-                        style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.5rem;">
-                        <span style="color: var(--color-text-secondary);">Progress</span>
-                        <span style="font-weight: 600; color: var(--color-primary);">
-                            {{ goal.current_value }}/{{ goal.target_value }} ({{ goal.progress }}%)
-                        </span>
-                    </div>
-                    <div class="progress-bar" style="height: 12px;">
-                        <div
-                            style="width: {{ goal.progress }}%; background: {% if goal.progress >= 80 %}var(--color-success){% elif goal.progress >= 50 %}var(--color-primary){% else %}var(--color-warning){% endif %}; transition: width 0.3s;">
-                        </div>
-                    </div>
-                </div>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.875rem;">
-                    <div style="color: var(--color-text-secondary);">
-                        {% if goal.deadline %}
-                        📅 Due: {{ goal.deadline|date:"M d, Y" }}
-                        {% else %}
-                        No deadline set
-                        {% endif %}
-                    </div>
-                    <div>
-                        {% if goal.progress >= 80 %}
-                        <span style="color: var(--color-success); font-weight: 600;">✓ On Track</span>
-                        {% elif goal.progress >= 50 %}
-                        <span style="color: var(--color-primary); font-weight: 600;">→ In Progress</span>
-                        {% else %}
-                        <span style="color: var(--color-warning); font-weight: 600;">⚠ Needs Attention</span>
-                        {% endif %}
+    <div class="space-y-4">
+        {% for goal in active_goals %}
+        <div class="card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:border-primary transition-colors cursor-pointer"
+            onclick="window.openModal('edit-goal', {goal_id: '{{ goal.goal_id }}'})">
+            <div class="flex items-start gap-4">
+                <div class="text-3xl">{{ goal.icon|default:"🎯" }}</div>
+                <div>
+                    <h3 class="font-bold text-lg mb-1">{{ goal.title }}</h3>
+                    <p class="text-sm text-secondary">{{ goal.description }}</p>
+                    <div class="text-xs text-secondary mt-2">
+                        Deadline: {{ goal.deadline|default:"No deadline" }}
                     </div>
                 </div>
             </div>
-            {% endfor %}
+
+            <div class="flex-1 w-full md:max-w-xs">
+                <div class="flex justify-between text-sm mb-2">
+                    <span class="font-bold">{{ goal.current_value }} / {{ goal.target_value }}</span>
+                    <span class="text-secondary">{{ goal.progress }}%</span>
+                </div>
+                <div class="h-2 bg-bg rounded overflow-hidden">
+                    <div class="h-full bg-primary transition-all duration-500" style="width: {{ goal.progress }}%">
+                    </div>
+                </div>
+            </div>
         </div>
-    </section>
+        {% endfor %}
+    </div>
     {% else %}
-    <div class="empty-state">
-        <svg class="empty-state-icon" width="80" height="80" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-            <path fill-rule="evenodd"
-                d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clip-rule="evenodd" />
-        </svg>
-        <h3 class="empty-state-title">No active goals</h3>
-        <p class="empty-state-description">Set a goal to track your long-term progress</p>
-        <button class="btn btn-primary" data-action="add-goal">Create Your First Goal</button>
+    <div class="empty-state card p-12 text-center">
+        <div class="empty-icon text-5xl mb-4">🏆</div>
+        <h3 class="text-xl font-bold mb-2">No active goals</h3>
+        <p class="text-secondary mb-6">Goals help you track long-term achievements.</p>
+        <button class="btn btn-primary" onclick="window.openModal('add-goal')">Create a Goal</button>
     </div>
     {% endif %}
 
     <!-- Completed Goals -->
     {% if completed_goals %}
-    <section>
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: var(--color-text-secondary);">
-            ✅ Completed Goals
-        </h2>
-        <div style="display: grid; gap: 0.75rem;">
+    <div class="mt-12 pt-8 border-t border-border">
+        <h3 class="text-lg font-bold mb-4 opacity-80">Completed Goals</h3>
+        <div class="space-y-3 opacity-60 hover:opacity-100 transition-opacity">
             {% for goal in completed_goals %}
-            <div
-                style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: var(--color-success-bg); border-radius: 8px;">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <div style="font-size: 1.5rem;">{{ goal.icon|default:"🏆" }}</div>
-                    <div>
-                        <div style="font-weight: 600;">{{ goal.title }}</div>
-                        <div style="font-size: 0.75rem; color: var(--color-text-secondary);">
-                            Completed {{ goal.updated_at|date:"M d, Y" }}
-                        </div>
-                    </div>
+            <div class="card p-4 flex justify-between items-center bg-surface-alt">
+                <div class="flex items-center gap-3">
+                    <span>✅</span>
+                    <span class="font-medium line-through">{{ goal.title }}</span>
                 </div>
-                <div style="color: var(--color-success); font-weight: 600;">100%</div>
+                <span class="text-sm text-success font-bold">Done!</span>
             </div>
             {% endfor %}
         </div>
-    </section>
+    </div>
     {% endif %}
 </div>
-
-<style>
-    .goal-card:hover {
-        border-color: var(--color-primary);
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
-    }
-</style>
+{% endblock %}

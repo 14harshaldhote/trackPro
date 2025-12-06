@@ -1,212 +1,85 @@
-{% load static %}
-<div class="panel" data-panel="help">
-    <div class="breadcrumb">
-        <a href="/">Home</a>
-        <span class="breadcrumb-separator">›</span>
-        <span>Help</span>
-    </div>
+{% extends 'base.html' %}
 
-    <div class="panel-header">
-        <h1 class="panel-title">❓ Help Center</h1>
-        <p style="color: var(--color-text-secondary); margin: 0.5rem 0 0;">
-            Everything you need to know about Tracker Pro
-        </p>
-    </div>
+{% block content %}
+<div class="panel fade-in">
+    <header class="panel-header mb-8">
+        <h1 class="text-3xl font-bold">Help Center</h1>
+        <p class="text-secondary">Guides, shortcuts, and FAQs</p>
+    </header>
 
-    <!-- Quick Links -->
-    <div
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 3rem;">
-        <a href="#getting-started" class="help-quick-link"
-            style="display: flex; align-items: center; gap: 1rem; padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; text-decoration: none; color: inherit; transition: all 0.2s;">
-            <div
-                style="width: 48px; height: 48px; border-radius: 12px; background: var(--color-primary); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.5rem;">
-                🚀
-            </div>
-            <div>
-                <div style="font-weight: 600; margin-bottom: 0.25rem;">Getting Started</div>
-                <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Learn the basics</div>
-            </div>
-        </a>
+    <div class="grid grid-cols-2 gap-6">
+        <!-- Shortcuts Reference -->
+        <div class="card p-6">
+            <h3 class="font-bold mb-4 flex items-center gap-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                        d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3-3h12z">
+                    </path>
+                </svg>
+                Keyboard Shortcuts
+            </h3>
 
-        <a href="#keyboard-shortcuts" class="help-quick-link"
-            style="display: flex; align-items: center; gap: 1rem; padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; text-decoration: none; color: inherit; transition: all 0.2s;">
-            <div
-                style="width: 48px; height: 48px; border-radius: 12px; background: var(--color-secondary); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.5rem;">
-                ⌨️
-            </div>
-            <div>
-                <div style="font-weight: 600; margin-bottom: 0.25rem;">Keyboard Shortcuts</div>
-                <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Work faster</div>
-            </div>
-        </a>
-
-        <a href="#faq" class="help-quick-link"
-            style="display: flex; align-items: center; gap: 1rem; padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; text-decoration: none; color: inherit; transition: all 0.2s;">
-            <div
-                style="width: 48px; height: 48px; border-radius: 12px; background: var(--color-success); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.5rem;">
-                💡
-            </div>
-            <div>
-                <div style="font-weight: 600; margin-bottom: 0.25rem;">FAQs</div>
-                <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Common questions</div>
-            </div>
-        </a>
-    </div>
-
-    <!-- Getting Started -->
-    <section id="getting-started" style="margin-bottom: 3rem;">
-        <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1.5rem;">🚀 Getting Started</h2>
-
-        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-            <div class="help-article">
-                <h3 style="font-weight: 600; margin-bottom: 0.5rem;">1. Create Your First Tracker</h3>
-                <p style="color: var(--color-text-secondary); margin-bottom: 0.75rem;">
-                    Click the "New Tracker" button in the sidebar or press <kbd>Ctrl+N</kbd> to create your first
-                    tracker. Choose a name, time period (daily/weekly/monthly), and add tasks.
-                </p>
-                <button class="btn btn-primary btn-sm" data-action="add-tracker">Create Tracker Now</button>
-            </div>
-
-            <div class="help-article">
-                <h3 style="font-weight: 600; margin-bottom: 0.5rem;">2. Add and Complete Tasks</h3>
-                <p style="color: var(--color-text-secondary);">
-                    Navigate to "Today" view to see all your tasks. Click the checkbox to mark tasks complete, or use
-                    swipe gestures on mobile to quickly complete, skip, or delete tasks.
-                </p>
-            </div>
-
-            <div class="help-article">
-                <h3 style="font-weight: 600; margin-bottom: 0.5rem;">3. Track Your Progress</h3>
-                <p style="color: var(--color-text-secondary);">
-                    View your analytics in the "Analytics" panel to see completion rates, streaks, and behavioral
-                    insights. Use "Insights" to get personalized recommendations.
-                </p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Keyboard Shortcuts -->
-    <section id="keyboard-shortcuts" style="margin-bottom: 3rem;">
-        <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1.5rem;">⌨️ Keyboard Shortcuts</h2>
-
-        {% include 'modals/keyboard_shortcuts.html' %}
-
-        <p style="margin-top: 1rem; color: var(--color-text-secondary);">
-            Press <kbd>?</kbd> anywhere to view the complete list of shortcuts.
-        </p>
-    </section>
-
-    <!-- FAQs -->
-    <section id="faq" style="margin-bottom: 3rem;">
-        <h2 style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1.5rem;">💡 Frequently Asked Questions</h2>
-
-        <div style="display: flex; flex-direction: column; gap: 1rem;">
-            {% if faq %}
-            {% for item in faq %}
-            <details class="faq-item"
-                style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
-                <summary
-                    style="font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center;">
-                    {{ item.question }}
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"
-                        style="transition: transform 0.2s;">
-                        <path fill-rule="evenodd"
-                            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                            clip-rule="evenodd" />
-                    </svg>
-                </summary>
-                <div style="margin-top: 1rem; color: var(--color-text-secondary);">
-                    {{ item.answer }}
+            <div class="space-y-4">
+                <div>
+                    <h4 class="text-xs font-bold text-secondary uppercase mb-2">Navigation</h4>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div class="flex justify-between"><span class="text-secondary">Dashboard</span> <kbd
+                                class="bg-surface border border-border px-1 rounded">D</kbd></div>
+                        <div class="flex justify-between"><span class="text-secondary">Today</span> <kbd
+                                class="bg-surface border border-border px-1 rounded">T</kbd></div>
+                        <div class="flex justify-between"><span class="text-secondary">Week</span> <kbd
+                                class="bg-surface border border-border px-1 rounded">W</kbd></div>
+                        <div class="flex justify-between"><span class="text-secondary">Month</span> <kbd
+                                class="bg-surface border border-border px-1 rounded">M</kbd></div>
+                    </div>
                 </div>
-            </details>
-            {% endfor %}
-            {% else %}
-            <details class="faq-item"
-                style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
-                <summary style="font-weight: 600; cursor: pointer;">How do I create a tracker?</summary>
-                <p style="margin-top: 1rem; color: var(--color-text-secondary);">
-                    Click the "New Tracker" button in the sidebar or press <kbd>Ctrl+N</kbd>. Fill in the tracker name,
-                    choose a time period, and add your tasks.
-                </p>
-            </details>
 
-            <details class="faq-item"
-                style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
-                <summary style="font-weight: 600; cursor: pointer;">What's the difference between daily, weekly, and
-                    monthly trackers?</summary>
-                <p style="margin-top: 1rem; color: var(--color-text-secondary);">
-                    Daily trackers reset every day, weekly trackers reset every week (Monday), and monthly trackers
-                    reset on the 1st of each month. Choose based on how often you want to complete your tasks.
-                </p>
-            </details>
-
-            <details class="faq-item"
-                style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
-                <summary style="font-weight: 600; cursor: pointer;">How do I edit or delete a task?</summary>
-                <p style="margin-top: 1rem; color: var(--color-text-secondary);">
-                    Click the three-dot menu next to any task to edit or delete it. You can also swipe left on mobile to
-                    reveal quick actions.
-                </p>
-            </details>
-
-            <details class="faq-item"
-                style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
-                <summary style="font-weight: 600; cursor: pointer;">What are goals and how do I track them?</summary>
-                <p style="margin-top: 1rem; color: var(--color-text-secondary);">
-                    Goals are long-term targets you want to achieve. Create a goal in the "Goals" panel, set a target
-                    number, and optionally link it to a tracker. Your progress updates automatically as you complete
-                    tasks.
-                </p>
-            </details>
-
-            <details class="faq-item"
-                style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px;">
-                <summary style="font-weight: 600; cursor: pointer;">Can I change the theme?</summary>
-                <p style="margin-top: 1rem; color: var(--color-text-secondary);">
-                    Yes! Click the theme button in the header or go to Settings → Appearance. We have 14 beautiful
-                    themes to choose from including dark mode options.
-                </p>
-            </details>
-            {% endif %}
+                <div>
+                    <h4 class="text-xs font-bold text-secondary uppercase mb-2">Actions</h4>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div class="flex justify-between"><span class="text-secondary">New Task</span> <kbd
+                                class="bg-surface border border-border px-1 rounded">Ctrl+T</kbd></div>
+                        <div class="flex justify-between"><span class="text-secondary">New Tracker</span> <kbd
+                                class="bg-surface border border-border px-1 rounded">Ctrl+N</kbd></div>
+                        <div class="flex justify-between"><span class="text-secondary">Search</span> <kbd
+                                class="bg-surface border border-border px-1 rounded">Ctrl+K</kbd></div>
+                        <div class="flex justify-between"><span class="text-secondary">Show Help</span> <kbd
+                                class="bg-surface border border-border px-1 rounded">?</kbd></div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </section>
 
-    <!-- Contact Support -->
-    <section
-        style="padding: 2rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; text-align: center;">
-        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Still need help?</h2>
-        <p style="color: var(--color-text-secondary); margin-bottom: 1.5rem;">
-            Our support team is here to assist you
-        </p>
-        <div style="display: flex; gap: 1rem; justify-content: center;">
-            <a href="mailto:support@trackerpro.com" class="btn btn-primary">
-                Email Support
-            </a>
-            <a href="/docs/" class="btn btn-secondary">
-                View Documentation
-            </a>
+        <!-- FAQ / Links -->
+        <div class="card p-6">
+            <h3 class="font-bold mb-4">Frequently Asked Questions</h3>
+            <div class="space-y-4">
+                <details class="group">
+                    <summary class="font-medium cursor-pointer list-none flex justify-between items-center">
+                        How do I delete a task?
+                        <span class="transition group-open:rotate-180">v</span>
+                    </summary>
+                    <p class="text-sm text-secondary mt-2">Open the task menu (three dots) and select Delete, or swipe
+                        left on mobile devices.</p>
+                </details>
+                <details class="group">
+                    <summary class="font-medium cursor-pointer list-none flex justify-between items-center">
+                        Can I export my data?
+                        <span class="transition group-open:rotate-180">v</span>
+                    </summary>
+                    <p class="text-sm text-secondary mt-2">Yes, go to Settings > Account > Export Data to download a
+                        JSON file.</p>
+                </details>
+                <details class="group">
+                    <summary class="font-medium cursor-pointer list-none flex justify-between items-center">
+                        How is streak calculated?
+                        <span class="transition group-open:rotate-180">v</span>
+                    </summary>
+                    <p class="text-sm text-secondary mt-2">Streaks increase every day you complete at least one task.
+                    </p>
+                </details>
+            </div>
         </div>
-    </section>
+    </div>
 </div>
-
-<style>
-    .help-quick-link:hover {
-        border-color: var(--color-primary);
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
-    }
-
-    .faq-item[open] summary svg {
-        transform: rotate(180deg);
-    }
-
-    kbd {
-        display: inline-block;
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        font-family: ui-monospace, monospace;
-        background: var(--color-bg);
-        border: 1px solid var(--color-border);
-        border-radius: 4px;
-    }
-</style>
+{% endblock %}

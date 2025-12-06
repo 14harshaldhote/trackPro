@@ -120,8 +120,20 @@ def panel_dashboard(request):
         end_date = start_date + timedelta(days=6) # Sunday
         period_title = "This Week's Tasks"
     elif period == 'monthly':
-        start_date = today.replace(day=1)
-        end_date = today.replace(day=calendar.monthrange(today.year, today.month)[1])
+        # Parse month parameter (YYYY-MM format)
+        month_str = request.GET.get('month')
+        if month_str:
+            try:
+                # Parse YYYY-MM format
+                year, month = map(int, month_str.split('-'))
+                selected_date = date(year, month, 1)
+            except (ValueError, AttributeError):
+                selected_date = today.replace(day=1)
+        else:
+            selected_date = today.replace(day=1)
+
+        start_date = selected_date
+        end_date = selected_date.replace(day=calendar.monthrange(selected_date.year, selected_date.month)[1])
         period_title = "This Month's Tasks"
     elif period == 'all':
         start_date = today - timedelta(days=365) # Sort of arbitrary "all" for performance
@@ -806,8 +818,20 @@ def panel_month(request):
     from calendar import monthrange, monthcalendar
     
     today = date.today()
-    year = int(request.GET.get('year', today.year))
-    month = int(request.GET.get('month', today.month))
+    
+    # Parse month parameter - handle both YYYY-MM format and separate year/month params
+    month_str = request.GET.get('month')
+    if month_str and '-' in str(month_str):
+        # YYYY-MM format
+        try:
+            year, month = map(int, month_str.split('-'))
+        except (ValueError, AttributeError):
+            year = today.year
+            month = today.month
+    else:
+        # Separate year and month params
+        year = int(request.GET.get('year', today.year))
+        month = int(request.GET.get('month', today.month)) if not month_str else today.month
     
     # Ensure valid month/year
     if month < 1:
@@ -1255,8 +1279,13 @@ def modal_view(request, modal_name):
     Loads templates from core/templates/modals/{modal_name}.html
     
     Enhanced with iOS bottom sheet configuration (OpusSuggestion.md Part 2.2)
+    
+    Note: Converts dash-separated names (theme-gallery) to underscores (theme_gallery.html)
+    for Django template naming convention.
     """
-    template_name = f'modals/{modal_name}.html'
+    # Convert dashes to underscores for template file naming
+    template_modal_name = modal_name.replace('-', '_')
+    template_name = f'modals/{template_modal_name}.html'
     
     # Context can be expanded based on modal_name if needed
     context = {
@@ -1305,7 +1334,7 @@ def modal_view(request, modal_name):
     
     # Add iOS configuration to context
     context['ios_modal_config'] = {
-        'presentation': MODAL_PRESENTATIONS['bottom_sheet'],
+        'presentation': MODAL_PRESENTATIONS['sheet'],
         'detents': modal_detents.get(modal_name, MODAL_DETENTS['medium']),
         'dismissible': True,
         'show_grabber': True,  # iOS drag handle

@@ -1,113 +1,413 @@
-<!-- Theme Gallery Modal -->
-<div class="modal-dialog modal-lg">
+<div class="modal w-full max-w-4xl">
     <div class="modal-header">
-        <h2 class="modal-title">🎨 Theme Gallery</h2>
-        <button class="modal-close" data-action="close-modal" aria-label="Close">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clip-rule="evenodd" />
+        <h2 class="text-xl font-bold">Theme Gallery</h2>
+        <button class="btn-icon" data-action="close-modal">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
         </button>
     </div>
 
-    <div class="modal-body">
-        <p style="color: var(--color-text-secondary); margin-bottom: 1.5rem;">
-            Choose a theme that matches your mood and workflow
-        </p>
+    <div class="modal-body p-6">
+        <p class="text-secondary mb-6">Choose a theme. Click to preview, then save to apply permanently.</p>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
-            {% for theme in available_themes %}
-            <div class="theme-preview" data-theme="{{ theme.value }}">
-                <div class="theme-colors"
-                    style="background: linear-gradient(135deg, {{ theme.primary }} 0%, {{ theme.secondary }} 100%); height: 100px; border-radius: 8px 8px 0 0;">
+        <div class="theme-grid">
+            <!-- Default / Working Hard -->
+            <button class="theme-card" onclick="applyThemePreview('working-hard')" data-theme="working-hard">
+                <div class="theme-preview bg-[#ECEFF1] border-[#0277BD]">
+                    <div class="theme-bar bg-[#0277BD]"></div>
+                    <div class="theme-line bg-gray-300"></div>
+                    <div class="theme-line bg-gray-200"></div>
                 </div>
-                <div style="padding: 1rem;">
-                    <h3 style="font-weight: 600; margin: 0 0 0.25rem;">{{ theme.name }}</h3>
-                    <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0;">
-                        {{ theme.description }}
-                    </p>
+                <div class="theme-name">Working Hard</div>
+            </button>
+
+            <!-- Rage -->
+            <button class="theme-card" onclick="applyThemePreview('rage')" data-theme="rage">
+                <div class="theme-preview bg-[#1A0000] border-[#FF1744]">
+                    <div class="theme-bar bg-[#FF1744]"></div>
+                    <div class="theme-line bg-[#C62828]"></div>
+                    <div class="theme-line bg-[#FF6F00]"></div>
                 </div>
-                <button class="btn btn-sm btn-secondary theme-apply-btn" data-theme="{{ theme.value }}"
-                    style="width: calc(100% - 2rem); margin: 0 1rem 1rem;">
-                    {% if theme.value == current_theme %}Current{% else %}Apply{% endif %}
-                </button>
-            </div>
-            {% endfor %}
+                <div class="theme-name text-red-500">Rage</div>
+            </button>
+
+            <!-- Bloom -->
+            <button class="theme-card" onclick="applyThemePreview('bloom')" data-theme="bloom">
+                <div class="theme-preview bg-[#F1F8E9] border-[#66BB6A]">
+                    <div class="theme-bar bg-[#66BB6A]"></div>
+                    <div class="theme-line bg-[#43A047]"></div>
+                    <div class="theme-line bg-[#AED581]"></div>
+                </div>
+                <div class="theme-name text-green-600">Bloom</div>
+            </button>
+
+            <!-- Blossom -->
+            <button class="theme-card" onclick="applyThemePreview('blossom')" data-theme="blossom">
+                <div class="theme-preview bg-[#FFF0F5] border-[#F48FB1]">
+                    <div class="theme-bar bg-[#F48FB1]"></div>
+                    <div class="theme-line bg-[#EC407A]"></div>
+                    <div class="theme-line bg-[#FFD54F]"></div>
+                </div>
+                <div class="theme-name text-pink-500">Blossom</div>
+            </button>
+
+            <!-- Cherry -->
+            <button class="theme-card" onclick="applyThemePreview('cherry')" data-theme="cherry">
+                <div class="theme-preview bg-[#FCE4EC] border-[#E91E63]">
+                    <div class="theme-bar bg-[#E91E63]"></div>
+                    <div class="theme-line bg-[#C2185B]"></div>
+                    <div class="theme-line bg-[#FF4081]"></div>
+                </div>
+                <div class="theme-name text-pink-600">Cherry</div>
+            </button>
+
+            <!-- Horny -->
+            <button class="theme-card" onclick="applyThemePreview('horny')" data-theme="horny">
+                <div class="theme-preview bg-[#1A0A14] border-[#D32F2F]">
+                    <div class="theme-bar bg-[#D32F2F]"></div>
+                    <div class="theme-line bg-[#7B1FA2]"></div>
+                    <div class="theme-line bg-[#FF6F00]"></div>
+                </div>
+                <div class="theme-name text-purple-400">Horny</div>
+            </button>
+
+            <!-- Total Dark -->
+            <button class="theme-card" onclick="applyThemePreview('total-dark')" data-theme="total-dark">
+                <div class="theme-preview bg-[#000000] border-[#00BFA5]">
+                    <div class="theme-bar bg-[#00BFA5]"></div>
+                    <div class="theme-line bg-[#00897B]"></div>
+                    <div class="theme-line bg-[#64FFDA]"></div>
+                </div>
+                <div class="theme-name text-teal-400">Total Dark</div>
+            </button>
+
+            <!-- Rising Up -->
+            <button class="theme-card" onclick="applyThemePreview('rising-up')" data-theme="rising-up">
+                <div class="theme-preview bg-[#FFF8E1] border-[#FFA726]">
+                    <div class="theme-bar bg-[#FFA726]"></div>
+                    <div class="theme-line bg-[#FB8C00]"></div>
+                    <div class="theme-line bg-[#FFEB3B]"></div>
+                </div>
+                <div class="theme-name text-orange-500">Rising Up</div>
+            </button>
+
+            <!-- Dig Deep -->
+            <button class="theme-card" onclick="applyThemePreview('dig-deep')" data-theme="dig-deep">
+                <div class="theme-preview bg-[#EFEBE9] border-[#6D4C41]">
+                    <div class="theme-bar bg-[#6D4C41]"></div>
+                    <div class="theme-line bg-[#4E342E]"></div>
+                    <div class="theme-line bg-[#A1887F]"></div>
+                </div>
+                <div class="theme-name text-brown-600">Dig Deep</div>
+            </button>
+
+            <!-- Sprinter -->
+            <button class="theme-card" onclick="applyThemePreview('sprinter')" data-theme="sprinter">
+                <div class="theme-preview bg-[#0A0A0A] border-[#00E676]">
+                    <div class="theme-bar bg-[#00E676]"></div>
+                    <div class="theme-line bg-[#00C853]"></div>
+                    <div class="theme-line bg-[#FFFF00]"></div>
+                </div>
+                <div class="theme-name text-green-400">Sprinter</div>
+            </button>
+
+            <!-- Rider -->
+            <button class="theme-card" onclick="applyThemePreview('rider')" data-theme="rider">
+                <div class="theme-preview bg-[#1A0033] border-[#FF6EC7]">
+                    <div class="theme-bar bg-[#FF6EC7]"></div>
+                    <div class="theme-line bg-[#00D9FF]"></div>
+                    <div class="theme-line bg-[#FFF01F]"></div>
+                </div>
+                <div class="theme-name text-pink-400">Rider</div>
+            </button>
+
+            <!-- Beast Mode -->
+            <button class="theme-card" onclick="applyThemePreview('beast-mode')" data-theme="beast-mode">
+                <div class="theme-preview bg-[#0D0D0D] border-[#FF3D00]">
+                    <div class="theme-bar bg-[#1A1A1A]"></div>
+                    <div class="theme-line bg-[#FF3D00]"></div>
+                    <div class="theme-line bg-[#FFAB00]"></div>
+                </div>
+                <div class="theme-name text-orange-500">Beast Mode</div>
+            </button>
+
+            <!-- Ocean Wave -->
+            <button class="theme-card" onclick="applyThemePreview('ocean-wave')" data-theme="ocean-wave">
+                <div class="theme-preview bg-[#E0F7FA] border-[#0288D1]">
+                    <div class="theme-bar bg-[#0288D1]"></div>
+                    <div class="theme-line bg-[#00ACC1]"></div>
+                    <div class="theme-line bg-[#80DEEA]"></div>
+                </div>
+                <div class="theme-name text-blue-600">Ocean Wave</div>
+            </button>
+
+            <!-- Sunset Grind -->
+            <button class="theme-card" onclick="applyThemePreview('sunset-grind')" data-theme="sunset-grind">
+                <div class="theme-preview bg-[#FFF3E0] border-[#FF6F00]">
+                    <div class="theme-bar bg-[#FF6F00]"></div>
+                    <div class="theme-line bg-[#F57C00]"></div>
+                    <div class="theme-line bg-[#FFB74D]"></div>
+                </div>
+                <div class="theme-name text-orange-600">Sunset Grind</div>
+            </button>
+
+            <!-- Ice Cold -->
+            <button class="theme-card" onclick="applyThemePreview('ice-cold')" data-theme="ice-cold">
+                <div class="theme-preview bg-[#E1F5FE] border-[#01579B]">
+                    <div class="theme-bar bg-[#01579B]"></div>
+                    <div class="theme-line bg-[#0277BD]"></div>
+                    <div class="theme-line bg-[#4FC3F7]"></div>
+                </div>
+                <div class="theme-name text-blue-900">Ice Cold</div>
+            </button>
+
+            <!-- Warrior Spirit -->
+            <button class="theme-card" onclick="applyThemePreview('warrior-spirit')" data-theme="warrior-spirit">
+                <div class="theme-preview bg-[#0A0A0A] border-[#D32F2F]">
+                    <div class="theme-bar bg-[#D32F2F]"></div>
+                    <div class="theme-line bg-[#F44336]"></div>
+                    <div class="theme-line bg-[#FF9800]"></div>
+                </div>
+                <div class="theme-name text-red-600">Warrior Spirit</div>
+            </button>
+
+            <!-- Neon Pulse -->
+            <button class="theme-card" onclick="applyThemePreview('neon-pulse')" data-theme="neon-pulse">
+                <div class="theme-preview bg-[#0D0D0D] border-[#FF00FF]">
+                    <div class="theme-bar bg-[#FF00FF]"></div>
+                    <div class="theme-line bg-[#00FFFF]"></div>
+                    <div class="theme-line bg-[#FF1493]"></div>
+                </div>
+                <div class="theme-name text-fuchsia-500">Neon Pulse</div>
+            </button>
+
+            <!-- Forest Trail -->
+            <button class="theme-card" onclick="applyThemePreview('forest-trail')" data-theme="forest-trail">
+                <div class="theme-preview bg-[#F1F8E9] border-[#388E3C]">
+                    <div class="theme-bar bg-[#388E3C]"></div>
+                    <div class="theme-line bg-[#4CAF50]"></div>
+                    <div class="theme-line bg-[#8BC34A]"></div>
+                </div>
+                <div class="theme-name text-green-700">Forest Trail</div>
+            </button>
+
+            <!-- Midnight Oil -->
+            <button class="theme-card" onclick="applyThemePreview('midnight-oil')" data-theme="midnight-oil">
+                <div class="-preview bg-[#0A0A0A] border-[#142850]">
+                    <div class="theme-bar bg-[#142850]"></div>
+                    <div class="theme-line bg-[#27496D]"></div>
+                    <div class="theme-line bg-[#00909E]"></div>
+                </div>
+                <div class="theme-name text-slate-400">Midnight Oil</div>
+            </button>
+
+            <!-- Gold Rush -->
+            <button class="theme-card" onclick="applyThemePreview('gold-rush')" data-theme="gold-rush">
+                <div class="theme-preview bg-[#FFFDE7] border-[#F57F17]">
+                    <div class="theme-bar bg-[#F57F17]"></div>
+                    <div class="theme-line bg-[#FBC02D]"></div>
+                    <div class="theme-line bg-[#FFD54F]"></div>
+                </div>
+                <div class="theme-name text-yellow-700">Gold Rush</div>
+            </button>
+
+            <!-- Arctic Blast -->
+            <button class="theme-card" onclick="applyThemePreview('arctic-blast')" data-theme="arctic-blast">
+                <div class="theme-preview bg-[#E0F2F1] border-[#00695C]">
+                    <div class="theme-bar bg-[#00695C]"></div>
+                    <div class="theme-line bg-[#00897B]"></div>
+                    <div class="theme-line bg-[#4DB6AC]"></div>
+                </div>
+                <div class="theme-name text-teal-700">Arctic Blast</div>
+            </button>
+
+            <!-- Volcano -->
+            <button class="theme-card" onclick="applyThemePreview('volcano')" data-theme="volcano">
+                <div class="theme-preview bg-[#0A0A0A] border-[#BF360C]">
+                    <div class="theme-bar bg-[#BF360C]"></div>
+                    <div class="theme-line bg-[#FF5722]"></div>
+                    <div class="theme-line bg-[#FFA726]"></div>
+                </div>
+                <div class="theme-name text-orange-700">Volcano</div>
+            </button>
+
+            <!-- Zen Master -->
+            <button class="theme-card" onclick="applyThemePreview('zen-master')" data-theme="zen-master">
+                <div class="theme-preview bg-[#ECEFF1] border-[#607D8B]">
+                    <div class="theme-bar bg-[#607D8B]"></div>
+                    <div class="theme-line bg-[#78909C]"></div>
+                    <div class="theme-line bg-[#90A4AE]"></div>
+                </div>
+                <div class="theme-name text-slate-600">Zen Master</div>
+            </button>
+
+            <!-- Cyberpunk -->
+            <button class="theme-card" onclick="applyThemePreview('cyberpunk')" data-theme="cyberpunk">
+                <div class="theme-preview bg-[#000000] border-[#00FFFF]">
+                    <div class="theme-bar bg-[#00FFFF]"></div>
+                    <div class="theme-line bg-[#FF006E]"></div>
+                    <div class="theme-line bg-[#FBFF12]"></div>
+                </div>
+                <div class="theme-name text-cyan-400">Cyberpunk</div>
+            </button>
+
+            <!-- Desert Storm -->
+            <button class="theme-card" onclick="applyThemePreview('desert-storm')" data-theme="desert-storm">
+                <div class="theme-preview bg-[#FFF8E1] border-[#D84315]">
+                    <div class="theme-bar bg-[#D84315]"></div>
+                    <div class="theme-line bg-[#F4511E]"></div>
+                    <div class="theme-line bg-[#FFE082]"></div>
+                </div>
+                <div class="theme-name text-amber-800">Desert Storm</div>
+            </button>
+
+            <!-- Northern Lights -->
+            <button class="theme-card" onclick="applyThemePreview('northern-lights')" data-theme="northern-lights">
+                <div class="theme-preview bg-[#0A0A0A] border-[#00E5FF]">
+                    <div class="theme-bar bg-[#00E5FF]"></div>
+                    <div class="theme-line bg-[#7C4DFF]"></div>
+                    <div class="theme-line bg-[#00FF90]"></div>
+                </div>
+                <div class="theme-name text-blue-400">Northern Lights</div>
+            </button>
         </div>
-    </div>
 
-    <div class="modal-footer">
-        <button class="btn btn-secondary" data-action="close-modal">Close</button>
+        <div class="mt-8 flex justify-between items-center">
+            <span class="text-sm text-secondary">26 themes available</span>
+            <div class="flex gap-3">
+                <button class="btn" data-action="close-modal">Cancel</button>
+                <button class="btn btn-primary" onclick="saveCurrentTheme()">Save Theme</button>
+            </div>
+        </div>
     </div>
 </div>
 
 <style>
-    .theme-preview {
+    .theme-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 1rem;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    .theme-card {
         background: var(--color-surface);
         border: 2px solid var(--color-border);
         border-radius: 12px;
-        overflow: hidden;
-        transition: all 0.2s;
+        padding: 0.75rem;
         cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
     }
 
-    .theme-preview:hover {
+    .theme-card:hover {
+        transform: translateY(-2px);
         border-color: var(--color-primary);
-        transform: translateY(-4px);
-        box-shadow: var(--shadow-lg);
+        box-shadow: var(--shadow-md);
+    }
+
+    .theme-card.active {
+        border-color: var(--color-primary);
+        background: var(--color-hover);
+    }
+
+    .theme-preview {
+        height: 60px;
+        border-radius: 8px;
+        border: 2px solid;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        position: relative;
+    }
+
+    .theme-bar {
+        height: 4px;
+        border-radius: 2px;
+        margin-bottom: 0.5rem;
+    }
+
+    .theme-line {
+        height: 3px;
+        border-radius: 2px;
+        margin-bottom: 0.25rem;
+        width: 70%;
+    }
+
+    .theme-name {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--color-text-primary);
     }
 </style>
 
 <script>
-    document.querySelectorAll('.theme-apply-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const theme = btn.dataset.theme;
+    // Define functions immediately on window object
+    let currentPreview = null;
+    let savedTheme = document.documentElement.getAttribute('data-theme') || 'working-hard';
 
-            try {
-                const response = await fetch('/api/preferences/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    },
-                    body: JSON.stringify({ theme })
-                });
+    // Apply theme preview
+    window.applyThemePreview = function (themeId) {
+        console.log('[Theme] Previewing:', themeId);
+        currentPreview = themeId;
+        document.documentElement.setAttribute('data-theme', themeId);
 
-                const data = await response.json();
+        // Update active state
+        document.querySelectorAll('.theme-card').forEach(card => {
+            card.classList.toggle('active', card.dataset.theme === themeId);
+        });
+    };
 
-                if (data.success) {
-                    // Apply theme immediately
-                    document.documentElement.setAttribute('data-theme', theme);
-                    localStorage.setItem('tracker-theme', theme);
+    // Save current theme
+    window.saveCurrentTheme = function () {
+        if (!currentPreview) {
+            console.warn('[Theme] No theme selected');
+            return;
+        }
 
-                    // Update button text
-                    document.querySelectorAll('.theme-apply-btn').forEach(b => {
-                        b.textContent = 'Apply';
-                    });
-                    btn.textContent = 'Current';
+        const themeId = currentPreview;
+        console.log('[Theme] Saving theme:', themeId);
 
-                    showToast(`Theme "${theme}" applied`, 'success');
+        // Save to backend
+        fetch('/api/preferences/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                    document.cookie.match(/csrftoken=([\w-]+)/)?.[1] || ''
+            },
+            body: JSON.stringify({ theme: themeId })
+        }).then(response => {
+            if (response.ok) {
+                console.log('[Theme] Theme saved successfully');
+                savedTheme = themeId;
+                if (window.app?.modules?.ui) {
+                    window.app.modules.ui.showToast('Theme applied!', 'success');
                 }
-            } catch (error) {
-                showToast('Failed to apply theme', 'error');
+                // Close modal
+                document.querySelector('[data-action="close-modal"]')?.click();
+            } else {
+                throw new Error('Failed to save theme');
+            }
+        }).catch(error => {
+            console.error('[Theme] Failed to save theme:', error);
+            if (window.app?.modules?.ui) {
+                window.app.modules.ui.showToast('Failed to save theme', 'error');
             }
         });
-    });
+    };
 
-    // Preview theme on hover
-    document.querySelectorAll('.theme-preview').forEach(preview => {
-        let originalTheme = document.documentElement.getAttribute('data-theme');
-
-        preview.addEventListener('mouseenter', () => {
-            const theme = preview.dataset.theme;
-            document.documentElement.setAttribute('data-theme', theme);
+    // Highlight current theme on load
+    setTimeout(function () {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'working-hard';
+        document.querySelectorAll('.theme-card').forEach(card => {
+            if (card.dataset.theme === currentTheme) {
+                card.classList.add('active');
+            }
         });
+    }, 100);
 
-        preview.addEventListener('mouseleave', () => {
-            const currentTheme = localStorage.getItem('tracker-theme') || 'working-hard';
-            document.documentElement.setAttribute('data-theme', currentTheme);
-        });
-    });
+    console.log('[Theme Gallery] Functions loaded and ready');
 </script>

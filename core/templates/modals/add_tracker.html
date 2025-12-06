@@ -1,238 +1,72 @@
-<!-- Add Tracker Modal -->
-<div class="modal-dialog modal-lg">
+<div class="modal w-full max-w-2xl">
     <div class="modal-header">
-        <h2 class="modal-title">🎯 Create New Tracker</h2>
-        <button class="modal-close" data-action="close-modal" aria-label="Close">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clip-rule="evenodd" />
+        <h2 class="text-xl font-bold">Create New Tracker</h2>
+        <button class="btn-icon" data-action="close-modal">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
         </button>
     </div>
 
-    <form id="add-tracker-form" method="post">
-        <div class="modal-body">
-            {% csrf_token %}
+    <div class="modal-body p-6">
+        <!-- Step 1: Template Selection (Simplified for now, can be expanded) -->
+        <div class="mb-6">
+            <h3 class="font-bold mb-2">Choose a starting point</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <button class="card p-3 hover:border-primary text-left bg-surface-alt"
+                    onclick="selectTemplate('custom')">
+                    <span class="text-2xl block mb-1">✨</span>
+                    <span class="font-bold text-sm">Custom</span>
+                </button>
+                <button class="card p-3 hover:border-primary text-left" onclick="selectTemplate('habit')">
+                    <span class="text-2xl block mb-1">💪</span>
+                    <span class="font-bold text-sm">Habit</span>
+                </button>
+                <button class="card p-3 hover:border-primary text-left" onclick="selectTemplate('skill')">
+                    <span class="text-2xl block mb-1">📚</span>
+                    <span class="font-bold text-sm">Skill</span>
+                </button>
+                <button class="card p-3 hover:border-primary text-left" onclick="selectTemplate('project')">
+                    <span class="text-2xl block mb-1">🚀</span>
+                    <span class="font-bold text-sm">Project</span>
+                </button>
+            </div>
+        </div>
 
-            <!-- Step Indicator -->
-            <div class="steps" style="display: flex; justify-content: space-between; margin-bottom: 2rem;">
-                <div class="step active" data-step="1">
-                    <div class="step-number">1</div>
-                    <div class="step-label">Basic Info</div>
-                </div>
-                <div class="step" data-step="2">
-                    <div class="step-number">2</div>
-                    <div class="step-label">Tasks</div>
-                </div>
-                <div class="step" data-step="3">
-                    <div class="step-number">3</div>
-                    <div class="step-label">Schedule</div>
-                </div>
+        <form id="add-tracker-form" method="post" action="/api/trackers/">
+            {% csrf_token %}
+            <div class="form-group mb-4">
+                <label class="form-label">Tracker Name</label>
+                <input type="text" name="name" class="form-input w-full"
+                    placeholder="e.g. Morning Routine, Learn Spanish" required>
             </div>
 
-            <!-- Step 1: Basic Info -->
-            <div class="step-content" data-step-content="1">
-                <div class="form-group">
-                    <label for="name" class="form-label">Tracker Name *</label>
-                    <input type="text" id="name" name="name" class="form-input"
-                        placeholder="e.g., Morning Routine, Fitness Goals" required maxlength="100">
-                </div>
+            <div class="form-group mb-4">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-input w-full h-20"
+                    placeholder="Why are you tracking this?"></textarea>
+            </div>
 
+            <div class="grid grid-cols-2 gap-4 mb-6">
                 <div class="form-group">
-                    <label for="description" class="form-label">Description</label>
-                    <textarea id="description" name="description" class="form-input" rows="3"
-                        placeholder="What is this tracker for?" maxlength="500"></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label for="time_period" class="form-label">Time Period *</label>
-                    <select id="time_period" name="time_period" class="form-input" required>
-                        <option value="daily">Daily - Resets every day</option>
-                        <option value="weekly">Weekly - Resets every week</option>
-                        <option value="monthly">Monthly - Resets every month</option>
+                    <label class="form-label">Frequency</label>
+                    <select name="frequency" class="form-input w-full">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
                     </select>
                 </div>
-            </div>
-
-            <!-- Step 2: Tasks -->
-            <div class="step-content" data-step-content="2" style="display: none;">
-                <div style="margin-bottom: 1rem;">
-                    <button type="button" class="btn btn-secondary btn-sm" id="add-task-field">
-                        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd"
-                                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                                clip-rule="evenodd" />
-                        </svg>
-                        Add Task
-                    </button>
-                </div>
-
-                <div id="tasks-container" style="display: flex; flex-direction: column; gap: 1rem;">
-                    <div class="task-field">
-                        <input type="text" name="tasks[]" class="form-input" placeholder="Task description" required>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label">Goal Target</label>
+                    <input type="number" name="target" class="form-input w-full" placeholder="1" min="1">
                 </div>
             </div>
 
-            <!-- Step 3: Schedule -->
-            <div class="step-content" data-step-content="3" style="display: none;">
-                <div class="form-group">
-                    <label class="form-label">Start Date *</label>
-                    <input type="date" name="start_date" class="form-input" required>
-                </div>
-
-                <div class="form-group">
-                    <label class="toggle-label">
-                        <input type="checkbox" name="auto_create_tasks" checked>
-                        <span class="toggle-switch"></span>
-                        <span>Automatically create task instances</span>
-                    </label>
-                    <small class="form-help">Tasks will be created based on the time period</small>
-                </div>
-
-                <div class="form-group">
-                    <label class="toggle-label">
-                        <input type="checkbox" name="enable_reminders">
-                        <span class="toggle-switch"></span>
-                        <span>Enable reminders</span>
-                    </label>
-                </div>
+            <div class="flex justify-end gap-3">
+                <button type="button" class="btn" data-action="close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Tracker</button>
             </div>
-        </div>
-
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" id="prev-step" style="display: none;">Previous</button>
-            <button type="button" class="btn btn-secondary" data-action="close-modal">Cancel</button>
-            <button type="button" class="btn btn-primary" id="next-step">Next</button>
-            <button type="submit" class="btn btn-primary" id="submit-tracker" style="display: none;">Create
-                Tracker</button>
-        </div>
-    </form>
+        </form>
+    </div>
 </div>
-
-<style>
-    .step {
-        flex: 1;
-        text-align: center;
-        position: relative;
-    }
-
-    .step::after {
-        content: '';
-        position: absolute;
-        top: 20px;
-        left: 50%;
-        width: 100%;
-        height: 2px;
-        background: var(--color-border);
-        z-index: -1;
-    }
-
-    .step:last-child::after {
-        display: none;
-    }
-
-    .step-number {
-        width: 40px;
-        height: 40px;
-        margin: 0 auto 0.5rem;
-        border-radius: 50%;
-        background: var(--color-bg);
-        border: 2px solid var(--color-border);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-    }
-
-    .step.active .step-number {
-        background: var(--color-primary);
-        border-color: var(--color-primary);
-        color: white;
-    }
-
-    .step-label {
-        font-size: 0.875rem;
-        color: var(--color-text-secondary);
-    }
-
-    .step.active .step-label {
-        color: var(--color-primary);
-        font-weight: 600;
-    }
-</style>
-
-<script>
-    let currentStep = 1;
-    const totalSteps = 3;
-
-    document.getElementById('next-step').addEventListener('click', () => {
-        if (currentStep < totalSteps) {
-            currentStep++;
-            updateSteps();
-        }
-    });
-
-    document.getElementById('prev-step').addEventListener('click', () => {
-        if (currentStep > 1) {
-            currentStep--;
-            updateSteps();
-        }
-    });
-
-    function updateSteps() {
-        // Update step indicators
-        document.querySelectorAll('.step').forEach((step, index) => {
-            if (index + 1 <= currentStep) {
-                step.classList.add('active');
-            } else {
-                step.classList.remove('active');
-            }
-        });
-
-        // Update step content
-        document.querySelectorAll('.step-content').forEach(content => {
-            content.style.display = 'none';
-        });
-        document.querySelector(`[data-step-content="${currentStep}"]`).style.display = 'block';
-
-        // Update buttons
-        document.getElementById('prev-step').style.display = currentStep > 1 ? 'block' : 'none';
-        document.getElementById('next-step').style.display = currentStep < totalSteps ? 'block' : 'none';
-        document.getElementById('submit-tracker').style.display = currentStep === totalSteps ? 'block' : 'none';
-    }
-
-    document.getElementById('add-task-field').addEventListener('click', () => {
-        const container = document.getElementById('tasks-container');
-        const field = document.createElement('div');
-        field.className = 'task-field';
-        field.innerHTML = '<input type="text" name="tasks[]" class="form-input" placeholder="Task description">';
-        container.appendChild(field);
-    });
-
-    document.getElementById('add-tracker-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const formData = new FormData(e.target);
-
-        try {
-            const response = await fetch('/api/trackers/add/', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                document.querySelector('[data-action="close-modal"]').click();
-                showToast('Tracker created successfully', 'success');
-                window.location.href = `/tracker/${data.tracker_id}/`;
-            } else {
-                showToast(data.error || 'Failed to create tracker', 'error');
-            }
-        } catch (error) {
-            showToast('An error occurred', 'error');
-        }
-    });
-</script>

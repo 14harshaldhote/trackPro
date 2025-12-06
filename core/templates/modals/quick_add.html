@@ -1,152 +1,36 @@
-<!-- Quick Add Modal -->
-<div class="modal-dialog modal-sm">
-    <div class="modal-header">
-        <h2 class="modal-title">⚡ Quick Add Task</h2>
-        <button class="modal-close" data-action="close-modal" aria-label="Close">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clip-rule="evenodd" />
+<div class="modal w-full max-w-lg">
+    <!-- No standard header to keep it minimal/launcher-like -->
+    <div class="p-4">
+        <div class="relative">
+            <svg class="absolute left-4 top-1/2 transform -translate-y-1/2 text-primary" width="24" height="24"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
-        </button>
+            <input type="text" id="quick-add-input"
+                class="w-full bg-surface-alt border-2 border-primary rounded-xl py-4 pl-12 pr-4 text-lg focus:outline-none focus:shadow-lg transition-shadow"
+                placeholder="Type a task and categorize with #" autofocus>
+        </div>
+
+        <div class="mt-4 px-2">
+            <div class="text-xs font-bold text-secondary uppercase mb-2">Suggestions</div>
+            <div class="space-y-1" id="quick-add-suggestions">
+                <button
+                    class="w-full text-left p-2 rounded hover:bg-surface-hover flex items-center justify-between group">
+                    <span>Read 10 pages <span class="text-primary">#reading</span></span>
+                    <span class="text-xs text-secondary opacity-0 group-hover:opacity-100">Enter to create</span>
+                </button>
+                <button
+                    class="w-full text-left p-2 rounded hover:bg-surface-hover flex items-center justify-between group">
+                    <span>Gym workout <span class="text-primary">#health</span></span>
+                    <span class="text-xs text-secondary opacity-0 group-hover:opacity-100">Enter to create</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-border flex justify-between items-center text-xs text-secondary">
+            <span><b>Enter</b> to create</span>
+            <span><b>Esc</b> to close</span>
+        </div>
     </div>
-
-    <form id="quick-add-form" method="post">
-        <div class="modal-body">
-            {% csrf_token %}
-
-            <div class="form-group">
-                <label for="description" class="form-label">What do you want to track? *</label>
-                <input type="text" id="description" name="description" class="form-input"
-                    placeholder="e.g., Morning workout" required maxlength="200" autofocus>
-            </div>
-
-            <div class="form-group">
-                <label for="tracker" class="form-label">Add to tracker *</label>
-                <select id="tracker" name="tracker_id" class="form-input" required>
-                    <option value="">Select a tracker...</option>
-                    {% for tracker in trackers %}
-                    <option value="{{ tracker.tracker_id }}">{{ tracker.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Optional: Quick settings (collapsed by default) -->
-            <details style="margin-top: 1rem;">
-                <summary
-                    style="cursor: pointer; font-size: 0.875rem; color: var(--color-text-secondary); user-select: none;">
-                    Advanced options
-                </summary>
-                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
-                    <div class="form-group">
-                        <label for="time_of_day" class="form-label">Time of day</label>
-                        <select id="time_of_day" name="time_of_day" class="form-input">
-                            <option value="anytime">⏰ Anytime</option>
-                            <option value="morning">🌅 Morning</option>
-                            <option value="afternoon">☀️ Afternoon</option>
-                            <option value="evening">🌙 Evening</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="weight" class="form-label">Importance</label>
-                        <input type="range" id="weight" name="weight" min="1" max="10" value="5" class="form-range">
-                        <div
-                            style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--color-text-tertiary);">
-                            <span>Low</span>
-                            <span id="weight-value">5</span>
-                            <span>High</span>
-                        </div>
-                    </div>
-                </div>
-            </details>
-        </div>
-
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-action="close-modal">Cancel</button>
-            <button type="submit" class="btn btn-primary">
-                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style="margin-right: 0.5rem;">
-                    <path fill-rule="evenodd"
-                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                        clip-rule="evenodd" />
-                </svg>
-                Add Task
-            </button>
-        </div>
-    </form>
 </div>
-
-<style>
-    .modal-sm {
-        max-width: 500px;
-    }
-
-    details summary::-webkit-details-marker {
-        display: none;
-    }
-
-    details summary::before {
-        content: '▶';
-        display: inline-block;
-        margin-right: 0.5rem;
-        transition: transform 0.2s;
-    }
-
-    details[open] summary::before {
-        transform: rotate(90deg);
-    }
-</style>
-
-<script>
-    // Weight slider value display
-    document.getElementById('weight').addEventListener('input', (e) => {
-        document.getElementById('weight-value').textContent = e.target.value;
-    });
-
-    // Form submission
-    document.getElementById('quick-add-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const formData = new FormData(e.target);
-        const trackerId = formData.get('tracker_id');
-
-        if (!trackerId) {
-            showToast('Please select a tracker', 'error');
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/tracker/${trackerId}/task/add/`, {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                document.querySelector('[data-action="close-modal"]').click();
-                showToast(data.message || 'Task added successfully!', 'success');
-
-                // Reload current panel if on dashboard or today
-                if (window.loadCurrentPanel) {
-                    window.loadCurrentPanel();
-                }
-            } else {
-                showToast(data.error || 'Failed to add task', 'error');
-            }
-        } catch (error) {
-            showToast('An error occurred. Please try again.', 'error');
-        }
-    });
-
-    // Auto-select tracker if only one exists
-    const trackerSelect = document.getElementById('tracker');
-    if (trackerSelect.options.length === 2) { // Only "Select..." and one tracker
-        trackerSelect.selectedIndex = 1;
-    }
-
-    // Focus on description field
-    setTimeout(() => {
-        document.getElementById('description').focus();
-    }, 100);
-</script>

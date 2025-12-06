@@ -1,197 +1,125 @@
-{% load static %}
-<div class="panel" data-panel="week">
-    <div class="breadcrumb">
-        <a href="/">Home</a>
-        <span class="breadcrumb-separator">›</span>
-        <span>Week View</span>
-    </div>
+{% extends 'base.html' %}
 
-    <div class="panel-header">
-        <div>
-            <h1 class="panel-title">Week {{ week_number }}</h1>
-            <p style="color: var(--color-text-secondary); margin: 0.5rem 0 0;">
-                {{ week_start|date:"F d" }} - {{ week_end|date:"F d, Y" }}
-            </p>
+{% block content %}
+<div class="panel fade-in">
+    <header class="panel-header mb-6 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Week {{ week_number }}</h1>
+        <div class="flex items-center gap-2 bg-surface rounded-lg p-1 border border-border">
+            <a href="/week/?week={{ week_number|add:-1 }}" class="btn-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                </button>
+                <span class="text-sm font-medium px-2">
+                    {{ week_start|date:"M j" }} - {{ week_end|date:"M j" }}
+                </span>
+                <a href="/week/?week={{ week_number|add:1 }}" class="btn-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                    </button>
         </div>
+    </header>
 
-        <div class="panel-actions">
-            <div class="btn-group">
-                <button class="btn btn-secondary btn-icon" data-action="prev-week" aria-label="Previous week">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                            clip-rule="evenodd" />
-                    </svg>
-                </button>
-                <button class="btn btn-secondary" data-action="goto-current-week">This Week</button>
-                <button class="btn btn-secondary btn-icon" data-action="next-week" aria-label="Next week">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                            clip-rule="evenodd" />
-                    </svg>
-                </button>
+    <!-- Weekly Summary Stats -->
+    <div class="grid-responsive mb-8">
+        <div class="card stat-card">
+            <div class="stat-value">{{ week_stats.completed }}/{{ week_stats.total }}</div>
+            <div class="stat-label">Tasks Completed</div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-value">{{ week_stats.completion_rate }}%</div>
+            <div class="stat-label">Completion Rate</div>
+            <div class="progress-bar mt-2">
+                <div class="progress-fill" style="width: {{ week_stats.completion_rate }}%"></div>
             </div>
         </div>
-    </div>
-
-    <!-- Week Stats -->
-    <div class="week-stats"
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; padding: 1.5rem; background: var(--color-surface); border-radius: 12px; border: 1px solid var(--color-border);">
-        <div class="stat-item">
-            <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-primary);">{{ week_stats.completion_rate
-                }}%</div>
-            <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Completion Rate</div>
+        <div class="card stat-card">
+            <div class="stat-value">{{ week_stats.best_day|default:"-" }}</div>
+            <div class="stat-label">Best Day</div>
         </div>
-        <div class="stat-item">
-            <div style="font-size: 1.5rem; font-weight: 700; color: var(--color-success);">{{ week_stats.completed }}
-            </div>
-            <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Tasks Completed</div>
-        </div>
-        <div class="stat-item">
-            <div style="font-size: 1.5rem; font-weight: 700;">{{ week_stats.best_day }}</div>
-            <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Best Day</div>
-        </div>
-        <div class="stat-item">
-            <div style="font-size: 1.5rem; font-weight: 700;">{{ week_stats.streak }}</div>
-            <div style="font-size: 0.875rem; color: var(--color-text-secondary);">Current Streak</div>
+        <div class="card stat-card">
+            <div class="stat-value">{{ week_stats.streak }}</div>
+            <div class="stat-label">Active Streak</div>
         </div>
     </div>
 
-    <!-- Week Calendar -->
-    <div class="week-calendar"
-        style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1rem; margin-bottom: 2rem;">
+    <!-- Calendar Grid -->
+    <div class="grid-calendar">
         {% for day in days %}
-        <div class="day-card {% if day.is_today %}day-today{% endif %}"
-            style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem; transition: all 0.2s; {% if day.is_today %}border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-focus-ring);{% endif %}">
-
-            <div class="day-header" style="text-align: center; margin-bottom: 1rem;">
-                <div
-                    style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 0.25rem;">
+        <div
+            class="card day-card p-3 flex flex-col h-full min-h-[200px] border {% if day.is_today %}border-primary ring-1 ring-primary{% endif %}">
+            <div class="flex justify-between items-center mb-3">
+                <div class="text-sm font-bold {% if day.is_today %}text-primary{% else %}text-secondary{% endif %}">
                     {{ day.date|date:"D" }}
                 </div>
-                <div
-                    style="font-size: 1.5rem; font-weight: 700; {% if day.is_today %}color: var(--color-primary);{% endif %}">
-                    {{ day.date|date:"d" }}
-                </div>
+                <div class="text-xs text-secondary">{{ day.date|date:"j" }}</div>
             </div>
 
-            <div class="day-progress" style="margin-bottom: 1rem;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
-                    <span style="color: var(--color-text-secondary);">Progress</span>
-                    <span style="font-weight: 600; color: var(--color-primary);">{{ day.progress }}%</span>
-                </div>
-                <div class="progress-bar"
-                    style="height: 6px; background: var(--color-bg); border-radius: 3px; overflow: hidden;">
-                    <div
-                        style="height: 100%; background: var(--color-primary); width: {{ day.progress }}%; transition: width 0.3s;">
-                    </div>
-                </div>
+            <!-- Progress Bar per day -->
+            <div class="w-full h-1 bg-bg rounded mb-3">
+                <div class="h-full bg-primary rounded" style="width: {{ day.progress }}%"></div>
             </div>
 
-            <div class="day-stats" style="font-size: 0.75rem; color: var(--color-text-secondary); text-align: center;">
-                <div>{{ day.completed }}/{{ day.total }} tasks</div>
-            </div>
-
-            {% if day.tasks %}
-            <div class="day-tasks" style="margin-top: 0.75rem; max-height: 120px; overflow-y: auto;">
-                {% for task in day.tasks|slice:":3" %}
-                <div
-                    style="padding: 0.25rem 0; font-size: 0.75rem; {% if task.status == 'DONE' %}text-decoration: line-through; color: var(--color-text-tertiary);{% endif %}">
-                    {{ task.description|truncatechars:30 }}
+            <div class="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
+                {% for task in day.tasks %}
+                <div class="task-mini-item p-2 rounded text-xs border border-border bg-bg/50 {% if task.status == 'DONE' %}opacity-50 line-through{% endif %}"
+                    title="{{ task.description }}">
+                    <div class="truncate">{{ task.description }}</div>
+                    <div class="text-[10px] text-secondary mt-1">{{ task.tracker_name }}</div>
+                </div>
+                {% empty %}
+                <div class="h-full flex items-center justify-center text-xs text-secondary italic opacity-50">
+                    No tasks
                 </div>
                 {% endfor %}
-                {% if day.tasks|length > 3 %}
-                <div style="font-size: 0.75rem; color: var(--color-text-tertiary); margin-top: 0.25rem;">
-                    +{{ day.tasks|length|add:"-3" }} more
-                </div>
-                {% endif %}
             </div>
-            {% endif %}
         </div>
         {% endfor %}
     </div>
 
-    <!-- Time of Day Analysis -->
-    {% if week_stats.best_time %}
-    <section
-        style="padding: 1.5rem; background: var(--color-surface); border-radius: 12px; border: 1px solid var(--color-border);">
-        <h2 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">⏰ Time of Day Performance</h2>
-
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
-            <div class="time-stat">
-                <div style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 0.5rem;">🌅 Morning
-                </div>
-                <div style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">{{
-                    week_stats.morning_completion }}/{{ week_stats.morning_total }}</div>
-                <div class="progress-bar" style="height: 4px; background: var(--color-bg); border-radius: 2px;">
-                    <div style="height: 100%; background: var(--color-primary); width: {{ week_stats.morning_rate }}%;">
-                    </div>
+    <!-- Time Breakdown -->
+    <div class="mt-8 card p-6">
+        <h3 class="font-bold mb-4">Time of Day Breakdown</h3>
+        <div class="grid grid-cols-3 gap-4 text-center">
+            <div>
+                <div class="text-2xl font-bold text-warning">🌅</div>
+                <div class="mt-2 font-medium">Morning</div>
+                <div class="text-sm text-secondary">{{ week_stats.morning_completion }}/{{ week_stats.morning_total }}
                 </div>
             </div>
-
-            <div class="time-stat">
-                <div style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 0.5rem;">☀️
-                    Afternoon</div>
-                <div style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">{{
-                    week_stats.afternoon_completion }}/{{ week_stats.afternoon_total }}</div>
-                <div class="progress-bar" style="height: 4px; background: var(--color-bg); border-radius: 2px;">
-                    <div
-                        style="height: 100%; background: var(--color-primary); width: {{ week_stats.afternoon_rate }}%;">
-                    </div>
-                </div>
+            <div>
+                <div class="text-2xl font-bold text-warning">☀️</div>
+                <div class="mt-2 font-medium">Afternoon</div>
+                <div class="text-sm text-secondary">{{ week_stats.afternoon_completion }}/{{ week_stats.afternoon_total
+                    }}</div>
             </div>
-
-            <div class="time-stat">
-                <div style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 0.5rem;">🌙 Evening
-                </div>
-                <div style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">{{
-                    week_stats.evening_completion }}/{{ week_stats.evening_total }}</div>
-                <div class="progress-bar" style="height: 4px; background: var(--color-bg); border-radius: 2px;">
-                    <div style="height: 100%; background: var(--color-primary); width: {{ week_stats.evening_rate }}%;">
-                    </div>
+            <div>
+                <div class="text-2xl font-bold text-primary">🌙</div>
+                <div class="mt-2 font-medium">Evening</div>
+                <div class="text-sm text-secondary">{{ week_stats.evening_completion }}/{{ week_stats.evening_total }}
                 </div>
             </div>
         </div>
-
-        <div
-            style="margin-top: 1rem; padding: 0.75rem; background: var(--color-bg); border-radius: 8px; font-size: 0.875rem;">
-            💡 <strong>Insight:</strong> You're most productive during {{ week_stats.best_time }} with a {{
-            week_stats.best_time_rate }}% completion rate.
-        </div>
-    </section>
-    {% endif %}
+    </div>
 </div>
 
 <style>
-    .day-card:hover {
-        border-color: var(--color-primary);
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
+    .min-h-\[200px\] {
+        min-height: 200px;
     }
 
-    .day-today {
-        position: relative;
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
     }
 
-    .day-today::before {
-        content: '●';
-        position: absolute;
-        top: 0.5rem;
-        right: 0.5rem;
-        color: var(--color-primary);
-        font-size: 0.5rem;
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: var(--color-border);
+        border-radius: 4px;
     }
 
-    @media (max-width: 1024px) {
-        .week-calendar {
-            grid-template-columns: repeat(4, 1fr);
-        }
-    }
-
-    @media (max-width: 768px) {
-        .week-calendar {
-            grid-template-columns: repeat(2, 1fr);
-        }
+    .ring-1 {
+        box-shadow: 0 0 0 1px var(--color-primary);
     }
 </style>
+{% endblock %}

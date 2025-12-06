@@ -1,202 +1,123 @@
 /**
- * Modal System
- * Handles modal loading, display, and interactions
+ * Modals Module
+ * Handles opening, closing, and stacking of modals.
  */
+import { api } from './api.js';
 
-import { ajax } from '../utils/ajax.js';
-import { dom } from '../utils/dom.js';
-
-export class ModalSystem {
-    constructor(app) {
-        this.app = app;
-        this.overlay = null;
-        this.container = null;
-        this.backdrop = null;
+export class ModalManager {
+    constructor() {
+        this.overlay = document.getElementById('modal-overlay');
+        this.container = document.getElementById('modal-container');
         this.activeModal = null;
-        this.modalStack = [];
+
+        this.bindEvents();
+
+        // Expose global helper for inline HTML calls (onclick="window.openModal(...)")
+        window.openModal = this.open.bind(this);
+        window.closeModal = this.close.bind(this);
     }
 
-    /**
-     * Initialize modal system
-     */
-    init() {
-        this.overlay = dom.$('#modal-overlay');
-        this.container = dom.$('#modal-container');
-        this.backdrop = dom.$('.modal-backdrop');
-
-        if (!this.overlay || !this.container) {
-            console.error('Modal elements not found');
-            return;
-        }
-
+    bindEvents() {
         // Close on backdrop click
-        if (this.backdrop) {
-            this.backdrop.addEventListener('click', () => this.close());
+        if (this.overlay) {
+            this.overlay.addEventListener('click', (e) => {
+                if (e.target === this.overlay || e.target.dataset.action === 'close-modal') {
+                    this.close();
+                }
+            });
         }
 
-        // Close on escape key (handled by keyboard module)
+        // Close on escape key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.activeModal) {
                 this.close();
             }
         });
-    }
 
-    /**
-     * Open a modal
-     */
-    async open(modalName, params = {}) {
-        try {
-            // Build URL with params
-            const url = `/modals/${modalName}/`;
-            const queryString = new URLSearchParams(params).toString();
-            const fullUrl = queryString ? `${url}?${queryString}` : url;
-
-            // Fetch modal content
-            const html = await ajax.get(fullUrl);
-
-            // Render modal
-            this.render(html, modalName);
-
-        } catch (error) {
-            console.error('Failed to load modal:', error);
-            this.app.notifications.showToast('Failed to open modal', 'error');
-        }
-    }
-
-    /**
-     * Render modal HTML
-     */
-    render(html, modalName) {
-        // Set content
-        this.container.innerHTML = html;
-
-        // Show overlay
-        this.overlay.classList.add('active');
-        this.overlay.setAttribute('aria-hidden', 'false');
-
-        // Animate in
-        dom.fadeIn(this.overlay, 200);
-
-        // Track modal
-        this.activeModal = modalName;
-        this.modalStack.push(modalName);
-
-        // Trap focus
-        this.trapFocus();
-
-        // Initialize modal elements
-        this.initModalElements();
-
-        // Prevent body scroll
-        document.body.style.overflow = 'hidden';
-    }
-
-    /**
-     * Close active modal
-     */
-    close() {
-        if (!this.activeModal) return;
-
-        // Animate out
-        dom.fadeOut(this.overlay, 200).then(() => {
-            // Clear content
-            this.container.innerHTML = '';
-
-            // Hide overlay
-            this.overlay.classList.remove('active');
-            this.overlay.setAttribute('aria-hidden', 'true');
-
-            // Remove from stack
-            this.modalStack.pop();
-            this.activeModal = this.modalStack[this.modalStack.length - 1] || null;
-
-            // Restore body scroll
-            document.body.style.overflow = '';
-
-            // Restore focus
-            this.restoreFocus();
-        });
-    }
-
-    /**
-     * Initialize modal interactive elements
-     */
-    initModalElements() {
-        // Close buttons
-        dom.$$('[data-action="close-modal"]', this.container).forEach(btn => {
-            btn.addEventListener('click', () => this.close());
-        });
-
-        // Forms in modal
-        const forms = dom.$$('form', this.container);
-        forms.forEach(form => {
-            this.app.forms.initForm(form);
-        });
-
-        // Focus first input
-        const firstInput = dom.$('input:not([type="hidden"]), textarea, select', this.container);
-        if (firstInput) {
-            setTimeout(() => firstInput.focus(), 100);
-        }
-    }
-
-    /**
-     * Trap focus within modal
-     */
-    trapFocus() {
-        const focusableElements = dom.$$([
-            'a[href]',
-            'button:not([disabled])',
-            'input:not([disabled])',
-            'select:not([disabled])',
-            'textarea:not([disabled])',
-            '[tabindex]:not([tabindex="-1"])'
-        ].join(','), this.container);
-
-        if (focusableElements.length === 0) return;
-
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
-
-        this.container.addEventListener('keydown', (e) => {
-            if (e.key !== 'Tab') return;
-
-            if (e.shiftKey) {
-                if (document.activeElement === firstElement) {
-                    e.preventDefault();
-                    lastElement.focus();
-                }
-            } else {
-                if (document.activeElement === lastElement) {
-                    e.preventDefault();
-                    firstElement.focus();
-                }
+        // Delegate internal close buttons
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('[data-action="close-modal"]')) {
+                this.close();
             }
         });
     }
 
-    /**
-     * Restore focus to trigger element
-     */
-    restoreFocus() {
-        // Focus management for accessibility
-        const mainContent = dom.$('#main-content');
-        if (mainContent) {
-            mainContent.focus();
+    async open(modalName, context = {}) {
+        console.log(`[Modals] 🔓 Opening modal: ${modalName}`, context);
+        this.activeModal = modalName;
+
+        // Show overlay with loading state
+        this.overlay.classList.add('active');
+        this.overlay.style.visibility = 'visible';
+        this.overlay.style.opacity = '1';
+        this.container.innerHTML = '<div class="p-8 text-center"><div class="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div></div>';
+
+        try {
+            // Check if modal exists in DOM (pre-rendered) first
+            const existingModal = document.getElementById(`modal-${modalName}`);
+            if (existingModal) {
+                console.log(`[Modals] Found pre-rendered modal: modal-${modalName}`);
+                this.container.innerHTML = '';
+                this.container.appendChild(existingModal.content.cloneNode(true));
+            } else {
+                console.log(`[Modals] Fetching modal content from server...`);
+                const html = await api.getPanel(`/modals/${modalName}/`);
+                console.log(`[Modals] Content received`);
+                this.container.innerHTML = html;
+
+                // Execute script tags in loaded content
+                this.executeScripts(this.container);
+            }
+
+            // Focus first input
+            const input = this.container.querySelector('input, button');
+            if (input) input.focus();
+
+        } catch (error) {
+            console.error(`[Modals] ❌ Failed to open modal ${modalName}:`, error);
+            this.container.innerHTML = `
+                <div class="p-6 text-center text-error">
+                    <p>Failed to load ${modalName}</p>
+                    <button class="btn btn-secondary mt-4" onclick="closeModal()">Close</button>
+                </div>
+            `;
         }
+    }
+
+    /**
+     * Execute script tags in dynamically loaded content
+     * innerHTML doesn't execute scripts, so we need to do it manually
+     */
+    executeScripts(container) {
+        const scripts = container.querySelectorAll('script');
+        scripts.forEach((script) => {
+            const newScript = document.createElement('script');
+
+            // Copy attributes
+            Array.from(script.attributes).forEach(attr => {
+                newScript.setAttribute(attr.name, attr.value);
+            });
+
+            // Copy content
+            newScript.textContent = script.textContent;
+
+            // Replace old script with new one to execute it
+            script.parentNode.replaceChild(newScript, script);
+            console.log('[Modals] Executed inline script');
+        });
+    }
+
+    close() {
+        if (!this.activeModal) return;
+        console.log(`[Modals] 🔒 Closing modal: ${this.activeModal}`);
+        this.overlay.classList.remove('active');
+        this.overlay.style.visibility = 'hidden';
+        this.overlay.style.opacity = '0';
+        setTimeout(() => {
+            this.container.innerHTML = '';
+            this.activeModal = null;
+        }, 300); // Wait for transition
     }
 }
 
-// Global helper function
-window.openModal = function (modalName, params = {}) {
-    if (window.app && window.app.modals) {
-        window.app.modals.open(modalName, params);
-    }
-};
-
-window.closeModal = function () {
-    if (window.app && window.app.modals) {
-        window.app.modals.close();
-    }
-};
+export const modals = new ModalManager();

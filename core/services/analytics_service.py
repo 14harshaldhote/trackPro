@@ -10,7 +10,7 @@ Enhanced with (Phase 2 Integration):
 - Standardized configurations
 """
 from datetime import date, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict
 from django.db.models import Count, Q, Avg
 
 from core import analytics

@@ -40,7 +40,7 @@ core/templates/
 │   ├── insights.html           # Behavioral insights
 │   ├── templates.html          # Template library
 │   ├── help.html               # Help center
-│   └── settings/               # Settings sub-panels
+│   └── settings/               # Settings sub-panels it must also have nav will help use to trigger pages like general, preferences, appearance etc.
 │       ├── preferences.html    # User preferences
 │       ├── account.html        # Account settings
 │       ├── notifications.html  # Notification settings
@@ -824,7 +824,7 @@ Modals are loaded via AJAX to `/modals/<modal_name>/` endpoint.
 
 ---
 
-## Settings Templates
+## Settings Templates it must also have nav will help use to trigger pages like general, preferences, appearance etc.
 
 ### `panels/settings/preferences.html`
 

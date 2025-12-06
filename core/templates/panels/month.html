@@ -1,186 +1,100 @@
-{% load static %}
-<div class="panel" data-panel="month">
-    <div class="breadcrumb">
-        <a href="/">Home</a>
-        <span class="breadcrumb-separator">›</span>
-        <span>Month View</span>
-    </div>
+{% extends 'base.html' %}
 
-    <div class="panel-header">
-        <div>
-            <h1 class="panel-title">{{ month_name }} {{ year }}</h1>
-            <p style="color: var(--color-text-secondary); margin: 0.5rem 0 0;">
-                {{ month_stats.productive_days }}/{{ month_stats.total_days }} productive days
-            </p>
-        </div>
-
-        <div class="panel-actions">
-            <div class="btn-group">
-                <button class="btn btn-secondary btn icon" data-action="prev-month" aria-label="Previous month">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                            clip-rule="evenodd" />
-                    </svg>
+{% block content %}
+<div class="panel fade-in">
+    <header class="panel-header mb-6 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">{{ month_name }} {{ year }}</h1>
+        <div class="flex items-center gap-2 bg-surface rounded-lg p-1 border border-border">
+            <a href="/month/?month={{ prev_month|date:'Y-m' }}" class="btn-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
                 </button>
-                <button class="btn btn-secondary" data-action="goto-current-month">This Month</button>
-                <button class="btn btn-secondary btn-icon" data-action="next-month" aria-label="Next month">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                            clip-rule="evenodd" />
+                <span class="text-sm font-medium px-4">
+                    {{ month_stats.total_days }} days
+                </span>
+                <a href="/month/?month={{ next_month|date:'Y-m' }}" class="btn-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
                     </svg>
-                </button>
-            </div>
+                    </button>
         </div>
-    </div>
+    </header>
 
     <!-- Month Stats -->
-    <div
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-        <div class="stat-card">
+    <div class="grid-responsive mb-6">
+        <div class="card stat-card">
+            <div class="stat-value">{{ month_stats.completed }}/{{ month_stats.total }}</div>
+            <div class="stat-label">Total Completed</div>
+        </div>
+        <div class="card stat-card">
             <div class="stat-value">{{ month_stats.completion_rate }}%</div>
             <div class="stat-label">Completion Rate</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-value">{{ month_stats.completed }}/{{ month_stats.total }}</div>
-            <div class="stat-label">Tasks Completed</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value">Week {{ month_stats.best_week }}</div>
-            <div class="stat-label">Best Week ({{ month_stats.best_week_rate }}%)</div>
-        </div>
-        <div class="stat-card">
+        <div class="card stat-card">
             <div class="stat-value">{{ month_stats.productive_days }}</div>
             <div class="stat-label">Productive Days</div>
-            <div class="stat-change">80%+ completion</div>
+            <div class="text-[10px] text-secondary mt-1">>80% tasks done</div>
+        </div>
+        <div class="card stat-card">
+            <div class="stat-value">{{ month_stats.best_week|default:"-" }}</div>
+            <div class="stat-label">Best Week</div>
         </div>
     </div>
 
-    <!-- Calendar Grid -->
-    <div class="month-calendar"
-        style="background: var(--color-surface); border-radius: 16px; border: 1px solid var(--color-border); padding: 1.5rem;">
-        <!-- Day Headers -->
-        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
-            <div
-                style="text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--color-text-tertiary); text-transform: uppercase;">
-                Sun</div>
-            <div
-                style="text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--color-text-tertiary); text-transform: uppercase;">
-                Mon</div>
-            <div
-                style="text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--color-text-tertiary); text-transform: uppercase;">
-                Tue</div>
-            <div
-                style="text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--color-text-tertiary); text-transform: uppercase;">
-                Wed</div>
-            <div
-                style="text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--color-text-tertiary); text-transform: uppercase;">
-                Thu</div>
-            <div
-                style="text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--color-text-tertiary); text-transform: uppercase;">
-                Fri</div>
-            <div
-                style="text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--color-text-tertiary); text-transform: uppercase;">
-                Sat</div>
+    <!-- Month Calendar -->
+    <div class="card p-4 overflow-hidden">
+        <!-- Weekday Headers -->
+        <div class="grid grid-cols-7 mb-2 border-b border-border pb-2 text-center text-sm font-bold text-secondary">
+            <div>Mon</div>
+            <div>Tue</div>
+            <div>Wed</div>
+            <div>Thu</div>
+            <div>Fri</div>
+            <div>Sat</div>
+            <div>Sun</div>
         </div>
 
-        <!-- Calendar Days -->
-        {% for week in calendar_weeks %}
-        <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; margin-bottom: 0.5rem;">
+        <!-- Days Grid -->
+        <div class="grid grid-cols-7 gap-1">
+            {% for week in calendar_weeks %}
             {% for day in week %}
-            {% if day.date %}
-            <div class="calendar-day {% if day.is_today %}calendar-day-today{% endif %} {% if not day.is_current_month %}calendar-day-other-month{% endif %}"
-                data-date="{{ day.date|date:'Y-m-d' }}" data-completion="{{ day.completion_rate }}"
-                style="aspect-ratio: 1; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--color-border); cursor: pointer; transition: all 0.2s; {% if day.is_today %}border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.05);{% elif day.completion_rate >= 80 %}background: rgba(var(--color-success-rgb), 0.1);{% elif day.completion_rate >= 50 %}background: rgba(var(--color-warning-rgb), 0.05);{% endif %}">
+            <div class="relative aspect-square p-1 {% if not day.date %}opacity-0 pointer-events-none{% endif %}">
+                {% if day.date %}
+                <a href="/today/?date={{ day.date|date:'Y-m-d' }}"
+                    title="{{ day.date|date:'Y-m-d' }}: {{ day.completion_rate }}% complete">
 
-                <div style="display: flex; flex-direction: column; height: 100%;">
-                    <div
-                        style="font-size: 0.875rem; font-weight: {% if day.is_today %}700{% else %}500{% endif %}; {% if not day.is_current_month %}color: var(--color-text-disabled);{% elif day.is_today %}color: var(--color-primary);{% endif %}">
-                        {{ day.day }}
-                    </div>
-
-                    {% if day.has_tasks %}
-                    <div
-                        style="flex: 1; display: flex; align-items: center; justify-content: center; margin-top: 0.25rem;">
-                        <div
-                            style="width: 100%; height: 4px; background: var(--color-bg); border-radius: 2px; overflow: hidden;">
-                            <div
-                                style="height: 100%; background: {% if day.completion_rate >= 80 %}var(--color-success){% elif day.completion_rate >= 50 %}var(--color-warning){% else %}var(--color-error){% endif %}; width: {{ day.completion_rate }}%;">
-                            </div>
+                    <div class="flex justify-between items-start p-1">
+                        <span class="text-xs font-medium {% if day.is_today %}text-primary{% endif %}">
+                            {{ day.day }}
+                        </span>
+                        {% if day.has_tasks %}
+                        <div class="w-2 h-2 rounded-full"
+                            style="background-color: {% if day.completion_rate >= 80 %}var(--color-success){% elif day.completion_rate >= 50 %}var(--color-warning){% else %}var(--color-error){% endif %}">
                         </div>
+                        {% endif %}
                     </div>
 
-                    <div
-                        style="font-size: 0.625rem; color: var(--color-text-tertiary); margin-top: 0.25rem; text-align: center;">
-                        {{ day.completed_count }}/{{ day.task_count }}
+                    <!-- Mini Heatmap/Progress -->
+                    <div class="absolute bottom-1 left-1 right-1 h-1 bg-border/30 rounded overflow-hidden">
+                        <div class="h-full bg-primary" style="width: {{ day.completion_rate }}%"></div>
                     </div>
-                    {% endif %}
-                </div>
             </div>
-            {% else %}
-            <div style="aspect-ratio: 1;"></div>
             {% endif %}
-            {% endfor %}
         </div>
         {% endfor %}
+        {% endfor %}
     </div>
-
-    <!-- Legend -->
-    <div style="display: flex; justify-content: center; gap: 2rem; margin-top: 1.5rem; font-size: 0.875rem;">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <div
-                style="width: 16px; height: 16px; border-radius: 4px; background: rgba(var(--color-success-rgb), 0.2);">
-            </div>
-            <span>80%+ complete</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <div
-                style="width: 16px; height: 16px; border-radius: 4px; background: rgba(var(--color-warning-rgb), 0.1);">
-            </div>
-            <span>50-79% complete</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <div style="width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--color-border);"></div>
-            <span>&lt;50% complete</span>
-        </div>
-    </div>
+</div>
 </div>
 
 <style>
-    .calendar-day:hover {
-        border-color: var(--color-primary);
-        transform: scale(1.05);
-        z-index: 1;
+    .aspect-square {
+        aspect-ratio: 1 / 1;
     }
 
-    .calendar-day-today {
-        box-shadow: 0 0 0 2px var(--color-primary);
-    }
-
-    .calendar-day-other-month {
-        opacity: 0.4;
-    }
-
-    @media (max-width: 768px) {
-        .month-calendar {
-            padding: 0.75rem;
-        }
-
-        .calendar-day {
-            font-size: 0.75rem;
-        }
+    .grid-cols-7 {
+        grid-template-columns: repeat(7, 1fr);
     }
 </style>
-
-<script>
-    // Click on day to navigate to that date
-    document.querySelectorAll('.calendar-day').forEach(day => {
-        day.addEventListener('click', () => {
-            const date = day.dataset.date;
-            if (date) {
-                window.location.href = `/today/?date=${date}`;
-            }
-        });
-    });
-</script>
+{% endblock %}

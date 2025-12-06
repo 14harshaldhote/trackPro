@@ -1,138 +1,95 @@
-<!-- Add Goal Modal -->
-<div class="modal-dialog">
+<div class="modal w-full max-w-lg">
     <div class="modal-header">
-        <h2 class="modal-title">🎯 Create New Goal</h2>
-        <button class="modal-close" data-action="close-modal" aria-label="Close">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clip-rule="evenodd" />
+        <h2 class="text-xl font-bold">Set a New Goal</h2>
+        <button class="btn-icon" data-action="close-modal">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
         </button>
     </div>
 
-    <form id="add-goal-form" method="post">
-        <div class="modal-body">
+    <div class="modal-body p-6">
+        <form id="add-goal-form">
             {% csrf_token %}
-
-            <div class="form-group">
-                <label for="title" class="form-label">Goal Title *</label>
-                <input type="text" id="title" name="title" class="form-input" placeholder="e.g., Complete 100 workouts"
-                    required maxlength="200">
+            <div class="form-group mb-4">
+                <label class="form-label">Goal Title</label>
+                <input type="text" name="title" class="form-input w-full" placeholder="e.g. Read 50 Books, Run Marathon"
+                    required>
             </div>
 
-            <div class="form-group">
-                <label for="description" class="form-label">Description</label>
-                <textarea id="description" name="description" class="form-input" rows="3"
-                    placeholder="Why is this goal important to you?" maxlength="1000"></textarea>
+            <div class="form-group mb-4">
+                <label class="form-label">Description</label>
+                <textarea name="description" class="form-input w-full h-16"
+                    placeholder="What detailed outcome are you looking for?"></textarea>
             </div>
 
-            <div class="form-group">
-                <label for="target_value" class="form-label">Target *</label>
-                <input type="number" id="target_value" name="target_value" class="form-input" placeholder="e.g., 100"
-                    required min="1">
-                <small class="form-help">The number you want to reach</small>
-            </div>
-
-            <div class="form-group">
-                <label for="deadline" class="form-label">Deadline</label>
-                <input type="date" id="deadline" name="deadline" class="form-input">
-                <small class="form-help">Optional: Set a target date</small>
-            </div>
-
-            <div class="form-group">
-                <label for="icon" class="form-label">Icon</label>
-                <div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 0.5rem;">
-                    <button type="button" class="icon-btn" data-icon="🎯">🎯</button>
-                    <button type="button" class="icon-btn" data-icon="🏆">🏆</button>
-                    <button type="button" class="icon-btn" data-icon="💪">💪</button>
-                    <button type="button" class="icon-btn" data-icon="📚">📚</button>
-                    <button type="button" class="icon-btn" data-icon="🏃">🏃</button>
-                    <button type="button" class="icon-btn" data-icon="💰">💰</button>
-                    <button type="button" class="icon-btn" data-icon="🎨">🎨</button>
-                    <button type="button" class="icon-btn" data-icon="🌟">🌟</button>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="form-group">
+                    <label class="form-label">Target Number</label>
+                    <input type="number" name="target_value" class="form-input w-full" placeholder="50" min="1"
+                        required>
                 </div>
-                <input type="hidden" id="icon" name="icon" value="🎯">
+                <div class="form-group">
+                    <label class="form-label">Unit</label>
+                    <input type="text" name="unit" class="form-input w-full" placeholder="Books, Km, Hours">
+                </div>
             </div>
 
-            <div class="form-group">
-                <label for="related_tracker" class="form-label">Link to Tracker (Optional)</label>
-                <select id="related_tracker" name="related_tracker" class="form-input">
-                    <option value="">No tracker</option>
-                    {% for tracker in trackers %}
-                    <option value="{{ tracker.tracker_id }}">{{ tracker.name }}</option>
-                    {% endfor %}
-                </select>
-                <small class="form-help">Track progress based on a specific tracker</small>
+            <div class="form-group mb-6">
+                <label class="form-label">Deadline (Optional)</label>
+                <input type="date" name="target_date" class="form-input w-full">
             </div>
-        </div>
 
-        <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-action="close-modal">Cancel</button>
-            <button type="submit" class="btn btn-primary">Create Goal</button>
-        </div>
-    </form>
+            <div class="flex justify-end gap-3">
+                <button type="button" class="btn" data-action="close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Goal</button>
+            </div>
+        </form>
+    </div>
 </div>
 
-<style>
-    .icon-btn {
-        aspect-ratio: 1;
-        padding: 0.75rem;
-        font-size: 1.5rem;
-        background: var(--color-bg);
-        border: 2px solid var(--color-border);
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .icon-btn:hover {
-        border-color: var(--color-primary);
-        transform: scale(1.1);
-    }
-
-    .icon-btn.selected {
-        border-color: var(--color-primary);
-        background: rgba(var(--color-primary-rgb), 0.1);
-    }
-</style>
-
 <script>
-    document.querySelectorAll('.icon-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.icon-btn').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            document.getElementById('icon').value = btn.dataset.icon;
-        });
-    });
-
-    // Select first icon by default
-    document.querySelector('.icon-btn').classList.add('selected');
-
-    document.getElementById('add-goal-form').addEventListener('submit', async (e) => {
+    document.getElementById('add-goal-form').addEventListener('submit', async function (e) {
         e.preventDefault();
 
-        const formData = new FormData(e.target);
+        const formData = new FormData(this);
+        const data = {
+            title: formData.get('title'),
+            description: formData.get('description'),
+            target_value: parseInt(formData.get('target_value')),
+            unit: formData.get('unit') || '',
+            target_date: formData.get('target_date') || null,
+            goal_type: 'habit'
+        };
 
         try {
             const response = await fetch('/api/goals/', {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                },
+                body: JSON.stringify(data)
             });
 
-            const data = await response.json();
+            const result = await response.json();
 
-            if (data.success) {
-                document.querySelector('[data-action="close-modal"]').click();
-                showToast('Goal created successfully', 'success');
-                if (window.loadCurrentPanel) {
-                    window.loadCurrentPanel();
+            if (result.success) {
+                if (window.app?.modules?.ui) {
+                    window.app.modules.ui.showToast(result.message || 'Goal created successfully', 'success');
                 }
+                // Close modal and refresh page
+                document.querySelector('[data-action="close-modal"]').click();
+                setTimeout(() => window.location.reload(), 500);
             } else {
-                showToast(data.error || 'Failed to create goal', 'error');
+                throw new Error(result.error || 'Failed to create goal');
             }
         } catch (error) {
-            showToast('An error occurred', 'error');
+            console.error('[Goal] Error creating goal:', error);
+            if (window.app?.modules?.ui) {
+                window.app.modules.ui.showToast('Failed to create goal: ' + error.message, 'error');
+            }
         }
     });
 </script>

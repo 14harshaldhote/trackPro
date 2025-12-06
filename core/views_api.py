@@ -550,7 +550,7 @@ def api_tracker_create(request):
 @login_required
 @require_POST
 def api_tracker_delete(request, tracker_id):
-    """Delete tracker via AJAX"""
+    """Archive tracker (soft delete) - sets status to 'archived'"""
     try:
         tracker = get_object_or_404(
             TrackerDefinition,
@@ -559,14 +559,53 @@ def api_tracker_delete(request, tracker_id):
         )
         
         name = tracker.name
-        tracker.delete()
+        
+        # Archive instead of delete
+        tracker.status = 'archived'
+        tracker.save()
         
         return JsonResponse({
             'success': True,
-            'message': f'"{name}" deleted',
+            'message': f'"{name}" archived successfully',
             'redirect': '/trackers/'
         })
         
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+
+@login_required
+@require_POST
+def api_tracker_restore(request, tracker_id):
+    """Restore archived tracker - sets status back to 'active'"""
+    try:
+        tracker = get_object_or_404(
+            TrackerDefinition,
+            tracker_id=tracker_id,
+            user=request.user,
+            status='archived'  # Only restore archived trackers
+        )
+        
+        name = tracker.name
+        
+        # Restore to active
+        tracker.status = 'active'
+        tracker.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'"{name}" restored successfully',
+            'redirect': '/trackers/'
+        })
+        
+    except TrackerDefinition.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Tracker not found or not archived'
+        }, status=404)
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -1468,7 +1507,7 @@ def api_goals(request):
 # ============================================================================
 
 @login_required
-@require_http_methods(['GET', 'PUT'])
+@require_http_methods(['GET', 'PUT', 'POST'])
 def api_preferences(request):
     """User preferences API endpoint"""
     from .models import UserPreferences
@@ -1495,7 +1534,7 @@ def api_preferences(request):
             }
         })
     
-    elif request.method == 'PUT':
+    elif request.method in ['PUT', 'POST']:
         try:
             data = json.loads(request.body)
             

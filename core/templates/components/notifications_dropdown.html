@@ -1,203 +1,35 @@
-{% load static %}
-<!-- Notifications Dropdown Content -->
-<div class="dropdown-menu notifications-dropdown">
-    <div class="dropdown-header">
-        <span style="font-weight: 600;">Notifications</span>
-        {% if unread_count > 0 %}
-        <button class="btn-text" data-action="mark-all-read" style="font-size: 0.75rem; color: var(--color-primary);">
-            Mark all read
-        </button>
-        {% endif %}
-    </div>
-
-    <div class="notifications-list" style="max-height: 400px; overflow-y: auto;">
-        {% if notifications %}
-        {% for notification in notifications %}
-        <div class="notification-item {% if not notification.is_read %}notification-unread{% endif %}"
-            data-notification-id="{{ notification.notification_id }}">
-            <div class="notification-icon"
-                style="width: 40px; height: 40px; border-radius: 50%; background: var(--color-bg); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                {% if notification.type == 'task_completed' %}
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="var(--color-success)">
-                    <path fill-rule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clip-rule="evenodd" />
-                </svg>
-                {% elif notification.type == 'streak_milestone' %}
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="var(--color-warning)">
-                    <path
-                        d="M11.983 1.907a.75.75 0 00-1.292-.657l-8.5 9.5A.75.75 0 002.75 12h6.572l-1.305 6.093a.75.75 0 001.292.657l8.5-9.5A.75.75 0 0017.25 8h-6.572l1.305-6.093z" />
-                </svg>
-                {% elif notification.type == 'goal_achieved' %}
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="var(--color-primary)">
-                    <path fill-rule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z"
-                        clip-rule="evenodd" />
-                </svg>
-                {% else %}
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="var(--color-text-secondary)">
-                    <path
-                        d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" />
-                </svg>
-                {% endif %}
-            </div>
-
-            <div class="notification-content" style="flex: 1; min-width: 0;">
-                <div class="notification-title" style="font-weight: 500; margin-bottom: 0.25rem;">
-                    {{ notification.title }}
-                </div>
-                <div class="notification-message"
-                    style="font-size: 0.875rem; color: var(--color-text-secondary); margin-bottom: 0.25rem;">
-                    {{ notification.message|truncatechars:80 }}
-                </div>
-                <div class="notification-time" style="font-size: 0.75rem; color: var(--color-text-tertiary);">
-                    {{ notification.created_at|timesince }} ago
-                </div>
-            </div>
-
-            <div class="notification-actions" style="display: flex; flex-direction: column; gap: 0.25rem;">
-                {% if notification.action_url %}
-                <button class="btn-icon" data-action="notification-action" data-url="{{ notification.action_url }}"
-                    aria-label="View">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                            clip-rule="evenodd" />
-                    </svg>
-                </button>
-                {% endif %}
-                {% if not notification.is_read %}
-                <button class="btn-icon" data-action="mark-read"
-                    data-notification-id="{{ notification.notification_id }}" aria-label="Mark as read">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clip-rule="evenodd" />
-                    </svg>
-                </button>
-                {% endif %}
-            </div>
-        </div>
-        {% endfor %}
-
-        {% if has_more %}
-        <div class="dropdown-item" style="text-align: center; padding: 0.75rem;">
-            <a href="/notifications/" style="color: var(--color-primary); text-decoration: none; font-size: 0.875rem;">
-                View all notifications →
-            </a>
-        </div>
-        {% endif %}
-        {% else %}
-        <div class="empty-state" style="padding: 3rem 2rem; text-align: center;">
-            <svg width="48" height="48" viewBox="0 0 20 20" fill="var(--color-text-tertiary)"
-                style="opacity: 0.3; margin-bottom: 0.5rem;">
-                <path
-                    d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" />
-            </svg>
-            <p style="color: var(--color-text-secondary); margin: 0; font-size: 0.875rem;">
-                No new notifications
-            </p>
-        </div>
-        {% endif %}
-    </div>
+<div class="notifications-header flex justify-between items-center p-3 border-b border-border">
+    <h3 class="font-bold">Notifications</h3>
+    {% if unread_notifications_count > 0 %}
+    <button class="text-xs text-primary hover:underline" onclick="markAllNotificationsRead()">Mark all read</button>
+    {% endif %}
 </div>
 
-<style>
-    .notifications-dropdown {
-        min-width: 360px;
-        max-width: 400px;
-    }
+<div class="notifications-list max-h-80 overflow-y-auto custom-scrollbar">
+    <!-- This would usually be populated by JS or context, implementing a skeleton for now -->
+    {% if notifications %}
+    {% for notif in notifications %}
+    <div class="notification-item p-3 border-b border-border hover:bg-surface-hover cursor-pointer {% if not notif.read %}bg-primary/5{% endif %}"
+        onclick="handleNotificationClick('{{ notif.id }}', '{{ notif.link }}')">
+        <div class="flex gap-3">
+            <div class="mt-1">
+                {% if notif.type == 'achievement' %}🏆{% elif notif.type == 'reminder' %}⏰{% else %}ℹ️{% endif %}
+            </div>
+            <div>
+                <p class="text-sm">{{ notif.message }}</p>
+                <span class="text-xs text-secondary">{{ notif.created_at|timesince }} ago</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="p-6 text-center text-secondary">
+        <p class="text-sm">No new notifications</p>
+    </div>
+    {% endif %}
+</div>
 
-    .notification-item {
-        display: flex;
-        gap: 0.75rem;
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid var(--color-border);
-        transition: background 0.2s;
-        cursor: pointer;
-    }
-
-    .notification-item:hover {
-        background: var(--color-bg);
-    }
-
-    .notification-item:last-child {
-        border-bottom: none;
-    }
-
-    .notification-unread {
-        background: rgba(var(--color-primary-rgb), 0.05);
-        position: relative;
-    }
-
-    .notification-unread::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 3px;
-        background: var(--color-primary);
-    }
-</style>
-
-<script>
-    // Mark single notification as read
-    document.querySelectorAll('[data-action="mark-read"]').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const notificationId = btn.dataset.notificationId;
-
-            try {
-                const response = await fetch(`/api/notifications/${notificationId}/mark-read/`, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-                });
-
-                if (response.ok) {
-                    btn.closest('.notification-item').classList.remove('notification-unread');
-                    btn.remove();
-                    updateNotificationBadge();
-                }
-            } catch (error) {
-                console.error('Failed to mark notification as read:', error);
-            }
-        });
-    });
-
-    // Mark all as read
-    document.querySelector('[data-action="mark-all-read"]')?.addEventListener('click', async () => {
-        try {
-            const response = await fetch('/api/notifications/mark-all-read/', {
-                method: 'POST',
-                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-            });
-
-            if (response.ok) {
-                document.querySelectorAll('.notification-unread').forEach(item => {
-                    item.classList.remove('notification-unread');
-                });
-                updateNotificationBadge();
-            }
-        } catch (error) {
-            console.error('Failed to mark all as read:', error);
-        }
-    });
-
-    // Navigate to notification action
-    document.querySelectorAll('[data-action="notification-action"]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            window.location.href = btn.dataset.url;
-        });
-    });
-
-    function updateNotificationBadge() {
-        const badge = document.querySelector('.notification-badge');
-        const unreadCount = document.querySelectorAll('.notification-unread').length;
-        if (badge) {
-            badge.textContent = unreadCount;
-            badge.style.display = unreadCount > 0 ? 'flex' : 'none';
-        }
-    }
-</script>
+<div class="p-2 border-t border-border">
+    <a href="/settings/notifications/"
+        class="block text-center text-xs text-secondary hover:text-primary py-1">Notification Settings</a>
+</div>

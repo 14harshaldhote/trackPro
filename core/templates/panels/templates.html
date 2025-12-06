@@ -1,211 +1,52 @@
-{% load static %}
-<div class="panel" data-panel="templates">
-    <div class="breadcrumb">
-        <a href="/">Home</a>
-        <span class="breadcrumb-separator">›</span>
-        <span>Templates</span>
-    </div>
+{% extends 'base.html' %}
 
-    <div class="panel-header">
-        <div>
-            <h1 class="panel-title">📋 Tracker Templates</h1>
-            <p style="color: var(--color-text-secondary); margin: 0.5rem 0 0;">
-                Start tracking faster with pre-built templates
-            </p>
-        </div>
-    </div>
+{% block content %}
+<div class="panel fade-in">
+    <header class="panel-header mb-8">
+        <h1 class="text-3xl font-bold">Tracker Templates</h1>
+        <p class="text-secondary">Start quickly with pre-built habits</p>
+    </header>
 
-    <!-- Category Filter -->
-    <div style="display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap;">
-        <button class="btn btn-sm {% if not selected_category %}btn-primary{% else %}btn-secondary{% endif %}"
-            data-filter-category="">
-            All Templates
-        </button>
+    <!-- Categories -->
+    <div class="flex gap-2 mb-8 overflow-x-auto pb-2 custom-scrollbar">
+        <button class="btn btn-sm btn-primary">All</button>
         {% for category in categories %}
-        <button class="btn btn-sm {% if selected_category == category %}btn-primary{% else %}btn-secondary{% endif %}"
-            data-filter-category="{{ category }}">
-            {{ category }}
-        </button>
+        <button class="btn btn-sm bg-surface hover:border-primary">{{ category }}</button>
         {% endfor %}
     </div>
 
-    <!-- Template Grid -->
-    {% if templates %}
-    <div
-        style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
-        {% for template in templates %}
-        <div class="template-card" data-template-id="{{ template.id }}" data-category="{{ template.category }}"
-            style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; padding: 1.5rem; transition: all 0.2s;">
-
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
-                <div>
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">{{ template.icon|default:"📋" }}</div>
-                    <h3 style="font-size: 1.125rem; font-weight: 600; margin: 0 0 0.25rem;">{{ template.name }}</h3>
-                    <span
-                        style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: var(--color-bg); border-radius: 4px; color: var(--color-text-secondary);">
-                        {{ template.category }}
-                    </span>
-                </div>
+    <!-- Templates Grid -->
+    <div class="grid-responsive">
+        {% for template inTemplates %}
+        <div class="card p-0 overflow-hidden flex flex-col hover:border-primary transition-all group">
+            <div class="h-32 bg-surface-alt flex items-center justify-center text-5xl">
+                {{ template.icon|default:"📝" }}
             </div>
+            <div class="p-4 flex-1 flex flex-col">
+                <h3 class="font-bold text-lg mb-1">{{ template.name }}</h3>
+                <p class="text-secondary text-sm mb-4 flex-1">{{ template.description }}</p>
 
-            <p style="color: var(--color-text-secondary); font-size: 0.875rem; margin: 0 0 1rem;">
-                {{ template.description }}
-            </p>
-
-            <!-- Template Details -->
-            <div style="margin-bottom: 1rem;">
-                <div
-                    style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--color-text-tertiary); margin-bottom: 0.5rem;">
-                    Includes {{ template.task_count }} task{{ template.task_count|pluralize }}:
-                </div>
-                <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem; color: var(--color-text-secondary);">
-                    {% for task in template.tasks|slice:":3" %}
-                    <li>{{ task }}</li>
-                    {% endfor %}
-                    {% if template.task_count > 3 %}
-                    <li style="color: var(--color-text-tertiary);">+{{ template.task_count|add:"-3" }} more</li>
-                    {% endif %}
-                </ul>
-            </div>
-
-            <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-secondary" data-action="preview-template" data-template-id="{{ template.id }}"
-                    style="flex: 1;">
-                    Preview
-                </button>
-                <button class="btn btn-primary" data-action="use-template" data-template-id="{{ template.id }}"
-                    style="flex: 1;">
+                <button class="btn btn-block btn-secondary group-hover:btn-primary transition-colors"
+                    onclick="window.openModal('use-template', {template_id: '{{ template.id }}'})">
                     Use Template
                 </button>
             </div>
         </div>
         {% endfor %}
-    </div>
-    {% else %}
-    <div class="empty-state">
-        <svg class="empty-state-icon" width="80" height="80" viewBox="0 0 20 20" fill="currentColor">
-            <path
-                d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
-        </svg>
-        <h3 class="empty-state-title">No templates available</h3>
-        <p class="empty-state-description">Templates will appear here once they're added</p>
-    </div>
-    {% endif %}
 
-    <!-- User Created Templates -->
-    {% if user_templates %}
-    <section>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h2 style="font-size: 1.125rem; font-weight: 600; margin: 0;">Your Templates</h2>
-            <button class="btn btn-secondary btn-sm" data-action="create-template">
-                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd"
-                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                        clip-rule="evenodd" />
-                </svg>
-                Create Template
-            </button>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
-            {% for template in user_templates %}
-            <div class="template-card"
-                style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 1rem;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                    <h4 style="font-weight: 600; margin: 0;">{{ template.name }}</h4>
-                    <div class="dropdown">
-                        <button class="btn-icon dropdown-toggle" aria-label="Options">
-                            <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                                <path
-                                    d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                            </svg>
-                        </button>
-                        <div class="dropdown-menu">
-                            <button class="dropdown-item" data-action="use-template"
-                                data-template-id="{{ template.id }}">Use Template</button>
-                            <button class="dropdown-item" data-action="edit-template"
-                                data-template-id="{{ template.id }}">Edit</button>
-                            <button class="dropdown-item" data-action="duplicate-template"
-                                data-template-id="{{ template.id }}">Duplicate</button>
-                            <div class="dropdown-divider"></div>
-                            <button class="dropdown-item dropdown-item-danger" data-action="delete-template"
-                                data-template-id="{{ template.id }}">Delete</button>
-                        </div>
-                    </div>
-                </div>
-                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0 0 0.5rem;">
-                    {{ template.task_count }} task{{ template.task_count|pluralize }} • {{ template.time_period|title }}
-                </p>
+        <!-- Placeholder items for demo if empty -->
+        {% if not templates %}
+        <div class="card p-0 overflow-hidden flex flex-col cursor-pointer border-dashed border-2 hover:border-primary"
+            onclick="window.openModal('add-tracker')">
+            <div class="h-32 bg-transparent flex items-center justify-center text-4xl text-secondary">
+                +
             </div>
-            {% endfor %}
+            <div class="p-4 text-center">
+                <h3 class="font-bold">Create Custom</h3>
+                <p class="text-sm text-secondary">Build from scratch</p>
+            </div>
         </div>
-    </section>
-    {% endif %}
+        {% endif %}
+    </div>
 </div>
-
-<style>
-    .template-card:hover {
-        border-color: var(--color-primary);
-        transform: translateY(-4px);
-        box-shadow: var(--shadow-lg);
-    }
-</style>
-
-<script>
-    // Category filter
-    document.querySelectorAll('[data-filter-category]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const category = btn.dataset.filterCategory;
-
-            // Update button states
-            document.querySelectorAll('[data-filter-category]').forEach(b => {
-                b.classList.remove('btn-primary');
-                b.classList.add('btn-secondary');
-            });
-            btn.classList.remove('btn-secondary');
-            btn.classList.add('btn-primary');
-
-            // Filter templates
-            document.querySelectorAll('.template-card').forEach(card => {
-                if (!category || card.dataset.category === category) {
-                    card.style.display = 'block';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
-        });
-    });
-
-    // Use template
-    document.querySelectorAll('[data-action="use-template"]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const templateId = btn.dataset.templateId;
-
-            try {
-                const response = await fetch(`/api/templates/${templateId}/use/`, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    showToast('Tracker created from template!', 'success');
-                    window.location.href = `/tracker/${data.tracker_id}/`;
-                } else {
-                    showToast(data.error || 'Failed to use template', 'error');
-                }
-            } catch (error) {
-                showToast('An error occurred', 'error');
-            }
-        });
-    });
-
-    // Preview template
-    document.querySelectorAll('[data-action="preview-template"]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const templateId = btn.dataset.templateId;
-            openModal('tracker-templates', { template_id: templateId });
-        });
-    });
-</script>
+{% endblock %}

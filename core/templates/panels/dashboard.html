@@ -1,362 +1,213 @@
-{% load static %}
-<div class="panel" data-panel="dashboard">
-    <!-- Breadcrumb -->
-    <div class="breadcrumb">
-        <span>Home</span>
-        <span class="breadcrumb-separator">›</span>
-        <span>Dashboard</span>
-    </div>
+{% extends 'base.html' %}
 
-    <!-- Panel Header -->
-    <div class="panel-header">
-        <h1 class="panel-title">
-            {% if time_of_day == 'morning' %}🌅{% elif time_of_day == 'afternoon' %}☀️{% else %}🌙{% endif %}
-            Good {{ time_of_day|title }}, {{ user.first_name|default:user.username }}!
-        </h1>
-
-        <div class="panel-actions">
-            <!-- Filter Buttons -->
-            <div class="btn-group" role="group" aria-label="Period filter">
-                <button
-                    class="btn btn-sm {% if current_period == 'daily' %}btn-primary{% else %}btn-secondary{% endif %}"
-                    data-filter="daily">
-                    Daily
-                </button>
-                <button
-                    class="btn btn-sm {% if current_period == 'weekly' %}btn-primary{% else %}btn-secondary{% endif %}"
-                    data-filter="weekly">
-                    Weekly
-                </button>
-                <button
-                    class="btn btn-sm {% if current_period == 'monthly' %}btn-primary{% else %}btn-secondary{% endif %}"
-                    data-filter="monthly">
-                    Monthly
-                </button>
-                <button class="btn btn-sm {% if current_period == 'all' %}btn-primary{% else %}btn-secondary{% endif %}"
-                    data-filter="all">
-                    All Time
-                </button>
+{% block content %}
+<div class="panel fade-in">
+    <!-- Enhanced Header -->
+    <header class="dashboard-header">
+        <div class="dashboard-welcome">
+            <h1 class="dashboard-title">
+                {% if time_of_day == 'morning' %}Good morning,
+                {% elif time_of_day == 'afternoon' %}Good afternoon,
+                {% else %}Good evening,
+                {% endif %}
+                {{ user.username }}
+            </h1>
+            <p class="dashboard-subtitle">{{ today|date:"l, F j, Y" }}</p>
+        </div>
+        <div class="dashboard-controls">
+            <div class="period-switcher">
+                <a href="/?period=daily"
+                    class="period-btn {% if current_period == 'daily' %}active{% endif %}">Daily</a>
+                <a href="/?period=weekly"
+                    class="period-btn {% if current_period == 'weekly' %}active{% endif %}">Weekly</a>
+                <a href="/?period=monthly"
+                    class="period-btn {% if current_period == 'monthly' %}active{% endif %}">Monthly</a>
             </div>
-
-            <button class="btn btn-primary" data-action="add-tracker">
-                <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd"
-                        d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                        clip-rule="evenodd" />
+            <button class="btn btn-primary" onclick="window.openModal('add-task')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-                New Tracker
+                New Task
             </button>
         </div>
-    </div>
+    </header>
 
-    <!-- Quick Stats -->
-    <div class="stats-grid"
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-        <div class="stat-card">
-            <div class="stat-value">{{ stats.completed_today }}</div>
-            <div class="stat-label">Tasks Completed</div>
-            <div class="stat-change">Today</div>
+    <!-- Stats Overview -->
+    <div class="dashboard-stats">
+        <div class="stat-card card">
+            <div class="stat-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+            </div>
+            <div class="stat-details">
+                <div class="stat-value">{{ stats.completed_today }}</div>
+                <div class="stat-label">Completed Today</div>
+            </div>
         </div>
-
-        <div class="stat-card">
-            <div class="stat-value">{{ stats.pending_today }}</div>
-            <div class="stat-label">Tasks Remaining</div>
-            <div class="stat-change">{{ stats.completion_rate }}% complete</div>
+        <div class="stat-card card">
+            <div class="stat-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+            </div>
+            <div class="stat-details">
+                <div class="stat-value">{{ stats.pending_today }}</div>
+                <div class="stat-label">Pending</div>
+            </div>
         </div>
-
-        <div class="stat-card">
-            <div class="stat-value">{{ stats.current_streak }}</div>
-            <div class="stat-label">Day Streak</div>
-            <div class="stat-change">{% if stats.current_streak > 0 %}🔥 On fire!{% else %}Start today!{% endif %}</div>
+        <div class="stat-card card">
+            <div class="stat-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                        d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z">
+                    </path>
+                </svg>
+            </div>
+            <div class="stat-details">
+                <div class="stat-value">{{ stats.current_streak }}</div>
+                <div class="stat-label">Day Streak</div>
+            </div>
         </div>
-
-        <div class="stat-card">
-            <div class="stat-value">{{ stats.active_trackers }}</div>
-            <div class="stat-label">Active Trackers</div>
-            <div class="stat-change">
-                <a href="/trackers/" style="color: var(--color-primary); text-decoration: none;">View all →</a>
+        <div class="stat-card card">
+            <div class="stat-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+            </div>
+            <div class="stat-details">
+                <div class="stat-value">{{ stats.completion_rate }}%</div>
+                <div class="stat-label">Completion Rate</div>
+            </div>
+            <div class="stat-progress">
+                <div class="stat-progress-fill" style="width: {{ stats.completion_rate }}%"></div>
             </div>
         </div>
     </div>
 
-    <!-- Today's Tasks -->
-    {% if today_tasks %}
-    <section style="margin-bottom: 2rem;">
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">{{ period_title|default:"Today's Tasks"
-            }}</h2>
+    <div class="dashboard-layout">
+        <!-- Main Tasks Column -->
+        <div class="dashboard-main">
+            <div class="section-header">
+                <h2 class="section-title">{{ period_title }}</h2>
+            </div>
 
-        <div class="task-list">
-            {% for task in today_tasks %}
-            <div class="task-item" data-task-id="{{ task.id }}" data-status="{{ task.status }}">
-                <label class="task-checkbox">
-                    <input type="checkbox" {% if task.status == 'DONE' %}checked{% endif %}>
-                    <span class="checkbox-mark"></span>
-                </label>
+            {% if today_tasks %}
+            <div class="dashboard-task-list">
+                {% for task in today_tasks %}
+                <div class="dashboard-task-item {% if task.status == 'DONE' %}task-done{% endif %}"
+                    data-task-id="{{ task.id }}">
 
-                <div class="task-content">
-                    <div class="task-description">{{ task.description }}</div>
-                    <div class="task-meta">
-                        <span class="task-tracker">{{ task.tracker_name }}</span>
-                        {% if task.category %}
-                        <span class="task-category">{{ task.category }}</span>
+                    <!-- Checkbox Button -->
+                    <button class="task-checkbox-btn {% if task.status == 'DONE' %}checked{% endif %}"
+                        onclick="toggleTask('{{ task.id }}')">
+                        {% if task.status == 'DONE' %}
+                        <svg class="checkmark" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="3">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
                         {% endif %}
-                        <span class="task-weight">Weight: {{ task.weight }}</span>
-                    </div>
-                </div>
+                    </button>
 
-                <div class="task-actions">
-                    <button class="btn-icon" data-action="edit-task" data-task-id="{{ task.id }}"
-                        aria-label="Edit task">
-                        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
-                            <path
-                                d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h 2.828l8.38-8.379-2.83-2.828z" />
+                    <!-- Task Content -->
+                    <div class="task-content-area" onclick="window.openModal('edit-task', {task_id: '{{ task.id }}'})">
+                        <div class="task-description {% if task.status == 'DONE' %}completed{% endif %}">
+                            {{ task.description }}
+                        </div>
+                        <div class="task-metadata">
+                            {% if task.category %}
+                            <span class="task-category-badge">{{ task.category }}</span>
+                            {% endif %}
+                            <span class="task-tracker-label">{{ task.tracker_name }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Quick Edit Button -->
+                    <button class="task-edit-btn"
+                        onclick="event.stopPropagation(); window.openModal('edit-task', {task_id: '{{ task.id }}'})">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                         </svg>
                     </button>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <div class="dashboard-empty-state">
+                <div class="empty-icon-container">
+                    <svg class="empty-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                </div>
+                <h3 class="empty-title">All done for {{ current_period }}!</h3>
+                <p class="empty-description">You've completed all your tasks for this period.</p>
+                <button class="btn btn-primary" onclick="window.openModal('add-task')">Add New Task</button>
+            </div>
+            {% endif %}
         </div>
-    </section>
-    {% else %}
-    <div class="empty-state">
-        <svg class="empty-state-icon" width="80" height="80" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                clip-rule="evenodd" />
-        </svg>
-        <h3 class="empty-state-title">No tasks yet</h3>
-        <p class="empty-state-description">Create a tracker to start tracking your daily tasks</p>
-        <button class="btn btn-primary" data-action="add-tracker">Create Your First Tracker</button>
+
+        <!-- Sidebar -->
+        <div class="dashboard-sidebar">
+            <!-- Insights Widget -->
+            {% if insights_widget.enabled %}
+            <div class="insights-widget card">
+                <h3 class="widget-title">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 12h5l3 5 5-11 4 7h3"></path>
+                    </svg>
+                    Insights
+                </h3>
+                <div class="insights-list">
+                    {% for suggestion in insights_widget.suggestions %}
+                    <div class="insight-item">
+                        <div class="insight-title">{{ suggestion.title }}</div>
+                        <p class="insight-description">{{ suggestion.description }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Active Trackers -->
+            <div class="trackers-widget">
+                <div class="widget-header">
+                    <h3 class="widget-title">Active Trackers</h3>
+                    <button class="btn-icon" onclick="window.openModal('add-tracker')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="trackers-list">
+                    {% for tracker in active_trackers %}
+                    <a href="/tracker/{{ tracker.id }}/" class="tracker-mini-card">
+                        <div class="tracker-header">
+                            <h4 class="tracker-name">{{ tracker.name }}</h4>
+                            <span class="tracker-period">{{ tracker.time_period }}</span>
+                        </div>
+                        <div class="tracker-stats">
+                            <div class="tracker-progress-value">{{ tracker.progress }}%</div>
+                            <div class="tracker-task-count">{{ tracker.completed_count }}/{{ tracker.task_count }}</div>
+                        </div>
+                        <div class="tracker-progress-bar">
+                            <div class="tracker-progress-fill" style="width: {{ tracker.progress }}%"></div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
     </div>
-    {% endif %}
-
-    <!-- Active Trackers -->
-    {% if active_trackers %}
-    <section>
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">Active Trackers</h2>
-
-        <div class="tracker-grid"
-            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
-            {% for tracker in active_trackers %}
-            <a href="/tracker/{{ tracker.tracker_id }}/" class="tracker-card" style="text-decoration: none;">
-                <div class="tracker-header">
-                    <h3 class="tracker-name">{{ tracker.name }}</h3>
-                    <span class="tracker-period">{{ tracker.time_period|title }}</span>
-                </div>
-
-                <div class="tracker-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: {{ tracker.progress }}%;"></div>
-                    </div>
-                    <span class="progress-text">{{ tracker.completed_count }}/{{ tracker.task_count }} tasks</span>
-                </div>
-
-                <div class="tracker-stats">
-                    <div class="tracker-stat">
-                        <span>{{ tracker.progress }}%</span>
-                        <small>Complete</small>
-                    </div>
-                </div>
-            </a>
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
-
-    <!-- Smart Suggestions -->
-    {% if smart_suggestions %}
-    <section style="margin-top: 2rem;">
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem;">💡 Smart Suggestions</h2>
-
-        <div class="insights-list">
-            {% for suggestion in smart_suggestions|slice:":3" %}
-            <div class="insight-card">
-                <div class="insight-icon">{{ suggestion.icon|default:"💡" }}</div>
-                <div class="insight-content">
-                    <h4 class="insight-title">{{ suggestion.title }}</h4>
-                    <p class="insight-description">{{ suggestion.description }}</p>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-    {% endif %}
 </div>
-
-<style>
-    /* Stats Cards */
-    .stat-card {
-        padding: 1.5rem;
-        background: var(--color-surface);
-        border: 1px solid var(--color-border);
-        border-radius: 12px;
-        transition: all 0.2s;
-    }
-
-    .stat-card:hover {
-        border-color: var(--color-primary);
-        transform: translateY(-2px);
-    }
-
-    .stat-value {
-        font-size: 2rem;
-        font-weight: 700;
-        color: var(--color-primary);
-        margin-bottom: 0.5rem;
-    }
-
-    .stat-label {
-        font-size: 0.875rem;
-        color: var(--color-text-secondary);
-        margin-bottom: 0.25rem;
-    }
-
-    .stat-change {
-        font-size: 0.75rem;
-        color: var(--color-text-tertiary);
-    }
-
-    /* Task List */
-    .task-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-
-    .task-item {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 1rem;
-        background: var(--color-surface);
-        border: 1px solid var(--color-border);
-        border-radius: 8px;
-        transition: all 0.2s;
-    }
-
-    .task-item:hover {
-        border-color: var(--color-primary);
-    }
-
-    .task-checkbox {
-        display: flex;
-        cursor: pointer;
-    }
-
-    .task-content {
-        flex: 1;
-    }
-
-    .task-description {
-        font-weight: 500;
-        color: var(--color-text-primary);
-        margin-bottom: 0.25rem;
-    }
-
-    .task-meta {
-        display: flex;
-        gap: 0.75rem;
-        font-size: 0.75rem;
-        color: var(--color-text-secondary);
-    }
-
-    /* Tracker Card */
-    .tracker-card {
-        padding: 1.5rem;
-        background: var(--color-surface);
-        border: 1px solid var(--color-border);
-        border-radius: 12px;
-        color: inherit;
-        transition: all 0.2s;
-    }
-
-    .tracker-card:hover {
-        border-color: var(--color-primary);
-        transform: translateY(-2px);
-    }
-
-    .tracker-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: start;
-        margin-bottom: 1rem;
-    }
-
-    .tracker-name {
-        font-size: 1rem;
-        font-weight: 600;
-        margin: 0;
-    }
-
-    .tracker-period {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-        background: var(--color-bg);
-        border-radius: 4px;
-    }
-
-    .progress-bar {
-        height: 8px;
-        background: var(--color-bg);
-        border-radius: 4px;
-        overflow: hidden;
-        margin-bottom: 0.5rem;
-    }
-
-    .progress-fill {
-        height: 100%;
-        background: var(--color-primary);
-        transition: width 0.3s;
-    }
-
-    .progress-text {
-        font-size: 0.875rem;
-        color: var(--color-text-secondary);
-    }
-
-    /* Button Group */
-    .btn-group {
-        display: flex;
-        gap: 0.5rem;
-    }
-
-    .btn {
-        padding: 0.5rem 1rem;
-        border: 1px solid var(--color-border);
-        border-radius: 8px;
-        font-size: 0.875rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .btn-primary {
-        background: var(--color-primary);
-        color: white;
-        border-color: var(--color-primary);
-    }
-
-    .btn-secondary {
-        background: var(--color-surface);
-        color: var(--color-text-secondary);
-    }
-
-    .btn-sm {
-        padding: 0.375rem 0.75rem;
-        font-size: 0.8125rem;
-    }
-
-    .btn-icon {
-        padding: 0.5rem;
-        background: transparent;
-        border: none;
-        border-radius: 6px;
-        color: var(--color-text-secondary);
-        cursor: pointer;
-    }
-
-    .btn-icon:hover {
-        background: var(--color-bg);
-        color: var(--color-text-primary);
-    }
-</style>
+{% endblock %}

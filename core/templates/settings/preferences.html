@@ -1,154 +1,128 @@
-{% load static %}
-<!-- Preferences Settings Panel Content -->
-<div class="settings-section" data-section="preferences">
-    <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem;">General Preferences</h2>
+{% extends 'base.html' %}
 
-    <form id="preferences-form" method="post" action="/api/preferences/">
-        {% csrf_token %}
+{% block content %}
+<div class="panel fade-in">
+    <header class="panel-header mb-8">
+        <h1 class="text-3xl font-bold">Preferences</h1>
+        <p class="text-secondary">Customize your Tracker Pro experience</p>
+    </header>
 
-        <!-- Theme Selection -->
-        <div class="form-group">
-            <label class="form-label">Theme</label>
-            <select name="theme" class="form-input">
-                {% for theme in themes %}
-                <option value="{{ theme.value }}" {% if theme.value==preferences.theme %}selected{% endif %}>
-                    {{ theme.label }}
-                </option>
-                {% endfor %}
-            </select>
-            <small class="form-help">Choose your preferred color theme</small>
-        </div>
-
+    <form id="preferences-form" method="post" action="/api/preferences/" class="space-y-8 max-w-2xl">
         <!-- Start of Week -->
-        <div class="form-group">
-            <label class="form-label">Start of Week</label>
-            <select name="start_of_week" class="form-input">
-                <option value="0" {% if preferences.start_of_week==0 %}selected{% endif %}>Monday</option>
-                <option value="1" {% if preferences.start_of_week==1 %}selected{% endif %}>Tuesday</option>
-                <option value="2" {% if preferences.start_of_week==2 %}selected{% endif %}>Wednesday</option>
-                <option value="3" {% if preferences.start_of_week==3 %}selected{% endif %}>Thursday</option>
-                <option value="4" {% if preferences.start_of_week==4 %}selected{% endif %}>Friday</option>
-                <option value="5" {% if preferences.start_of_week==5 %}selected{% endif %}>Saturday</option>
-                <option value="6" {% if preferences.start_of_week==6 %}selected{% endif %}>Sunday</option>
-            </select>
+        <div class="card p-6">
+            <h3 class="font-bold mb-4">Calendar Settings</h3>
+
+            <div class="form-group mb-6">
+                <label class="form-label block mb-2 font-medium">Start of Week</label>
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="radio-card cursor-pointer">
+                        <input type="radio" name="start_of_week" value="0" class="hidden peer" {% if
+                            preferences.start_of_week == 0 %}checked{% endif %}>
+                        <div
+                            class="p-4 rounded border border-border bg-surface peer-checked:border-primary peer-checked:bg-primary/5 transition-all text-center">
+                            <span class="block font-bold mb-1">Monday</span>
+                            <span class="text-xs text-secondary">ISO Standard</span>
+                        </div>
+                    </label>
+                    <label class="radio-card cursor-pointer">
+                        <input type="radio" name="start_of_week" value="6" class="hidden peer" {% if
+                            preferences.start_of_week == 6 %}checked{% endif %}>
+                        <div
+                            class="p-4 rounded border border-border bg-surface peer-checked:border-primary peer-checked:bg-primary/5 transition-all text-center">
+                            <span class="block font-bold mb-1">Sunday</span>
+                            <span class="text-xs text-secondary">Traditional</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label block mb-2 font-medium">Default View</label>
+                <select name="default_view" class="form-input w-full">
+                    <option value="dashboard" {% if preferences.default_view == 'dashboard' %}selected{% endif %}>
+                        Dashboard</option>
+                    <option value="today" {% if preferences.default_view == 'today' %}selected{% endif %}>Today</option>
+                    <option value="week" {% if preferences.default_view == 'week' %}selected{% endif %}>Week</option>
+                    <option value="trackers" {% if preferences.default_view == 'trackers' %}selected{% endif %}>My
+                        Trackers</option>
+                </select>
+                <p class="text-xs text-secondary mt-2">Where you'll land when you open the app.</p>
+            </div>
         </div>
 
-        <!-- Default View -->
-        <div class="form-group">
-            <label class="form-label">Default View</label>
-            <select name="default_view" class="form-input">
-                <option value="dashboard" {% if preferences.default_view=='dashboard' %}selected{% endif %}>Dashboard
-                </option>
-                <option value="today" {% if preferences.default_view=='today' %}selected{% endif %}>Today</option>
-                <option value="week" {% if preferences.default_view=='week' %}selected{% endif %}>Week</option>
-                <option value="trackers" {% if preferences.default_view=='trackers' %}selected{% endif %}>Trackers
-                </option>
-            </select>
-            <small class="form-help">The page you see when you open the app</small>
+        <!-- Notifications -->
+        <div class="card p-6">
+            <h3 class="font-bold mb-4">Notifications</h3>
+
+            <div class="space-y-4">
+                <label class="flex items-center justify-between cursor-pointer">
+                    <div>
+                        <div class="font-medium">Push Notifications</div>
+                        <div class="text-xs text-secondary">Receive alerts on your device</div>
+                    </div>
+                    <div class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="push_enabled" class="sr-only peer" {% if preferences.push_enabled
+                            %}checked{% endif %}>
+                        <div
+                            class="w-11 h-6 bg-border peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary">
+                        </div>
+                    </div>
+                </label>
+
+                <label class="flex items-center justify-between cursor-pointer">
+                    <div>
+                        <div class="font-medium">Email Summaries</div>
+                        <div class="text-xs text-secondary">Weekly progress reports</div>
+                    </div>
+                    <div class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="email_notifications" class="sr-only peer" {% if
+                            preferences.email_notifications %}checked{% endif %}>
+                        <div
+                            class="w-11 h-6 bg-border peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary">
+                        </div>
+                    </div>
+                </label>
+            </div>
         </div>
 
-        <!-- Toggle Preferences -->
-        <div class="form-group">
-            <label class="form-label">Notifications</label>
-
-            <label class="toggle-label">
-                <input type="checkbox" name="push_enabled" {% if preferences.push_enabled %}checked{% endif %}>
-                <span class="toggle-switch"></span>
-                <span>Push Notifications</span>
-            </label>
-
-            <label class="toggle-label">
-                <input type="checkbox" name="email_notifications" {% if preferences.email_notifications %}checked{%
-                    endif %}>
-                <span class="toggle-switch"></span>
-                <span>Email Notifications</span>
-            </label>
+        <div class="flex justify-end gap-4">
+            <button type="button" class="btn" onclick="history.back()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
         </div>
-
-        <!-- Save Button -->
-        <button type="submit" class="btn btn-primary">Save Preferences</button>
     </form>
 </div>
 
-<style>
-    .settings-section {
-        background: var(--color-surface);
-        border: 1px solid var(--color-border);
-        border-radius: 12px;
-        padding: 2rem;
-    }
-
-    .toggle-label {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        padding: 0.75rem 0;
-        cursor: pointer;
-    }
-
-    .toggle-switch {
-        position: relative;
-        width: 44px;
-        height: 24px;
-        background: var(--color-bg);
-        border-radius: 12px;
-        transition: background 0.2s;
-    }
-
-    .toggle-switch::after {
-        content: '';
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        width: 20px;
-        height: 20px;
-        background: white;
-        border-radius: 50%;
-        transition: transform 0.2s;
-    }
-
-    .toggle-label input:checked+.toggle-switch {
-        background: var(--color-primary);
-    }
-
-    .toggle-label input:checked+.toggle-switch::after {
-        transform: translateX(20px);
-    }
-
-    .toggle-label input {
-        position: absolute;
-        opacity: 0;
-    }
-</style>
-
 <script>
-    document.getElementById('preferences-form').addEventListener('submit', async (e) => {
+    // Handle form submission via AJAX
+    document.getElementById('preferences-form').addEventListener('submit', async function (e) {
         e.preventDefault();
-
-        const formData = new FormData(e.target);
+        const form = e.target;
+        const formData = new FormData(form);
 
         try {
-            const response = await fetch('/api/preferences/', {
+            const response = await fetch(form.action, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: {
+                    'X-CSRFToken': getCsrfToken()
+                }
             });
-
             const data = await response.json();
 
             if (data.success) {
                 showToast('Preferences saved successfully', 'success');
-
-                // Apply theme immediately
-                const theme = formData.get('theme');
-                if (theme) {
-                    document.documentElement.setAttribute('data-theme', theme);
-                    localStorage.setItem('tracker-theme', theme);
-                }
             } else {
-                showToast(data.error || 'Failed to save preferences', 'error');
+                showToast('Failed to save preferences', 'error');
             }
-        } catch (error) {
+        } catch (err) {
+            console.error(err);
             showToast('An error occurred', 'error');
         }
     });
+
+    function getCsrfToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+            document.cookie.match(/csrftoken=([\w-]+)/)?.[1];
+    }
 </script>
+{% endblock %}
