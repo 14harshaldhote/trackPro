@@ -337,7 +337,7 @@ def login_page(request):
     from django.shortcuts import render, redirect
     if request.user.is_authenticated:
         return redirect('/')
-    return render(request, 'auth/login.html')
+    return render(request, 'account/login.html')
 
 
 def signup_page(request):
@@ -345,7 +345,7 @@ def signup_page(request):
     from django.shortcuts import render, redirect
     if request.user.is_authenticated:
         return redirect('/')
-    return render(request, 'auth/signup.html')
+    return render(request, 'account/signup.html')
 
 
 def forgot_password(request):

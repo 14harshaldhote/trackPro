@@ -210,3 +210,67 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function initTemplatesPanel() {
+        'use strict';
+
+        // Template category filtering
+        document.querySelectorAll('.category-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Update active button
+                document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                const category = btn.dataset.category;
+
+                // Filter template cards
+                document.querySelectorAll('.template-card').forEach(card => {
+                    if (category === 'all' || card.dataset.category === category) {
+                        card.style.display = '';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        });
+
+        // Template activation
+        document.querySelectorAll('[data-action="use-template"]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const templateName = btn.dataset.template;
+                const card = btn.closest('.template-card');
+                const templateTitle = card?.querySelector('.template-name')?.textContent || templateName;
+
+                btn.disabled = true;
+                btn.textContent = 'Creating...';
+
+                try {
+                    const result = await window.apiClient.post('/templates/activate/', {
+                        template_key: templateName
+                    });
+
+                    if (window.App) {
+                        window.App.showToast('success', `"${templateTitle}" tracker created!`);
+                        // Navigate to the new tracker
+                        if (result.tracker_id) {
+                            window.App.loadPanel(`/tracker/${result.tracker_id}/`);
+                        } else {
+                            window.App.loadPanel('/trackers/');
+                        }
+                    }
+                } catch (error) {
+                    console.error('[Templates] Activation failed:', error);
+                    if (window.App) {
+                        window.App.showToast('error', 'Failed to create tracker', error.message);
+                    }
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Use Template';
+                }
+            });
+        });
+
+        console.log('[TemplatesPanel] Initialized');
+    })();
+</script>

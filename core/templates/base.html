@@ -75,18 +75,15 @@
             panelBase: '/panel/'
         };
     </script>
-
-    <!-- New Utilities (Phase 9 Backend Enhancements) -->
-    <script src="{% static 'core/js/api-client.js' %}?v=3"></script>
-    <script src="{% static 'core/js/feature-flags.js' %}?v=3"></script>
-    <script src="{% static 'core/js/insights-widget.js' %}?v=3"></script>
-
-    <!-- Core Scripts -->
-    <script src="{% static 'core/js/app.js' %}?v=2"></script>
-    <script src="{% static 'core/js/panels.js' %}?v=2"></script>
-    <script src="{% static 'core/js/interactive.js' %}?v=2"></script>
-    <script src="{% static 'core/js/analytics.js' %}?v=2"></script>
-    <script src="{% static 'core/js/polish.js' %}?v=2"></script>
+    <!-- New utility scripts -->
+    <script src="{% static 'core/js/apiClient.js' %}?v=3"></script>
+    <script src="{% static 'core/js/insightsWidget.js' %}?v=3"></script>
+    <!-- Existing scripts -->
+    <script src="{% static 'core/js/app.js' %}?v=3"></script>
+    <script src="{% static 'core/js/panels.js' %}?v=3"></script>
+    <script src="{% static 'core/js/interactive.js' %}?v=3"></script>
+    <script src="{% static 'core/js/analytics.js' %}?v=3"></script>
+    <script src="{% static 'core/js/polish.js' %}?v=3"></script>
 
     {% block extra_js %}{% endblock %}
 </body>

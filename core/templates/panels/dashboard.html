@@ -93,6 +93,11 @@
         </div>
     </div>
 
+    <!-- Behavioral Insights Section -->
+    <section class="dashboard-section" id="insights-section" style="display:none;">
+        <div id="insights-container"></div>
+    </section>
+
     <!-- Today's Tasks Section -->
     <section class="dashboard-section">
         <div class="section-header">
@@ -180,24 +185,6 @@
         </div>
     </section>
 
-    <!-- Behavioral Insights (New from Phase 9) -->
-    <section class="dashboard-section" id="insights-section" style="display:none;">
-        <div class="section-header">
-            <h2 class="section-title">💡 Insights</h2>
-            <button class="btn btn-ghost btn-sm" id="refresh-insights">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <polyline points="1 20 1 14 7 14"></polyline>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                </svg>
-                Refresh
-            </button>
-        </div>
-        <div id="insights-container" class="insights-container">
-            <!-- Insights loaded dynamically -->
-        </div>
-    </section>
-
     <!-- Quick Actions -->
     <section class="dashboard-section">
         <div class="section-header">
@@ -253,77 +240,54 @@
 </div>
 
 <script>
-    // Dashboard initialization with Phase 9 Enhancements
-    (function initDashboard() {
+    // Dashboard initialization
+    (async function initDashboard() {
         'use strict';
 
-        // Wait for utilities to load
-        const waitForUtilities = setInterval(() => {
-            if (window.api && window.featureFlags && window.InsightsWidget) {
-                clearInterval(waitForUtilities);
-                init();
-            }
-        }, 100);
-
-        function init() {
-            console.log('[Dashboard] Initializing with backend enhancements');
-
-            // Initialize insights widget
-            const insightsWidget = new InsightsWidget('insights-container');
-
-            // Load insights if feature is enabled
-            featureFlags.ifEnabled('advanced_analytics', () => {
+        // Initialize insights widget if feature is enabled
+        try {
+            const insightsEnabled = await window.FeatureFlags.check('behavioral_insights');
+            if (insightsEnabled) {
                 const insightsSection = document.getElementById('insights-section');
-                if (insightsSection) {
-                    insightsSection.style.display = '';
-                    loadInsights();
-                }
-            });
+                const insightsContainer = document.getElementById('insights-container');
 
-            // Load insights function
-            async function loadInsights() {
-                try {
-                    await insightsWidget.load(); // Load user-level insights
-                    console.log('[Dashboard] Insights loaded');
-                } catch (error) {
-                    console.error('[Dashboard] Failed to load insights:', error);
-                }
-            }
+                if (insightsContainer) {
+                    window.insightsWidget = new window.InsightsWidget(insightsContainer);
+                    await window.insightsWidget.loadInsights();
 
-            // Refresh insights button
-            const refreshBtn = document.getElementById('refresh-insights');
-            if (refreshBtn) {
-                refreshBtn.addEventListener('click', () => {
-                    loadInsights();
-                    if (window.App && window.App.showToast) {
-                        window.App.showToast('info', 'Refreshing insights...');
+                    // Show section if we have insights
+                    if (window.insightsWidget.insights.length > 0 && insightsSection) {
+                        insightsSection.style.display = 'block';
                     }
-                });
+                }
             }
-
-            // Dashboard filters (if they exist)
-            const filterGroup = document.getElementById('period-filter-group');
-            if (filterGroup) {
-                const getApp = () => window.App || (window.parent && window.parent.App) || null;
-
-                filterGroup.querySelectorAll('.btn').forEach(btn => {
-                    btn.onclick = function (e) {
-                        e.preventDefault();
-                        const filter = this.dataset.dashboardFilter;
-                        console.log('[Dashboard] Switching to filter:', filter);
-
-                        const App = getApp();
-                        if (App && App.loadPanel) {
-                            App.loadPanel(`/${filter}`);
-                        } else {
-                            console.warn('[Dashboard] App not found, using regular navigation');
-                            window.location.href = `/${filter}`;
-                        }
-                    };
-                });
-            }
-
-            console.log('[Dashboard] Initialized successfully');
+        } catch (error) {
+            console.warn('[Dashboard] Failed to load insights:', error);
         }
+
+        // Dashboard filter initialization
+        const filterGroup = document.getElementById('period-filter-group');
+        if (!filterGroup) return;
+
+        // Get App reference - check multiple locations
+        const getApp = () => window.App || (window.parent && window.parent.App) || null;
+
+        // Bind click handlers to filter buttons
+        filterGroup.querySelectorAll('.btn').forEach(btn => {
+            btn.onclick = function (e) {
+                e.preventDefault();
+                const filter = this.dataset.dashboardFilter;
+                console.log('[Dashboard] Switching to filter:', filter);
+
+                const App = getApp();
+                if (App && App.loadPanel) {
+                    App.loadPanel(`/${filter}`);
+                } else {
+                    // Fallback: use regular navigation
+                    console.warn('[Dashboard] App not found, using regular navigation');
+                    window.location.href = `/${filter}`;
+                }
+            };
+        });
     })();
 </script>

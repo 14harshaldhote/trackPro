@@ -139,3 +139,70 @@
         </button>
     </div>
 </div>
+
+<script>
+    (function initMonthPanel() {
+        'use strict';
+
+        // Export month report
+        const exportBtn = document.getElementById('export-month');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', async () => {
+                const year = '{{ year }}';
+                const month = '{{ month }}';
+
+                exportBtn.disabled = true;
+                exportBtn.innerHTML = `
+                    <span class="loading-spinner"></span>
+                    Exporting...
+                `;
+
+                try {
+                    // Use streaming export for large datasets
+                    const response = await fetch(`/api/v1/export/month/${year}/${month}/`, {
+                        headers: {
+                            'X-Request-ID': `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                            'X-CSRFToken': window.TrackerPro?.csrfToken || ''
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Export failed');
+                    }
+
+                    // Download as file
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `tracker-report-${year}-${month}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+
+                    if (window.App) {
+                        window.App.showToast('success', 'Report exported successfully');
+                    }
+                } catch (error) {
+                    console.error('[MonthPanel] Export failed:', error);
+                    if (window.App) {
+                        window.App.showToast('error', 'Export failed', error.message);
+                    }
+                } finally {
+                    exportBtn.disabled = false;
+                    exportBtn.innerHTML = `
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Export Report
+                    `;
+                }
+            });
+        }
+
+        console.log('[MonthPanel] Initialized');
+    })();
+</script>
