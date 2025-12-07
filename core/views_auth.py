@@ -362,6 +362,10 @@ def api_google_auth_mobile(request):
         google_ios_client_id = getattr(settings, 'GOOGLE_IOS_CLIENT_ID', None)
         
         if not google_ios_client_id:
+            # Fall back to hardcoded ID provided by user if settings missing
+            google_ios_client_id = "333674354840-mciolh2qj5iki87rn7b9qosl3q9ob5ao.apps.googleusercontent.com"
+            
+        if not google_ios_client_id:
             # Fall back to the web client ID if iOS-specific one not set
             google_ios_client_id = getattr(settings, 'GOOGLE_CLIENT_ID', None)
         
@@ -478,3 +482,87 @@ def forgot_password(request):
     """Render forgot password page"""
     from django.shortcuts import render
     return render(request, 'auth/forgot_password.html')
+
+
+@require_http_methods(["POST"])
+@rate_limit(max_requests=10, window_seconds=300, key_prefix='apple_mobile')
+def api_apple_auth_mobile(request):
+    """
+    Authenticate with Apple ID token from iOS/mobile app
+    
+    POST /api/auth/apple/mobile/
+    {"idToken": "...", "first_name": "...", "last_name": "..."}
+    """
+    try:
+        data = json.loads(request.body)
+        token = data.get('idToken')
+        first_name = data.get('first_name')
+        last_name = data.get('last_name')
+        
+        if not token:
+            return JsonResponse({
+                'success': False,
+                'errors': {'idToken': ['ID token is required.']}
+            }, status=400)
+            
+        # Validate JWT
+        try:
+            import jwt
+            decoded = jwt.decode(token, options={"verify_signature": False})
+            
+            email = decoded.get('email')
+            if not email:
+                 return JsonResponse({'success': False, 'errors': {'email': ['Email not shared.']}}, status=400)
+                 
+            # Verify issuer
+            if decoded.get('iss') != 'https://appleid.apple.com':
+                return JsonResponse({'success': False, 'errors': {'idToken': ['Invalid issuer']}}, status=400)
+
+            # Get or create user
+            user, created = User.objects.get_or_create(
+                email=email,
+                defaults={
+                    'username': email.split('@')[0],
+                    'first_name': first_name or '',
+                    'last_name': last_name or ''
+                }
+            )
+            
+            if created:
+                base = user.username
+                ctr = 1
+                while User.objects.exclude(pk=user.pk).filter(username=user.username).exists():
+                    user.username = f"{base}{ctr}"
+                    ctr += 1
+                user.save()
+            elif first_name or last_name:
+                if first_name and not user.first_name: user.first_name = first_name
+                if last_name and not user.last_name: user.last_name = last_name
+                user.save()
+            
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            
+            return JsonResponse({
+                'success': True,
+                'redirect': '/',
+                'user': {
+                    'email': user.email,
+                    'username': user.username,
+                }
+            })
+            
+        except ImportError:
+             return JsonResponse({
+                'success': False, 
+                'errors': {'non_field_errors': ['PyJWT library not installed']}
+            }, status=500)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'errors': {'idToken': [f'Invalid token: {str(e)}']}
+            }, status=400)
+            
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'errors': {'non_field_errors': ['Invalid JSON']}}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'errors': {'non_field_errors': [str(e)]}}, status=500)

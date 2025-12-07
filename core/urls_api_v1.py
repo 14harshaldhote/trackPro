@@ -105,4 +105,6 @@ urlpatterns = [
     path('auth/logout/', views_auth.api_logout, name='auth_logout'),
     path('auth/status/', views_auth.api_check_auth, name='auth_status'),
     path('auth/validate-email/', views_auth.api_validate_email, name='auth_validate_email'),
+    path('auth/google/mobile/', views_auth.api_google_auth_mobile, name='auth_google_mobile'),
+    path('auth/apple/mobile/', views_auth.api_apple_auth_mobile, name='auth_apple_mobile'),
 ]
