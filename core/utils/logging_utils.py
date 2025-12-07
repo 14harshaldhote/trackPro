@@ -102,7 +102,7 @@ def log_api_request(request, response_status: int, duration_ms: float):
         path=request.path,
         status=response_status,
         duration_ms=round(duration_ms, 2),
-        user_id=getattr(request.user, 'id', None),
+        user_id=getattr(getattr(request, 'user', None), 'id', None),
         ip=request.META.get('REMOTE_ADDR')
     )
 
