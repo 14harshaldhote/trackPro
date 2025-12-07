@@ -228,8 +228,8 @@ def api_signup(request):
             password=password
         )
         
-        # Auto-login after signup
-        login(request, user)
+        # Auto-login after signup (must specify backend with multiple AUTHENTICATION_BACKENDS)
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
         
         return JsonResponse({
             'success': True,
