@@ -42,3 +42,4 @@ trackerWeb/data/*.xls
 venv/
 env/
 ENV/
+.vercel

@@ -9,23 +9,12 @@ django-simple-history>=3.4.0
 dj-database-url
 psycopg2-binary
 
-# Data Processing
+# Data Processing (lightweight)
 pandas
 numpy
-scipy
-statsmodels
 openpyxl
 xlsxwriter
 tablib
-
-# NLP & ML
-nltk
-spacy
-
-# Visualization
-matplotlib
-seaborn
-pillow
 
 # API & Serialization
 marshmallow
@@ -50,3 +39,4 @@ whitenoise
 # HTTP
 certifi
 urllib3
+pillow
