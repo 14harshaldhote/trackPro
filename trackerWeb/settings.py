@@ -28,6 +28,13 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-build-key-replace-in-
 DEBUG = False
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='', cast=Csv())
+# Add Vercel domains
+ALLOWED_HOSTS.extend([
+    '.vercel.app',  # Allow all Vercel subdomains (previews)
+    'trackerpro-rho.vercel.app',
+    'trackerpro-git-main-14harshaldhotes-projects.vercel.app',
+    'trackerpro-kkjmjon9t-14harshaldhotes-projects.vercel.app',
+])
 
 # CSRF Trusted Origins for Vercel
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
