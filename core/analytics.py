@@ -2,6 +2,9 @@
 Behavior Analytics Engine
 Provides comprehensive metrics, NLP analysis, and visualizations for tracker data.
 All metrics return structured metadata for explainability.
+
+NOTE: Matplotlib/Seaborn visualizations are disabled for Vercel serverless deployment.
+Only core metrics and analytics functions are available.
 """
 import io
 import base64
@@ -14,38 +17,9 @@ from core.helpers import nlp_helpers as nlp_utils
 from core.helpers import metric_helpers
 from core.helpers.cache_helpers import cache_result, CACHE_TIMEOUTS
 
-# Lazy matplotlib imports to avoid Vercel serverless failures
+# Matplotlib/Seaborn disabled for serverless deployment
+# Visualization functions will return None
 _matplotlib_available = False
-_plt = None
-_sns = None
-
-def _init_matplotlib():
-    """Initialize matplotlib lazily only when needed for visualization."""
-    global _matplotlib_available, _plt, _sns
-    if _matplotlib_available:
-        return True
-    try:
-        import matplotlib
-        matplotlib.use('Agg')  # Non-interactive backend
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        _plt = plt
-        _sns = sns
-        _matplotlib_available = True
-        return True
-    except ImportError:
-        return False
-
-def get_plot_as_base64(fig):
-    """Converts a matplotlib figure to base64 string."""
-    if not _matplotlib_available or _plt is None:
-        return None
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', transparent=True, dpi=100)
-    buf.seek(0)
-    image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-    _plt.close(fig)
-    return image_base64
 
 # ====================================================================
 # CORE METRICS
@@ -489,155 +463,36 @@ def compute_mood_trends(tracker_id: str, window_days: int = 7) -> Dict:
 # ====================================================================
 
 def generate_completion_chart(tracker_id):
-    """Generates a line chart of task completion over time."""
-    if not _init_matplotlib():
-        return None
+    """Generates a line chart of task completion over time.
     
-    completion_data = compute_completion_rate(tracker_id)
-    daily_rates = completion_data['daily_rates']
-    
-    if not daily_rates:
-        return None
-    
-    df = pd.DataFrame(daily_rates)
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values('date')
-    
-    # Plot
-    _sns.set_theme(style="darkgrid", rc={
-        "axes.facecolor": "#00000000",
-        "figure.facecolor": "#00000000",
-        "text.color": "white",
-        "axes.labelcolor": "white",
-        "xtick.color": "white",
-        "ytick.color": "white"
-    })
-    fig, ax = _plt.subplots(figsize=(10, 4))
-    
-    _sns.lineplot(data=df, x='date', y='rate', marker='o', linewidth=2.5, color='#00E676', ax=ax)
-    ax.fill_between(df['date'], df['rate'], alpha=0.2, color='#00E676')
-    
-    ax.set_title('Completion Rate Trend', color='white', fontsize=14)
-    ax.set_ylabel('Completion %')
-    ax.set_xlabel('Date')
-    ax.set_ylim(0, 105)
-    
-    return get_plot_as_base64(fig)
+    NOTE: Visualization disabled for Vercel deployment.
+    """
+    # Matplotlib not available on serverless
+    return None
 
 def generate_category_pie_chart(tracker_id):
-    """Generates a donut chart of task distribution by category."""
-    if not _init_matplotlib():
-        return None
+    """Generates a donut chart of task distribution by category.
     
-    balance_data = compute_balance_score(tracker_id)
-    category_dist = balance_data['category_distribution']
-    
-    if not category_dist:
-        return None
-    
-    # Plot
-    labels = list(category_dist.keys())
-    sizes = list(category_dist.values())
-    colors = _sns.color_palette('pastel')[0:len(labels)]
-    
-    fig, ax = _plt.subplots(figsize=(6, 6))
-    wedges, texts, autotexts = ax.pie(
-        sizes, labels=labels, autopct='%1.1f%%',
-        startangle=90, colors=colors, pctdistance=0.85,
-        textprops={'color':"white"}
-    )
-    
-    # Draw circle for donut
-    centre_circle = _plt.Circle((0,0),0.70,fc='none')
-    fig.gca().add_artist(centre_circle)
-    
-    ax.axis('equal')
-    _plt.title('Task Distribution by Category', color='white')
-    
-    return get_plot_as_base64(fig)
+    NOTE: Visualization disabled for Vercel deployment.
+    """
+    # Matplotlib not available on serverless
+    return None
 
 def generate_completion_heatmap(tracker_id, days=30):
-    """Generates a calendar-style heatmap of completions."""
-    if not _init_matplotlib():
-        return None
+    """Generates a calendar-style heatmap of completions.
     
-    completion_data = compute_completion_rate(tracker_id)
-    daily_rates = completion_data['daily_rates']
-    
-    if not daily_rates:
-        return None
-    
-    df = pd.DataFrame(daily_rates)
-    df['date'] = pd.to_datetime(df['date'])
-    
-    # Take last N days
-    df = df.sort_values('date').tail(days)
-    
-    if df.empty:
-        return None
-    
-    # Create calendar grid (week rows, day columns)
-    df['day_of_week'] = df['date'].dt.dayofweek
-    df['week'] = ((df['date'] - df['date'].min()).dt.days // 7)
-    
-    pivot = df.pivot(index='week', columns='day_of_week', values='rate')
-    
-    # Plot
-    _sns.set_theme()
-    fig, ax = _plt.subplots(figsize=(10, 4))
-    
-    _sns.heatmap(pivot, cmap='Greens', annot=False, cbar_kws={'label': 'Completion %'}, ax=ax)
-    ax.set_xlabel('Day of Week (Mon-Sun)')
-    ax.set_ylabel('Week')
-    ax.set_title('Completion Heatmap', fontsize=14)
-    
-    return get_plot_as_base64(fig)
+    NOTE: Visualization disabled for Vercel deployment.
+    """
+    # Matplotlib not available on serverless
+    return None
 
 def generate_streak_timeline(tracker_id):
-    """Generates an annotated timeline showing streaks."""
-    if not _init_matplotlib():
-        return None
+    """Generates an annotated timeline showing streaks.
     
-    streak_data = detect_streaks(tracker_id)
-    
-    # For visualization, we need the full completion series
-    instances = crud.get_tracker_instances(tracker_id)
-    completion_data = {}
-    
-    for inst in instances:
-        inst_date = inst.period_start or inst.tracking_date
-        if isinstance(inst_date, str):
-            inst_date = date.fromisoformat(inst_date)
-        
-        tasks = crud.get_task_instances_for_tracker_instance(inst.instance_id)
-        completed = any(t.status == 'DONE' for t in tasks) if tasks else False
-        completion_data[inst_date] = 1 if completed else 0
-    
-    if not completion_data:
-        return None
-    
-    df = pd.DataFrame(list(completion_data.items()), columns=['date', 'completed'])
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values('date')
-    
-    # Plot
-    _sns.set_theme()
-    fig, ax = _plt.subplots(figsize=(12, 3))
-    
-    ax.fill_between(df['date'], 0, df['completed'], alpha=0.7, color='#00E676', step='mid')
-    ax.plot(df['date'], df['completed'], marker='o', color='#00E676', linewidth=2)
-    
-    # Annotate current streak
-    ax.text(0.95, 0.95, f"Current Streak: {streak_data['value']['current_streak']} days",
-            transform=ax.transAxes, ha='right', va='top',
-            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-    
-    ax.set_ylabel('Completed')
-    ax.set_xlabel('Date')
-    ax.set_title('Streak Timeline', fontsize=14)
-    ax.set_ylim(-0.1, 1.1)
-    
-    return get_plot_as_base64(fig)
+    NOTE: Visualization disabled for Vercel deployment.
+    """
+    # Matplotlib not available on serverless
+    return None
 
 @cache_result(timeout=CACHE_TIMEOUTS['tracker_stats'], key_prefix='tracker_stats')
 def compute_tracker_stats(tracker_id):
