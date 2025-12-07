@@ -3,10 +3,6 @@ Behavior Analytics Engine
 Provides comprehensive metrics, NLP analysis, and visualizations for tracker data.
 All metrics return structured metadata for explainability.
 """
-import matplotlib
-matplotlib.use('Agg') # Non-interactive backend
-import matplotlib.pyplot as plt
-import seaborn as sns
 import io
 import base64
 import pandas as pd
@@ -18,13 +14,37 @@ from core.helpers import nlp_helpers as nlp_utils
 from core.helpers import metric_helpers
 from core.helpers.cache_helpers import cache_result, CACHE_TIMEOUTS
 
+# Lazy matplotlib imports to avoid Vercel serverless failures
+_matplotlib_available = False
+_plt = None
+_sns = None
+
+def _init_matplotlib():
+    """Initialize matplotlib lazily only when needed for visualization."""
+    global _matplotlib_available, _plt, _sns
+    if _matplotlib_available:
+        return True
+    try:
+        import matplotlib
+        matplotlib.use('Agg')  # Non-interactive backend
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        _plt = plt
+        _sns = sns
+        _matplotlib_available = True
+        return True
+    except ImportError:
+        return False
+
 def get_plot_as_base64(fig):
     """Converts a matplotlib figure to base64 string."""
+    if not _matplotlib_available or _plt is None:
+        return None
     buf = io.BytesIO()
     fig.savefig(buf, format='png', bbox_inches='tight', transparent=True, dpi=100)
     buf.seek(0)
     image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-    plt.close(fig)
+    _plt.close(fig)
     return image_base64
 
 # ====================================================================
@@ -470,6 +490,9 @@ def compute_mood_trends(tracker_id: str, window_days: int = 7) -> Dict:
 
 def generate_completion_chart(tracker_id):
     """Generates a line chart of task completion over time."""
+    if not _init_matplotlib():
+        return None
+    
     completion_data = compute_completion_rate(tracker_id)
     daily_rates = completion_data['daily_rates']
     
@@ -481,7 +504,7 @@ def generate_completion_chart(tracker_id):
     df = df.sort_values('date')
     
     # Plot
-    sns.set_theme(style="darkgrid", rc={
+    _sns.set_theme(style="darkgrid", rc={
         "axes.facecolor": "#00000000",
         "figure.facecolor": "#00000000",
         "text.color": "white",
@@ -489,9 +512,9 @@ def generate_completion_chart(tracker_id):
         "xtick.color": "white",
         "ytick.color": "white"
     })
-    fig, ax = plt.subplots(figsize=(10, 4))
+    fig, ax = _plt.subplots(figsize=(10, 4))
     
-    sns.lineplot(data=df, x='date', y='rate', marker='o', linewidth=2.5, color='#00E676', ax=ax)
+    _sns.lineplot(data=df, x='date', y='rate', marker='o', linewidth=2.5, color='#00E676', ax=ax)
     ax.fill_between(df['date'], df['rate'], alpha=0.2, color='#00E676')
     
     ax.set_title('Completion Rate Trend', color='white', fontsize=14)
@@ -503,6 +526,9 @@ def generate_completion_chart(tracker_id):
 
 def generate_category_pie_chart(tracker_id):
     """Generates a donut chart of task distribution by category."""
+    if not _init_matplotlib():
+        return None
+    
     balance_data = compute_balance_score(tracker_id)
     category_dist = balance_data['category_distribution']
     
@@ -512,9 +538,9 @@ def generate_category_pie_chart(tracker_id):
     # Plot
     labels = list(category_dist.keys())
     sizes = list(category_dist.values())
-    colors = sns.color_palette('pastel')[0:len(labels)]
+    colors = _sns.color_palette('pastel')[0:len(labels)]
     
-    fig, ax = plt.subplots(figsize=(6, 6))
+    fig, ax = _plt.subplots(figsize=(6, 6))
     wedges, texts, autotexts = ax.pie(
         sizes, labels=labels, autopct='%1.1f%%',
         startangle=90, colors=colors, pctdistance=0.85,
@@ -522,16 +548,19 @@ def generate_category_pie_chart(tracker_id):
     )
     
     # Draw circle for donut
-    centre_circle = plt.Circle((0,0),0.70,fc='none')
+    centre_circle = _plt.Circle((0,0),0.70,fc='none')
     fig.gca().add_artist(centre_circle)
     
     ax.axis('equal')
-    plt.title('Task Distribution by Category', color='white')
+    _plt.title('Task Distribution by Category', color='white')
     
     return get_plot_as_base64(fig)
 
 def generate_completion_heatmap(tracker_id, days=30):
     """Generates a calendar-style heatmap of completions."""
+    if not _init_matplotlib():
+        return None
+    
     completion_data = compute_completion_rate(tracker_id)
     daily_rates = completion_data['daily_rates']
     
@@ -554,10 +583,10 @@ def generate_completion_heatmap(tracker_id, days=30):
     pivot = df.pivot(index='week', columns='day_of_week', values='rate')
     
     # Plot
-    sns.set_theme()
-    fig, ax = plt.subplots(figsize=(10, 4))
+    _sns.set_theme()
+    fig, ax = _plt.subplots(figsize=(10, 4))
     
-    sns.heatmap(pivot, cmap='Greens', annot=False, cbar_kws={'label': 'Completion %'}, ax=ax)
+    _sns.heatmap(pivot, cmap='Greens', annot=False, cbar_kws={'label': 'Completion %'}, ax=ax)
     ax.set_xlabel('Day of Week (Mon-Sun)')
     ax.set_ylabel('Week')
     ax.set_title('Completion Heatmap', fontsize=14)
@@ -566,6 +595,9 @@ def generate_completion_heatmap(tracker_id, days=30):
 
 def generate_streak_timeline(tracker_id):
     """Generates an annotated timeline showing streaks."""
+    if not _init_matplotlib():
+        return None
+    
     streak_data = detect_streaks(tracker_id)
     
     # For visualization, we need the full completion series
@@ -589,8 +621,8 @@ def generate_streak_timeline(tracker_id):
     df = df.sort_values('date')
     
     # Plot
-    sns.set_theme()
-    fig, ax = plt.subplots(figsize=(12, 3))
+    _sns.set_theme()
+    fig, ax = _plt.subplots(figsize=(12, 3))
     
     ax.fill_between(df['date'], 0, df['completed'], alpha=0.7, color='#00E676', step='mid')
     ax.plot(df['date'], df['completed'], marker='o', color='#00E676', linewidth=2)

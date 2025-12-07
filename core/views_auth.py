@@ -328,6 +328,130 @@ def api_validate_email(request):
         return JsonResponse({'available': False, 'error': 'Invalid JSON'}, status=400)
 
 
+@require_http_methods(["POST"])
+@rate_limit(max_requests=10, window_seconds=300, key_prefix='google_mobile')
+def api_google_auth_mobile(request):
+    """
+    Authenticate with Google ID token from iOS/mobile app
+    
+    POST /api/auth/google/mobile/
+    {"idToken": "..."}
+    
+    Validates the ID token with Google, creates or retrieves the user,
+    and logs them in.
+    
+    Returns: {"success": true, "user": {"email": "...", "username": "..."}}
+    """
+    try:
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as google_requests
+        from django.conf import settings
+        
+        data = json.loads(request.body)
+        token = data.get('idToken') or data.get('id_token')
+        
+        if not token:
+            return JsonResponse({
+                'success': False,
+                'errors': {'idToken': ['ID token is required.']}
+            }, status=400)
+        
+        # Get the Google iOS Client ID from settings
+        google_ios_client_id = getattr(settings, 'GOOGLE_IOS_CLIENT_ID', None)
+        
+        if not google_ios_client_id:
+            # Fall back to the web client ID if iOS-specific one not set
+            google_ios_client_id = getattr(settings, 'GOOGLE_CLIENT_ID', None)
+        
+        if not google_ios_client_id:
+            return JsonResponse({
+                'success': False,
+                'errors': {'non_field_errors': ['Google authentication not configured.']}
+            }, status=500)
+        
+        try:
+            # Verify the token with Google
+            idinfo = id_token.verify_oauth2_token(
+                token, 
+                google_requests.Request(), 
+                audience=google_ios_client_id
+            )
+            
+            # Check that the token is valid (not expired, correct issuer, etc.)
+            if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+                raise ValueError('Invalid issuer.')
+            
+            # Get user info from the token
+            email = idinfo.get('email')
+            email_verified = idinfo.get('email_verified', False)
+            
+            if not email:
+                return JsonResponse({
+                    'success': False,
+                    'errors': {'non_field_errors': ['Could not get email from Google account.']}
+                }, status=400)
+            
+            if not email_verified:
+                return JsonResponse({
+                    'success': False,
+                    'errors': {'email': ['Please verify your Google email address first.']}
+                }, status=400)
+            
+            # Get or create user
+            user, created = User.objects.get_or_create(
+                email=email,
+                defaults={
+                    'username': email.split('@')[0],
+                    'first_name': idinfo.get('given_name', ''),
+                    'last_name': idinfo.get('family_name', ''),
+                }
+            )
+            
+            # If user exists but was created differently, ensure unique username
+            if created:
+                # Ensure unique username
+                base_username = user.username
+                counter = 1
+                while User.objects.exclude(pk=user.pk).filter(username=user.username).exists():
+                    user.username = f"{base_username}{counter}"
+                    counter += 1
+                user.save()
+            
+            # Log the user in
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            
+            return JsonResponse({
+                'success': True,
+                'redirect': '/',
+                'user': {
+                    'email': user.email,
+                    'username': user.username,
+                }
+            })
+            
+        except ValueError as e:
+            return JsonResponse({
+                'success': False,
+                'errors': {'idToken': [f'Invalid Google token: {str(e)}']}
+            }, status=400)
+            
+    except ImportError:
+        return JsonResponse({
+            'success': False,
+            'errors': {'non_field_errors': ['Google authentication library not installed. Run: pip install google-auth']}
+        }, status=500)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'errors': {'non_field_errors': ['Invalid JSON data.']}
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'errors': {'non_field_errors': [str(e)]}
+        }, status=500)
+
+
 # ============================================================================
 # AUTH PAGES (Render custom templates)
 # ============================================================================

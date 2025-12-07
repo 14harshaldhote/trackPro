@@ -236,6 +236,12 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
+# Google OAuth2 Client IDs for mobile apps
+# Web client ID (used for allauth)
+GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
+# iOS-specific client ID (from Google Cloud Console -> iOS OAuth Client)
+GOOGLE_IOS_CLIENT_ID = config('GOOGLE_IOS_CLIENT_ID', default='')
+
 # Email backend (for development - prints to console)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
