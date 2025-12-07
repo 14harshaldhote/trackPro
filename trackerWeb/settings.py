@@ -34,10 +34,18 @@ ALLOWED_HOSTS.extend([
     'trackerpro-rho.vercel.app',
     'trackerpro-git-main-14harshaldhotes-projects.vercel.app',
     'trackerpro-kkjmjon9t-14harshaldhotes-projects.vercel.app',
+    'trackerpro-fy7zgrne2-14harshaldhotes-projects.vercel.app',
 ])
 
 # CSRF Trusted Origins for Vercel
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+# Add Vercel domains (must include scheme)
+CSRF_TRUSTED_ORIGINS.extend([
+    'https://trackerpro-rho.vercel.app',
+    'https://trackerpro-git-main-14harshaldhotes-projects.vercel.app',
+    'https://trackerpro-kkjmjon9t-14harshaldhotes-projects.vercel.app',
+    'https://trackerpro-fy7zgrne2-14harshaldhotes-projects.vercel.app',
+])
 
 
 # Application definition
