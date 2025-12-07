@@ -101,10 +101,8 @@ App.bindEventDelegation = function () {
 
 App.handleAction = function (action, element, event) {
     switch (action) {
-        case 'toggle':
-            const taskRow = element.closest('[data-task-id]');
-            if (taskRow) this.toggleTask(taskRow.dataset.taskId, taskRow);
-            break;
+        // Removed 'toggle' case - now handled by individual panels (dashboard, today, week)
+        // to prevent duplicate API calls
         case 'edit':
             const editId = element.closest('[data-task-id]')?.dataset.taskId;
             if (editId) this.loadModal(`/modals/edit_task/?task_id=${editId}`);

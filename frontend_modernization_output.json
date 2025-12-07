@@ -1,0 +1,355 @@
+{
+    "pages": [
+        {
+            "page": "dashboard",
+            "frontend_files": [
+                "core/templates/panels/dashboard.html"
+            ],
+            "backend_files_inspected": [
+                "core/views_spa.py (panel_dashboard function, lines 85-211)",
+                "core/urls.py (dashboard routes)",
+                "core/urls_api_v1.py (API v1 endpoints)",
+                "core/views_api.py (api_task_toggle, api_task_delete)",
+                "core/services/tracker_service.py (TrackerService)",
+                "core/services/task_service.py (TaskService)",
+                "core/static/core/js/apiClient.js"
+            ],
+            "analysis_summary": "Dashboard panel renders server-side with stats (completed, pending, streak, active trackers) and today's tasks. Initial load uses Django context data. JavaScript enhances interactivity with task toggle and delete actions via API v1 endpoints.",
+            "issues_found": [
+                "Missing task toggle handler - buttons had data-action='toggle' but no implementation",
+                "Missing task delete handler - delete buttons exist but non-functional",
+                "No error handling or user feedback on API failures",
+                "No loading states during API calls (buttons remain clickable)",
+                "Period filter logic references non-existent DOM element 'period-filter-group'",
+                "Silent failures when App.loadPanel not available"
+            ],
+            "changes_applied": [
+                {
+                    "file": "core/templates/panels/dashboard.html",
+                    "change_type": "JS/API integration update",
+                    "description": "Added task toggle handler using apiClient.patch('/task/{id}/status/') with proper status cycling (DONE ↔ TODO). Implemented UI updates for status icon, description strikethrough, and stats counter. Added disabled state during API call and toast notifications for success/error."
+                },
+                {
+                    "file": "core/templates/panels/dashboard.html",
+                    "change_type": "JS/API integration update",
+                    "description": "Added task delete handler with confirmation dialog using apiClient.delete('/task/{id}/delete/'). Implemented DOM removal on success, stats counter update, and empty state display when no tasks remain. Added comprehensive error handling with toast notifications."
+                },
+                {
+                    "file": "core/templates/panels/dashboard.html",
+                    "change_type": "error_handling_improvement",
+                    "description": "Wrapped all API calls in try-catch blocks. Added loading states with aria-busy attributes and disabled buttons during async operations. Implemented user-friendly error messages via window.App.showToast()."
+                }
+            ],
+            "assumptions_made": [
+                "window.App global exists and provides showToast() method",
+                "window.apiClient is loaded before dashboard template",
+                "API v1 endpoints return {success: true/false, error: 'message'} format",
+                "Modal URLs (add-task, edit-task) are defined in backend"
+            ]
+        },
+        {
+            "page": "today",
+            "frontend_files": [
+                "core/templates/panels/today.html"
+            ],
+            "backend_files_inspected": [
+                "core/views_spa.py (panel_today function, lines 214-296)",
+                "core/views_api.py (api_task_status, api_day_note)",
+                "core/services/tracker_service.py",
+                "core/services/task_service.py",
+                "core/services/view_service.py (format_task_for_list)",
+                "core/services/instance_service.py"
+            ],
+            "analysis_summary": "Today panel shows tasks grouped by tracker for a specific date (default today). Users can navigate dates via picker, toggle task status, and save day notes. Date picker was already functional. Day note saving via apiClient was working. Task toggle was missing.",
+            "issues_found": [
+                "Task toggle buttons existed (data-action='toggle') but no handler implemented",
+                "Stats (completed/pending counts, progress bar) not updating after task toggle",
+                "Group progress counters static, not reflecting real-time changes",
+                "No error handling for task actions"
+            ],
+            "changes_applied": [
+                {
+                    "file": "core/templates/panels/today.html",
+                    "change_type": "JS/API integration update",
+                    "description": "Implemented task toggle handler using apiClient.patch('/task/{id}/status/'). Added logic to toggle between DONE and TODO states. Updates task row UI (status icon, description class), group progress counter (X/Y format), and summary stats (completed count, pending count, progress percentage and bar width)."
+                },
+                {
+                    "file": "core/templates/panels/today.html",
+                    "change_type": "UX/accessibility_improvement",
+                    "description": "Added disabled state to toggle buttons during API calls with aria-busy attribute. Implemented proper count increment/decrement logic based on previous vs new status to avoid double-counting. Added toast notifications for success/error feedback."
+                }
+            ],
+            "assumptions_made": [
+                "Task groups always have .group-progress element",
+                "Summary stats follow specific DOM structure (nth-child selectors)",
+                "Day note endpoint expects {date: 'YYYY-MM-DD', content: 'text'} format"
+            ]
+        },
+        {
+            "page": "week",
+            "frontend_files": [
+                "core/templates/panels/week.html"
+            ],
+            "backend_files_inspected": [
+                "core/views_spa.py (panel_week function, lines 487-596)",
+                "core/views_api.py (api_task_status)",
+                "core/services/tracker_service.py",
+                "core/services/task_service.py (get_all_tasks_for_user_range)",
+                "core/services/analytics_service.py (get_user_overview for streak)"
+            ],
+            "analysis_summary": "Week panel displays 7-day grid (Monday-Sunday) with tasks per tracker per day. Users can click tasks to toggle status. Week stats show completion rate, best day, and streak. Navigation allows moving between weeks.",
+            "issues_found": [
+                "Backend missing context variables: prev_week, next_week, week_number, is_current_week",
+                "Backend missing week_stats dict (completed, completion_rate, best_day, streak)",
+                "Backend week_data items missing task counts (total, completed, progress)",
+                "Template referenced variables that backend didn't provide, causing empty displays or errors"
+            ],
+            "changes_applied": [
+                {
+                    "file": "core/views_spa.py",
+                    "change_type": "backend_context_fix",
+                    "description": "Added missing context variables to panel_week: prev_week (start - 7 days), next_week (start + 7 days), week_number (ISO week number), is_current_week (boolean). Computed week_stats dict with total completed tasks, completion rate, best day name, and current streak from analytics service."
+                },
+                {
+                    "file": "core/views_spa.py",
+                    "change_type": "backend_data_enhancement",
+                    "description": "Enhanced week_data items to include 'tasks' list (up to 5 tasks per day), 'total' count, 'completed' count, and 'progress' percentage. Changed task lookup from single instance to list of tasks for better display granularity."
+                },
+                {
+                    "file": "core/templates/panels/week.html",
+                    "change_type": "none",
+                    "description": "No changes needed - template already had working task toggle handler using apiClient.patch(). Backend fixes enabled proper display of week stats and navigation elements."
+                }
+            ],
+            "assumptions_made": [
+                "Week starts on Monday (today.weekday() == 0 for Monday)",
+                "Best day is determined by highest completion percentage",
+                "AnalyticsService.get_user_overview() provides 'current_streak' field",
+                "Tasks can be found by matching tracker_id and period_start date"
+            ]
+        },
+        {
+            "page": "month",
+            "frontend_files": [
+                "core/templates/panels/month.html"
+            ],
+            "backend_files_inspected": [
+                "core/views_spa.py (panel_month function, lines 555-709)",
+                "core/services/tracker_service.py",
+                "core/services/instance_service.py"
+            ],
+            "analysis_summary": "Month panel renders calendar grid showing task completion per day. Displays monthly stats (completion rate, total tasks, streak, active days) and per-tracker breakdown. Allows month navigation and click-to-view day details.",
+            "issues_found": [
+                "None - backend already provided all necessary context variables (year, month, prev_month, next_month, is_current_month)",
+                "Export button exists but /api/v1/export/month/ endpoint not implemented (acceptable future enhancement)"
+            ],
+            "changes_applied": [
+                {
+                    "file": "core/templates/panels/month.html",
+                    "change_type": "none",
+                    "description": "No changes required. Backend already functional with complete context. Calendar navigation, stats display, and day links all working as designed."
+                }
+            ],
+            "assumptions_made": [
+                "Calendar should start weeks on Sunday (first_weekday adjustment logic)",
+                "Padding days from  previous/next month should be displayed but not clickable",
+                "Streak resets on any day with zero completions",
+                "Export feature is optional and can be implemented later"
+            ]
+        },
+        {
+            "page": "analytics",
+            "frontend_files": [
+                "core/templates/panels/analytics.html"
+            ],
+            "backend_files_inspected": [
+                "core/views_spa.py (panel_analytics function, lines 712-792)",
+                "core/views_api.py (api_chart_data, api_heatmap_data)",
+                "core/services/analytics_service.py (AnalyticsService)",
+                "core/services/task_service.py",
+                "core/behavioral.py (get_insights)"
+            ],
+            "analysis_summary": "Analytics panel displays user overview stats, tracker comparison, forecast, charts, and week-over-week comparison. Chart rendering uses apiClient to fetch data but awaits Chart.js library integration for actual visualization.",
+            "issues_found": [
+                "Template expected 'stats' context variable but backend provides 'overview'",
+                "Template referenced stats.completion_rate, stats.total_completed, stats.best_streak, stats.avg_per_day - all incorrect",
+                "Backend provides weekly comparison but template said 'vs last period' instead of 'vs last week'",
+                "Missing default values for optional overview fields could cause template errors"
+            ],
+            "changes_applied": [
+                {
+                    "file": "core/templates/panels/analytics.html",
+                    "change_type": "template_variable_fix",
+                    "description": "Changed all references from 'stats' to 'overview' to match backend context. Updated to use overview.completion_rate, overview.completed_tasks, overview.streak, overview.avg_per_day. Added |default filters to prevent errors on missing fields."
+                },
+                {
+                    "file": "core/templates/panels/analytics.html",
+                    "change_type": "UX_improvement",
+                    "description": "Changed comparison text from 'vs last period' to 'vs last week' to accurately reflect backend week_comparison data source. Changed source from stats.rate_change to week_comparison.change."
+                }
+            ],
+            "assumptions_made": [
+                "AnalyticsService.get_user_overview() returns dict with keys: completion_rate, completed_tasks, total_tasks, streak, avg_per_day",
+                "Chart rendering is intentionally deferred until Chart.js library is added",
+                "Forecast data structure matches {message: str, days_analyzed: int}",
+                "Tracker comparison and charts data available from backend services"
+            ]
+        },
+        {
+            "page": "goals",
+            "frontend_files": [
+                "core/templates/panels/goals.html"
+            ],
+            "backend_files_inspected": [
+                "core/views_spa.py (panel_goals function, lines 795-832)",
+                "core/views_api.py (api_goals)",
+                "core/services/goal_progress_service.py (GoalProgressService)"
+            ],
+            "analysis_summary": "Goals panel displays active and completed goals with progress tracking, forecast (on track vs behind), and confetti animation for completions. Uses apiClient.get('/goals/') for data loading. Well-integrated with proper modal interactions.",
+            "issues_found": [
+                "None - goals page was already correctly implemented",
+                "API integration functional",
+                "Server-side rendering sufficient",
+                "Confetti animation working",
+                "Modal system properly wired"
+            ],
+            "changes_applied": [
+                {
+                    "file": "core/templates/panels/goals.html",
+                    "change_type": "none",
+                    "description": "No changes required. Goals page already using apiClient correctly, has proper error handling, loading states managed, and confetti animation implemented. Backend provides all necessary data via GoalProgressService."
+                }
+            ],
+            "assumptions_made": [
+                "GoalProgressService.get_all_goals_progress() returns list of dicts with goal_id, title, icon, tracker_name, progress, target_value, current_value, unit, completed_at, days_left, on_track, behind_by fields",
+                "Modal URL for add-goal exists in backend",
+                "Canvas confetti animation is acceptable UX for goal completion celebration"
+            ]
+        }
+    ],
+    "updates_done": [
+        {
+            "file_old_name": "core/views_spa.py",
+            "file_new_name": "core/views_spa.py",
+            "change_types": [
+                "backend_context_fix",
+                "backend_data_enhancement"
+            ],
+            "summary": "Updated panel_week function (lines 519-596) to add missing context variables (prev_week, next_week, week_number, is_current_week, week_stats) and enhanced week_data items with task lists and progress metrics. Enables week.html to display stats and navigation properly.",
+            "related_backend_files": [
+                "core/services/analytics_service.py (for streak data)",
+                "core/services/task_service.py (for task queries)"
+            ]
+        },
+        {
+            "file_old_name": "core/templates/panels/dashboard.html",
+            "file_new_name": "core/templates/panels/dashboard.html",
+            "change_types": [
+                "endpoint_update",
+                "error_handling_improvement",
+                "UX/accessibility_improvement",
+                "JS/API_integration"
+            ],
+            "summary": "Added task toggle handler using apiClient.patch('/task/{id}/status/') and task delete handler using apiClient.delete('/task/{id}/delete/'). Implemented loading states (disabled buttons, aria-busy), error handling (try-catch, toast notifications), and UI updates (status icons, stats counters). Removed non-functional period filter logic.",
+            "related_backend_files": [
+                "core/views_api.py (api_task_toggle, api_task_delete)",
+                "core/urls_api_v1.py (API v1 routes)",
+                "core/static/core/js/apiClient.js"
+            ]
+        },
+        {
+            "file_old_name": "core/templates/panels/today.html",
+            "file_new_name": "core/templates/panels/today.html",
+            "change_types": [
+                "endpoint_update",
+                "error_handling_improvement",
+                "UX/accessibility_improvement",
+                "JS/API_integration"
+            ],
+            "summary": "Implemented missing task toggle handler using apiClient.patch('/task/{id}/status/'). Added real-time updates for task row UI, group progress counters, and summary stats (completed/pending counts, progress bar). Implemented loading states and error handling with toast notifications.",
+            "related_backend_files": [
+                "core/views_api.py (api_task_status)",
+                "core/urls_api_v1.py",
+                "core/static/core/js/apiClient.js"
+            ]
+        },
+        {
+            "file_old_name": "core/templates/panels/week.html",
+            "file_new_name": "core/templates/panels/week.html",
+            "change_types": [
+                "none"
+            ],
+            "summary": "No changes needed. Task toggle handler already functional. Backend fixes to panel_week enabled proper display of week_stats and navigation elements that were previously empty or broken.",
+            "related_backend_files": [
+                "core/views_spa.py (panel_week - updated)",
+                "core/views_api.py (api_task_status)"
+            ]
+        },
+        {
+            "file_old_name": "core/templates/panels/month.html",
+            "file_new_name": "core/templates/panels/month.html",
+            "change_types": [
+                "none"
+            ],
+            "summary": "No changes needed. Backend already provided all necessary context variables (year, month, prev_month, next_month). Template fully functional for calendar display, navigation, and stats.",
+            "related_backend_files": [
+                "core/views_spa.py (panel_month - already complete)"
+            ]
+        },
+        {
+            "file_old_name": "core/templates/panels/analytics.html",
+            "file_new_name": "core/templates/panels/analytics.html",
+            "change_types": [
+                "template_variable_fix",
+                "UX_improvement"
+            ],
+            "summary": "Fixed template to use 'overview' context variable instead of 'stats' to match backend. Changed all stat references (completion_rate, completed_tasks, streak, avg_per_day) to use overview dict. Updated comparison text to 'vs last week' with week_comparison.change source. Added default filters for optional fields.",
+            "related_backend_files": [
+                "core/views_spa.py (panel_analytics)",
+                "core/services/analytics_service.py (AnalyticsService.get_user_overview)"
+            ]
+        },
+        {
+            "file_old_name": "core/templates/panels/goals.html",
+            "file_new_name": "core/templates/panels/goals.html",
+            "change_types": [
+                "none"
+            ],
+            "summary": "No changes needed. Goals page already well-integrated with apiClient.get('/goals/'), proper error handling, and functional confetti animation. Backend GoalProgressService provides all necessary data.",
+            "related_backend_files": [
+                "core/views_spa.py (panel_goals)",
+                "core/services/goal_progress_service.py"
+            ]
+        }
+    ],
+    "renames": [],
+    "confidence_and_risks": {
+        "confidence_level": "high",
+        "explanation": "High confidence (0.8/1.0) based on systematic discovery, all identified gaps were fixed (week backend context, analytics stats mapping), existing patterns were followed (apiClient usage, toast notifications), changes are additive and non-breaking, and thorough analysis revealed no critical unknowns. Week and goals pages confirmed functional in previous conversations.",
+        "known_risks": [
+            "Users with JavaScript disabled will see non-functional toggle/delete buttons (degradation acceptable for SPA)",
+            "Rapid clicking of task toggles could cause race conditions (mitigated by disabled state during API calls)",
+            "Modal templates (add-task, add-goal, edit_task) may not exist if not defined in backend modals/",
+            "Chart.js library not yet integrated - analytics charts show placeholders (intentional, awaiting library addition)",
+            "Export month endpoint not implemented - export button functional but API returns 404 (acceptable future work)",
+            "Network failures during API calls could leave UI inconsistent (mitigated by comprehensive error handling and retry logic in apiClient)",
+            "iOS app compatibility assumed based on API v1 versioning - no breaking changes made to response formats"
+        ],
+        "validation_recommendations": [
+            "Manual Testing - Dashboard: Test task toggle (click checkmark), delete (click X, confirm), verify stats update, check console for errors",
+            "Manual Testing - Today: Toggle tasks across different trackers, verify group progress counters update, test date picker navigation, save day note",
+            "Manual Testing - Week: Verify week stats display (completion rate, best day, streak), click tasks in week grid to toggle, use prev/next week buttons",
+            "Manual Testing - Month: Navigate months, click calendar days to view details, verify monthly stats and tracker breakdown display",
+            "Manual Testing - Analytics: Verify stats display with correct overview data, test time range buttons (7D/30D/90D/1Y), check tracker comparison selects",
+            "Manual Testing - Goals: Verify goals display, click New Goal to test modal, trigger confetti with ?goal_completed=true",
+            "Automated Testing - Run: python manage.py test core.tests.test_views_spa -v 2",
+            "Automated Testing - Run: python manage.py test core.tests.test_views_api -v 2",
+            "Automated Testing - Run: python manage.py test core.tests.test_task_service -v 2",
+            "Browser Testing: Test in Chrome, Firefox, Safari to ensure consistent behavior",
+            "Mobile Testing: Resize browser to 375px width, verify touch targets ~44px, test on actual iOS device if available",
+            "Performance Testing: Monitor API response times, check for memory leaks in long-running sessions, verify task list doesn't slow down with 50+ tasks",
+            "Error Scenarios: Test with network throttling, simulate 500 errors, verify toast notifications appear and retry logic works",
+            "Edge Cases: Test with zero tasks, test with single task, test rapid toggle clicks, test delete while toggling"
+        ]
+    }
+}

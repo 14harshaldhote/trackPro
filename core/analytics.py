@@ -240,7 +240,8 @@ def compute_balance_score(tracker_id: str) -> Dict:
         }
     """
     templates = crud.get_task_templates_for_tracker(tracker_id)
-    template_map = {t['template_id']: t.get('category', 'Uncategorized') for t in templates}
+    # Fix: templates is a QuerySet of objects, not dicts
+    template_map = {str(t.template_id): getattr(t, 'category', 'Uncategorized') for t in templates}
     
     # Use optimized prefetch query
     instances = crud.get_tracker_instances_with_tasks(tracker_id)
@@ -285,7 +286,8 @@ def compute_effort_index(tracker_id: str, start_date: Optional[date] = None, end
         }
     """
     templates = crud.get_task_templates_for_tracker(tracker_id)
-    template_map = {t['template_id']: t.get('weight', 1) for t in templates}
+    # Fix: templates is a QuerySet of objects, not dicts
+    template_map = {str(t.template_id): getattr(t, 'weight', 1) for t in templates}
     
     # Use optimized prefetch query with date filtering
     instances = crud.get_tracker_instances_with_tasks(tracker_id, start_date, end_date)
@@ -668,7 +670,8 @@ def compute_correlations(tracker_id: str, metrics: Optional[List[str]] = None) -
         # Need per-day effort - compute from instances
         instances = crud.get_tracker_instances(tracker_id)
         templates = crud.get_task_templates_for_tracker(tracker_id)
-        template_map = {t['template_id']: t.get('weight', 1) for t in templates}
+        # Fix: templates is a QuerySet of objects, not dicts
+        template_map = {str(t.template_id): getattr(t, 'weight', 1) for t in templates}
         
         daily_effort = []
         for inst in instances:

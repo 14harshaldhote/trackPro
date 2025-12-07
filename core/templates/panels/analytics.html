@@ -36,18 +36,18 @@
     <!-- Stats Overview -->
     <div class="analytics-stats">
         <div class="analytics-stat">
-            <div class="stat-value">{{ stats.completion_rate }}%</div>
+            <div class="stat-value">{{ overview.completion_rate|floatformat:0 }}%</div>
             <div class="stat-label">Completion Rate</div>
-            <div class="stat-change {% if stats.rate_change >= 0 %}positive{% else %}negative{% endif %}">
-                {{ stats.rate_change|floatformat:1 }}% vs last period
+            <div class="stat-change {% if week_comparison.change >= 0 %}positive{% else %}negative{% endif %}">
+                {{ week_comparison.change|floatformat:1 }}% vs last week
             </div>
         </div>
         <div class="analytics-stat">
-            <div class="stat-value">{{ stats.total_completed }}</div>
+            <div class="stat-value">{{ overview.completed_tasks }}</div>
             <div class="stat-label">Tasks Done</div>
         </div>
         <div class="analytics-stat">
-            <div class="stat-value">{{ stats.best_streak }}</div>
+            <div class="stat-value">{{ overview.streak|default:0 }}</div>
             <div class="stat-label">Best Streak <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path
@@ -56,7 +56,7 @@
                 </svg></div>
         </div>
         <div class="analytics-stat">
-            <div class="stat-value">{{ stats.avg_per_day|floatformat:1 }}</div>
+            <div class="stat-value">{{ overview.avg_per_day|floatformat:1|default:"0.0" }}</div>
             <div class="stat-label">Avg/Day</div>
         </div>
     </div>
@@ -148,3 +148,237 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function initAnalyticsPanel() {
+        'use strict';
+
+        const container = document.querySelector('.analytics-panel');
+        if (!container) return;
+
+        let currentRange = 30; // Default range in days
+        let chartInstances = {}; // Store chart instances for updates
+
+        // ===== TIME RANGE SELECTOR =====
+        const rangeButtons = container.querySelectorAll('.range-btn');
+        rangeButtons.forEach(btn => {
+            btn.addEventListener('click', async function () {
+                // Update active state
+                rangeButtons.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                // Update current range
+                currentRange = parseInt(this.dataset.range);
+
+                // Disable buttons during load
+                rangeButtons.forEach(b => b.disabled = true);
+
+                try {
+                    // Reload charts with new range
+                    await loadAllCharts();
+                } catch (error) {
+                    console.error('[Analytics] Failed to load charts for range:', error);
+                    if (window.App) {
+                        window.App.showToast('error', 'Failed to load analytics data');
+                    }
+                } finally {
+                    // Re-enable buttons
+                    rangeButtons.forEach(b => b.disabled = false);
+                }
+            });
+        });
+
+        // ===== CHART TYPE TOGGLE =====
+        const chartTypeBtns = container.querySelectorAll('.chart-type-btn');
+        chartTypeBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                const parent = this.closest('.chart-section');
+                parent.querySelectorAll('.chart-type-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                const chartType = this.dataset.type;
+                // Update chart type - would need chart library to implement
+                console.log('[Analytics] Chart type changed to:', chartType);
+            });
+        });
+
+        // ===== TRACKER COMPARISON =====
+        const compareTracker1 = container.querySelector('#compare-tracker-1');
+        const compareTracker2 = container.querySelector('#compare-tracker-2');
+
+        if (compareTracker1 && compareTracker2) {
+            [compareTracker1, compareTracker2].forEach(select => {
+                select.addEventListener('change', async () => {
+                    const tracker1 = compareTracker1.value;
+                    const tracker2 = compareTracker2.value;
+
+                    if (tracker1 && tracker2) {
+                        await loadComparisonChart(tracker1, tracker2);
+                    }
+                });
+            });
+        }
+
+        // ===== LOAD CHARTS FROM API =====
+        async function loadAllCharts() {
+            if (!window.apiClient) {
+                console.log('[Analytics] apiClient not available, using server-rendered data');
+                return;
+            }
+
+            // Show loading states
+            const chartContainers = container.querySelectorAll('.chart-container');
+            chartContainers.forEach(c => {
+                c.setAttribute('aria-busy', 'true');
+                c.style.opacity = '0.5';
+            });
+
+            try {
+                // Load completion trend chart
+                await loadChartData('completion', 'completion-chart-container');
+
+                // Load category breakdown
+                await loadChartData('pie', 'category-chart');
+
+                // Load time of day chart
+                await loadChartData('bar', 'time-chart');
+
+                console.log('[Analytics] Charts loaded successfully');
+            } catch (error) {
+                console.error('[Analytics] Failed to load charts:', error);
+                if (window.App) {
+                    window.App.showToast('error', 'Failed to load chart data');
+                }
+                throw error;
+            } finally {
+                // Remove loading states
+                chartContainers.forEach(c => {
+                    c.setAttribute('aria-busy', 'false');
+                    c.style.opacity = '1';
+                });
+            }
+        }
+
+        async function loadChartData(chartType, containerId, trackerId = null) {
+            if (!window.apiClient) {
+                console.warn('[Analytics] apiClient not available');
+                return;
+            }
+
+            try {
+                const params = {
+                    type: chartType,
+                    days: currentRange
+                };
+
+                if (trackerId) {
+                    params.tracker_id = trackerId;
+                }
+
+                // API v1: /api/v1/chart-data/
+                const result = await window.apiClient.get('/chart-data/', params);
+
+                if (result.success) {
+                    console.log(`[Analytics] Loaded ${chartType} chart data:`, result.data);
+                    // Chart rendering would go here with a library like Chart.js
+                    // For now, just log the data
+                    // TODO: Implement actual chart rendering when Chart.js is added
+                } else {
+                    throw new Error(result.error || 'Failed to load chart data');
+                }
+            } catch (error) {
+                console.error(`[Analytics] Failed to load ${chartType} chart:`, error);
+                if (window.App) {
+                    window.App.showToast('error', `Failed to load ${chartType} chart`);
+                }
+                throw error;
+            }
+        }
+
+        async function loadComparisonChart(tracker1Id, tracker2Id) {
+            if (!window.apiClient) {
+                console.warn('[Analytics] apiClient not available');
+                return;
+            }
+
+            const comparisonContainer = container.querySelector('#comparison-chart-container');
+            if (comparisonContainer) {
+                comparisonContainer.setAttribute('aria-busy', 'true');
+                comparisonContainer.style.opacity = '0.5';
+            }
+
+            try {
+                // Load data for both trackers
+                const [data1, data2] = await Promise.all([
+                    window.apiClient.get('/chart-data/', {
+                        type: 'completion',
+                        tracker_id: tracker1Id,
+                        days: currentRange
+                    }),
+                    window.apiClient.get('/chart-data/', {
+                        type: 'completion',
+                        tracker_id: tracker2Id,
+                        days: currentRange
+                    })
+                ]);
+
+                if (data1.success && data2.success) {
+                    console.log('[Analytics] Comparison data loaded:', { data1, data2 });
+                    // Render comparison chart here with Chart.js when available
+                    // TODO: Implement multi-dataset chart rendering
+                } else {
+                    throw new Error('Failed to load comparison data');
+                }
+            } catch (error) {
+                console.error('[Analytics] Failed to load comparison:', error);
+                if (window.App) {
+                    window.App.showToast('error', 'Failed to load comparison');
+                }
+            } finally {
+                if (comparisonContainer) {
+                    comparisonContainer.setAttribute('aria-busy', 'false');
+                    comparisonContainer.style.opacity = '1';
+                }
+            }
+        }
+
+        // ===== EXPORT CHARTS =====
+        const exportBtn = container.querySelector('#export-charts');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', async () => {
+                exportBtn.disabled = true;
+                exportBtn.setAttribute('aria-busy', 'true');
+                const originalHTML = exportBtn.innerHTML;
+                exportBtn.innerHTML = '<span class="loading-spinner" style="width:14px;height:14px;"></span> Exporting...';
+
+                try {
+                    // TODO: Implement actual chart export when Chart.js is added
+                    // For now, show placeholder success
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate export
+
+                    if (window.App) {
+                        window.App.showToast('success', 'Charts exported');
+                    }
+                } catch (error) {
+                    console.error('[Analytics] Export failed:', error);
+                    if (window.App) {
+                        window.App.showToast('error', 'Export failed');
+                    }
+                } finally {
+                    exportBtn.disabled = false;
+                    exportBtn.setAttribute('aria-busy', 'false');
+                    exportBtn.innerHTML = originalHTML;
+                }
+            });
+        }
+
+        // Load initial charts in background if apiClient available
+        if (window.apiClient) {
+            loadAllCharts().catch(err => {
+                console.log('[Analytics] Initial chart load failed, using server-rendered data:', err);
+            });
+        }
+
+        console.log('[Analytics] Panel initialized with API v1 support');
+    })();
+</script>

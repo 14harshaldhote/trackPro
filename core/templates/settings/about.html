@@ -1,4 +1,5 @@
 <!-- Settings: About -->
+{% load static %}
 <div class="panel settings-panel fade-in">
     <div class="settings-layout">
         {% include 'settings/_sidebar.html' with active='about' %}
@@ -115,3 +116,6 @@
         </div>
     </div>
 </div>
+
+<!-- Load settings.js module -->
+<script src="{% static 'core/js/settings.js' %}"></script>

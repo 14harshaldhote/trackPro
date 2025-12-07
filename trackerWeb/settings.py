@@ -94,12 +94,24 @@ WSGI_APPLICATION = 'trackerWeb.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # Database configuration - uses DATABASE_URL for Railway/Vercel
-if config('DATABASE_URL', default=None):
+# 1. Check for LOCAL/PUBLIC URL first (for local dev with Railway)
+if config('DATABASE_URL_LOCAL', default=None):
     DATABASES = {
-        'default': dj_database_url.config(
-            default=config('DATABASE_URL'),
+        'default': dj_database_url.parse(
+            config('DATABASE_URL_LOCAL'),
             conn_max_age=600,
             conn_health_checks=True,
+            ssl_require=True, # Public proxy requires SSL
+        )
+    }
+# 2. Fallback to INTERNAL URL (for Railway deployment)
+elif config('DATABASE_URL', default=None):
+    DATABASES = {
+        'default': dj_database_url.parse(
+            config('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=False, # Internal network doesn't require forced SSL
         )
     }
 else:
@@ -107,11 +119,11 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
-            'NAME': config('DB_NAME', default='tracker'),
-            'USER': config('DB_USER', default='root'),
-            'PASSWORD': config('DB_PASSWORD', default=''),
-            'HOST': config('DB_HOST', default='127.0.0.1'),
-            'PORT': config('DB_PORT', default='3306'),
+            'NAME': config('DB_NAME'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD'),
+            'HOST': config('DB_HOST'),
+            'PORT': config('DB_PORT'),
             'OPTIONS': {
                 'charset': 'utf8mb4',
                 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
@@ -163,6 +175,15 @@ STATICFILES_DIRS = [
 
 # Whitenoise configuration for serving static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media files (User-uploaded content)
+# https://docs.djangoproject.com/en/5.2/howto/static-files/
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# For production, consider using cloud storage (e.g., AWS S3, Google Cloud Storage)
+# Install django-storages and configure:
+# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

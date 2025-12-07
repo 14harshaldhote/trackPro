@@ -278,6 +278,102 @@
             });
         }
 
+        // Task toggle handler
+        container.addEventListener('click', async (e) => {
+            const toggleButton = e.target.closest('[data-action="toggle"]');
+            if (!toggleButton) return;
+
+            const taskRow = toggleButton.closest('.task-row');
+            if (!taskRow) return;
+
+            const taskId = taskRow.dataset.taskId;
+            const oldStatus = taskRow.dataset.status; // Capture old status BEFORE API call
+
+            toggleButton.disabled = true;
+            toggleButton.setAttribute('aria-busy', 'true');
+
+            try {
+                const result = await window.apiClient.post(`/task/${taskId}/toggle/`);
+
+                if (result.success) {
+                    // Parse status from UXResponse format: result.data.new_status
+                    const newStatus = result.data?.new_status || result.new_status || result.status || 'DONE';
+
+                    // Update UI
+                    taskRow.dataset.status = newStatus;
+                    const statusIcon = taskRow.querySelector('.status-icon');
+                    if (statusIcon) {
+                        statusIcon.className = `status-icon status-${newStatus.toLowerCase()}`;
+                    }
+
+                    const description = taskRow.querySelector('.task-description');
+                    if (description) {
+                        if (newStatus === 'DONE') {
+                            description.classList.add('completed');
+                        } else {
+                            description.classList.remove('completed');
+                        }
+                    }
+
+                    // Update group and summary counts
+                    const taskGroup = taskRow.closest('.task-group');
+                    const groupProgress = taskGroup?.querySelector('.group-progress');
+                    if (groupProgress) {
+                        const [done, total] = groupProgress.textContent.split('/').map(n => parseInt(n.trim()));
+                        let newDone = done;
+                        if (oldStatus !== 'DONE' && newStatus === 'DONE') {
+                            newDone++;
+                        } else if (oldStatus === 'DONE' && newStatus !== 'DONE') {
+                            newDone--;
+                        }
+                        groupProgress.textContent = `${newDone}/${total}`;
+                    }
+
+                    // Update summary stats
+                    const completedEl = document.querySelector('.day-summary .summary-stat:nth-child(1) .summary-value');
+                    const pendingEl = document.querySelector('.day-summary .summary-stat:nth-child(3) .summary-value');
+                    const progressValueEl = document.querySelector('.day-summary .summary-stat:nth-child(5) .summary-value');
+                    const progressBarFillEl = document.querySelector('.day-summary .progress-bar .progress-fill');
+
+                    if (completedEl && pendingEl && progressValueEl && progressBarFillEl) {
+                        let currentCompleted = parseInt(completedEl.textContent);
+                        let currentPending = parseInt(pendingEl.textContent);
+                        let totalTasks = currentCompleted + currentPending; // Assuming total is sum of completed and pending for simplicity here
+
+                        if (newStatus === 'DONE' && oldStatus !== 'DONE') {
+                            currentCompleted++;
+                            currentPending--;
+                        } else if (newStatus !== 'DONE' && oldStatus === 'DONE') {
+                            currentCompleted--;
+                            currentPending++;
+                        }
+
+                        completedEl.textContent = currentCompleted;
+                        pendingEl.textContent = currentPending;
+
+                        const newProgress = totalTasks > 0 ? Math.round((currentCompleted / totalTasks) * 100) : 0;
+                        progressValueEl.textContent = `${newProgress}%`;
+                        progressBarFillEl.style.width = `${newProgress}%`;
+                    }
+
+
+                    if (window.App) {
+                        window.App.showToast('success', `Task ${newStatus === 'DONE' ? 'completed' : 'reopened'}`);
+                    }
+                } else {
+                    throw new Error(result.error || 'Failed to toggle task');
+                }
+            } catch (error) {
+                console.error('[TodayPanel] Toggle failed:', error);
+                if (window.App) {
+                    window.App.showToast('error', 'Failed to update task', error.message);
+                }
+            } finally {
+                toggleButton.disabled = false;
+                toggleButton.setAttribute('aria-busy', 'false');
+            }
+        });
+
         // Also handle filter tabs if they exist
         const filterTabs = container.querySelectorAll('.tab');
         if (filterTabs.length > 0) {

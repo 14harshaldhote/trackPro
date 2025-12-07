@@ -248,7 +248,6 @@
         if (!container) return;
 
         // ===== DROPDOWN TOGGLE =====
-        // Bind dropdown toggles directly for this panel
         container.querySelectorAll('.dropdown-toggle').forEach(toggle => {
             toggle.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -256,7 +255,6 @@
                 const dropdown = this.closest('.dropdown');
                 const isOpen = dropdown.classList.contains('open');
 
-                // Close all other dropdowns
                 container.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
 
                 if (!isOpen) {
@@ -265,7 +263,6 @@
             });
         });
 
-        // Close dropdowns on outside click
         document.addEventListener('click', function (e) {
             if (!e.target.closest('.dropdown')) {
                 container.querySelectorAll('.dropdown.open').forEach(d => d.classList.remove('open'));
@@ -316,7 +313,6 @@
             });
         });
 
-        // Clear filters
         if (clearFiltersBtn) {
             clearFiltersBtn.addEventListener('click', function () {
                 filterCheckboxes.forEach(cb => cb.checked = false);
@@ -354,7 +350,6 @@
                 }
             });
 
-            // Update filter count badge
             const totalFilters = currentFilters.status.length + currentFilters.period.length;
             if (filterCountEl) {
                 filterCountEl.textContent = totalFilters;
@@ -372,12 +367,10 @@
                 const status = item.dataset.status?.toLowerCase() || 'active';
                 const period = card.querySelector('.tracker-period-badge')?.textContent.toLowerCase() || 'daily';
 
-                // Check search match
                 const matchesSearch = !searchQuery ||
                     name.includes(searchQuery) ||
                     description.includes(searchQuery);
 
-                // Check filter match (empty array means show all)
                 const matchesStatus = currentFilters.status.length === 0 ||
                     currentFilters.status.includes(status);
                 const matchesPeriod = currentFilters.period.length === 0 ||
@@ -403,21 +396,19 @@
                     case 'progress':
                         const progressA = parseInt(cardA?.querySelector('.progress-text')?.textContent) || 0;
                         const progressB = parseInt(cardB?.querySelector('.progress-text')?.textContent) || 0;
-                        return progressB - progressA; // Descending
+                        return progressB - progressA;
 
                     case 'tasks':
                         const tasksA = parseInt(cardA?.querySelector('.tracker-task-count')?.textContent) || 0;
                         const tasksB = parseInt(cardB?.querySelector('.tracker-task-count')?.textContent) || 0;
-                        return tasksB - tasksA; // Descending
+                        return tasksB - tasksA;
 
                     case 'recent':
                     default:
-                        // Keep original order (server-side sorted by updated_at)
                         return 0;
                 }
             });
 
-            // Re-append in sorted order
             if (trackersContainer) {
                 itemsArray.forEach(item => trackersContainer.appendChild(item));
             }
@@ -431,19 +422,62 @@
             };
         }
 
+        // ===== TRACKER ACTIONS (using apiClient with API v1 endpoints) =====
+        async function handleTrackerAction(action, trackerId) {
+            try {
+                switch (action) {
+                    case 'archive':
+                        // API v1: /api/v1/tracker/{id}/update/ with status=archived
+                        await window.apiClient.post(`/tracker/${trackerId}/update/`, { status: 'archived' });
+                        if (window.App) {
+                            window.App.showToast('success', 'Tracker archived');
+                            window.App.loadPanel('/trackers/', false);
+                        }
+                        break;
+                    case 'unarchive':
+                        await window.apiClient.post(`/tracker/${trackerId}/update/`, { status: 'active' });
+                        if (window.App) {
+                            window.App.showToast('success', 'Tracker restored');
+                            window.App.loadPanel('/trackers/', false);
+                        }
+                        break;
+                    case 'delete':
+                        // API v1: /api/v1/tracker/{id}/delete/
+                        await window.apiClient.post(`/tracker/${trackerId}/delete/`);
+                        if (window.App) {
+                            window.App.showToast('success', 'Tracker deleted');
+                            window.App.loadPanel('/trackers/', false);
+                        }
+                        break;
+                    case 'duplicate':
+                        // Duplicate not directly in API - create copy via create endpoint
+                        if (window.App) {
+                            window.App.showToast('info', 'Use edit to duplicate settings');
+                        }
+                        break;
+                }
+            } catch (error) {
+                console.error('[TrackerList] Action failed:', error);
+                if (window.App) {
+                    window.App.showToast('error', 'Action failed', error.message);
+                }
+            }
+        }
+
+        // Expose for inline handlers
+        window.handleTrackerAction = handleTrackerAction;
+
         // Context Menu Logic
         const contextMenu = document.getElementById('tracker-context-menu');
         let activeTrackerId = null;
 
         if (contextMenu) {
-            // Close menu when clicking outside
             document.addEventListener('click', (e) => {
                 if (!contextMenu.contains(e.target) && !e.target.closest('[data-action="context-menu"]')) {
                     contextMenu.style.display = 'none';
                 }
             });
 
-            // Handle Menu Trigger
             container.addEventListener('click', (e) => {
                 const trigger = e.target.closest('[data-action="context-menu"]');
                 if (trigger) {
@@ -453,7 +487,6 @@
                     const trackerItem = trigger.closest('.tracker-item');
                     activeTrackerId = trackerItem.dataset.trackerId;
 
-                    // Position menu
                     const rect = trigger.getBoundingClientRect();
                     contextMenu.style.display = 'block';
                     contextMenu.style.top = (rect.bottom + window.scrollY + 5) + 'px';
@@ -461,7 +494,6 @@
                 }
             });
 
-            // Handle Menu Actions
             contextMenu.addEventListener('click', (e) => {
                 const actionBtn = e.target.closest('[data-action]');
                 if (!actionBtn) return;
@@ -469,22 +501,18 @@
                 const action = actionBtn.dataset.action;
                 contextMenu.style.display = 'none';
 
-                if (window.App && activeTrackerId) {
+                if (activeTrackerId) {
                     if (action === 'edit') {
-                        // For edit, use the centralized modal loader with correct URL
-                        window.App.loadModal(`/modals/edit_tracker/?tracker_id=${activeTrackerId}`);
-                    } else {
-                        // For archive/delete, use the handler
-                        if (typeof window.App.handleTrackerAction === 'function') {
-                            window.App.handleTrackerAction(action, activeTrackerId);
-                        } else {
-                            console.error('App.handleTrackerAction not found');
+                        if (window.App) {
+                            window.App.loadModal(`/modals/edit_tracker/?tracker_id=${activeTrackerId}`);
                         }
+                    } else {
+                        handleTrackerAction(action, activeTrackerId);
                     }
                 }
             });
         }
 
-        console.log('[TrackerList] Context menu and filter/sort handlers initialized');
+        console.log('[TrackerList] Initialized with apiClient support');
     })();
 </script>

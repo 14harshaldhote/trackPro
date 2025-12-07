@@ -34,6 +34,7 @@ urlpatterns = [
     path('tracker/<str:tracker_id>/update/', views_api.api_tracker_update, name='tracker_update'),
     path('tracker/<str:tracker_id>/share/', views_api.api_share_tracker, name='tracker_share'),
     path('tracker/<str:tracker_id>/export/', views_api.api_export, name='tracker_export'),
+    path('templates/activate/', views_api.api_template_activate, name='template_activate'),
     
     # =========================================================================
     # UTILITY ENDPOINTS
@@ -65,6 +66,24 @@ urlpatterns = [
     path('notifications/', views_api.api_notifications, name='notifications'),
     
     # =========================================================================
+    # USER PROFILE & DATA MANAGEMENT
+    # =========================================================================
+    path('user/profile/', views_api.api_user_profile, name='user_profile'),
+    path('user/avatar/', views_api.api_user_avatar, name='user_avatar'),
+    path('user/delete/', views_api.api_user_delete, name='user_delete'),
+    path('data/export/', views_api.api_data_export, name='data_export'),
+    path('data/import/', views_api.api_data_import, name='data_import'),
+    path('data/clear/', views_api.api_data_clear, name='data_clear'),
+    
+    # =========================================================================
+    # ANALYTICS & EXPORT
+    # =========================================================================
+    path('analytics/data/', views_api.api_analytics_data, name='analytics_data'),
+    path('analytics/forecast/', views_api.api_analytics_forecast, name='analytics_forecast'),
+    path('export/month/', views_api.api_export_month, name='export_month'),
+    path('undo/', views_api.api_undo, name='undo'),
+    
+    # =========================================================================
     # UX OPTIMIZATION
     # =========================================================================
     path('prefetch/', views_api.api_prefetch, name='prefetch'),
@@ -75,6 +94,7 @@ urlpatterns = [
     # =========================================================================
     # SYSTEM
     # =========================================================================
+    path('feature-flags/<str:flag_name>/', views_api.api_feature_flag, name='feature_flag'),
     path('health/', views_api.api_health, name='health'),
     
     # =========================================================================

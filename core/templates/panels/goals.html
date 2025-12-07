@@ -171,3 +171,133 @@
 
 <!-- Confetti Container -->
 <canvas id="confetti-canvas" class="confetti-canvas"></canvas>
+
+<script>
+    (function initGoalsPanel() {
+        'use strict';
+
+        const container = document.querySelector('.goals-panel');
+        if (!container) return;
+
+        // ===== GOAL CARD CLICK HANDLING =====
+        const goalCards = container.querySelectorAll('.goal-card');
+        goalCards.forEach(card => {
+            const menuBtn = card.querySelector('[data-action="context-menu"]');
+            if (menuBtn) {
+                menuBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const goalId = card.dataset.goalId;
+                    // Open edit modal instead of showing context menu
+                    if (window.App) {
+                        window.App.loadModal(`/modals/edit_goal/?goal_id=${goalId}`);
+                    }
+                });
+            }
+        });
+
+        // ===== LOAD GOALS VIA API =====
+        async function loadGoals() {
+            if (!window.apiClient) {
+                console.log('[Goals] apiClient not available, using server-rendered data');
+                return;
+            }
+
+            try {
+                // API v1: /api/v1/goals/
+                const result = await window.apiClient.get('/goals/');
+
+                if (result.success) {
+                    console.log('[Goals] Loaded goals:', result.goals);
+                    // Could dynamically update UI here if needed
+                    // For now, server-side rendering handles initial load
+                    return result.goals;
+                } else {
+                    throw new Error(result.error || 'Failed to load goals');
+                }
+            } catch (error) {
+                console.error('[Goals] Failed to load goals:', error);
+                if (window.App) {
+                    window.App.showToast('error', 'Failed to load goals');
+                }
+                throw error;
+            }
+        }
+
+        // ===== CONFETTI ANIMATION =====
+        function triggerConfetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            const confetti = [];
+            const colors = ['#6366f1', '#22c55e', '#f97316', '#ec4899', '#0ea5e9'];
+
+            // Create confetti particles
+            for (let i = 0; i < 100; i++) {
+                confetti.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    size: Math.random() * 10 + 5,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    speedY: Math.random() * 3 + 2,
+                    speedX: Math.random() * 2 - 1,
+                    rotation: Math.random() * 360
+                });
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                confetti.forEach((particle, index) => {
+                    ctx.save();
+                    ctx.translate(particle.x, particle.y);
+                    ctx.rotate(particle.rotation * Math.PI / 180);
+                    ctx.fillStyle = particle.color;
+                    ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
+                    ctx.restore();
+
+                    particle.y += particle.speedY;
+                    particle.x += particle.speedX;
+                    particle.rotation += 5;
+
+                    if (particle.y > canvas.height) {
+                        confetti.splice(index, 1);
+                    }
+                });
+
+                if (confetti.length > 0) {
+                    requestAnimationFrame(animate);
+                } else {
+                    canvas.style.display = 'none';
+                }
+            }
+
+            canvas.style.display = 'block';
+            animate();
+
+            // Hide after 3 seconds (reduced from 5)
+            setTimeout(() => {
+                canvas.style.display = 'none';
+            }, 3000);
+        }
+
+        // Check if we just completed a goal (from URL param or localStorage)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('goal_completed')) {
+            setTimeout(triggerConfetti, 500);
+        }
+
+        // Load goals data in background if apiClient available
+        if (window.apiClient) {
+            loadGoals().catch(err => {
+                console.log('[Goals] Initial goal load failed, using server-rendered data:', err);
+            });
+        }
+
+        console.log('[Goals] Panel initialized with API v1 support');
+    })();
+</script>

@@ -156,37 +156,39 @@
 
                 const statusIcon = task.querySelector('.week-task-status');
                 const isDone = task.classList.contains('done');
-                const newStatus = isDone ? 'TODO' : 'DONE';
 
                 try {
-                    await window.apiClient.patch(`/tasks/${taskId}/status/`, {
-                        status: newStatus
-                    });
+                    const result = await window.apiClient.post(`/task/${taskId}/toggle/`);
 
-                    task.classList.toggle('done');
-                    if (statusIcon) {
-                        statusIcon.className = `week-task-status status-${newStatus.toLowerCase()}`;
-                    }
+                    if (result.success) {
+                        // Parse status from UXResponse format: result.data.new_status
+                        const newStatus = result.data?.new_status || result.new_status || result.status || 'DONE';
 
-                    // Update day counter
-                    const dayCell = task.closest('.week-day');
-                    if (dayCell) {
-                        const progressText = dayCell.querySelector('.mini-progress-text');
-                        if (progressText) {
-                            const [completed, total] = progressText.textContent.split('/').map(Number);
-                            const newCompleted = isDone ? completed - 1 : completed + 1;
-                            progressText.textContent = `${newCompleted}/${total}`;
+                        task.classList.toggle('done');
+                        if (statusIcon) {
+                            statusIcon.className = `week-task-status status-${newStatus.toLowerCase()}`;
+                        }
 
-                            // Update progress bar
-                            const progressFill = dayCell.querySelector('.mini-progress-fill');
-                            if (progressFill && total > 0) {
-                                progressFill.style.width = `${Math.round(newCompleted / total * 100)}%`;
+                        // Update day counter
+                        const dayCell = task.closest('.week-day');
+                        if (dayCell) {
+                            const progressText = dayCell.querySelector('.mini-progress-text');
+                            if (progressText) {
+                                const [completed, total] = progressText.textContent.split('/').map(Number);
+                                const newCompleted = isDone ? completed - 1 : completed + 1;
+                                progressText.textContent = `${newCompleted}/${total}`;
+
+                                // Update progress bar
+                                const progressFill = dayCell.querySelector('.mini-progress-fill');
+                                if (progressFill && total > 0) {
+                                    progressFill.style.width = `${Math.round(newCompleted / total * 100)}%`;
+                                }
                             }
                         }
-                    }
 
-                    if (window.App) {
-                        window.App.showToast('success', `Task ${newStatus === 'DONE' ? 'completed' : 'reopened'}`);
+                        if (window.App) {
+                            window.App.showToast('success', `Task ${newStatus === 'DONE' ? 'completed' : 'reopened'}`);
+                        }
                     }
                 } catch (error) {
                     console.error('[WeekPanel] Toggle failed:', error);

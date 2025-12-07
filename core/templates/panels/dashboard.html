@@ -94,9 +94,9 @@
     </div>
 
     <!-- Behavioral Insights Section -->
-    <section class="dashboard-section" id="insights-section" style="display:none;">
+    <!-- <section class="dashboard-section" id="insights-section" style="display:none;">
         <div id="insights-container"></div>
-    </section>
+    </section> -->
 
     <!-- Today's Tasks Section -->
     <section class="dashboard-section">
@@ -265,29 +265,152 @@
             console.warn('[Dashboard] Failed to load insights:', error);
         }
 
-        // Dashboard filter initialization
-        const filterGroup = document.getElementById('period-filter-group');
-        if (!filterGroup) return;
+        // Task toggle handler
+        const taskList = document.getElementById('today-tasks');
+        if (taskList) {
+            taskList.addEventListener('click', async (e) => {
+                const toggleBtn = e.target.closest('[data-action="toggle"]');
+                if (!toggleBtn) return;
 
-        // Get App reference - check multiple locations
-        const getApp = () => window.App || (window.parent && window.parent.App) || null;
+                const taskRow = toggleBtn.closest('.task-row');
+                if (!taskRow) return;
 
-        // Bind click handlers to filter buttons
-        filterGroup.querySelectorAll('.btn').forEach(btn => {
-            btn.onclick = function (e) {
-                e.preventDefault();
-                const filter = this.dataset.dashboardFilter;
-                console.log('[Dashboard] Switching to filter:', filter);
+                const taskId = taskRow.dataset.taskId;
+                const oldStatus = taskRow.dataset.status;
 
-                const App = getApp();
-                if (App && App.loadPanel) {
-                    App.loadPanel(`/${filter}`);
-                } else {
-                    // Fallback: use regular navigation
-                    console.warn('[Dashboard] App not found, using regular navigation');
-                    window.location.href = `/${filter}`;
+                // Disable button during API call
+                toggleBtn.disabled = true;
+                toggleBtn.setAttribute('aria-busy', 'true');
+
+                try {
+                    const result = await window.apiClient.post(`/task/${taskId}/toggle/`);
+
+                    if (result.success) {
+                        // Parse status from UXResponse format: result.data.new_status
+                        const newStatus = result.data?.new_status || result.new_status || result.status || 'DONE';
+
+                        // Update UI
+                        taskRow.dataset.status = newStatus;
+                        const statusIcon = taskRow.querySelector('.status-icon');
+                        if (statusIcon) {
+                            statusIcon.className = `status-icon status-${newStatus.toLowerCase()}`;
+                        }
+
+                        const description = taskRow.querySelector('.task-description');
+                        if (description) {
+                            if (newStatus === 'DONE') {
+                                description.classList.add('completed');
+                            } else {
+                                description.classList.remove('completed');
+                            }
+                        }
+
+                        // Update stats (Completed and Pending)
+                        const stats = document.querySelectorAll('.stat-value');
+                        // 0: Completed, 1: Pending (Based on DOM order)
+                        if (stats.length >= 2) {
+                            const completedEl = stats[0];
+                            const pendingEl = stats[1];
+                            let completed = parseInt(completedEl.textContent) || 0;
+                            let pending = parseInt(pendingEl.textContent) || 0;
+
+                            if (newStatus === 'DONE' && oldStatus !== 'DONE') {
+                                completed++;
+                                pending--;
+                            } else if (newStatus !== 'DONE' && oldStatus === 'DONE') {
+                                completed--;
+                                pending++;
+                            }
+
+                            completedEl.textContent = completed;
+                            pendingEl.textContent = pending;
+                        }
+
+                        // Also update completion rate if possible (Optional polish)
+                        const trendEl = document.querySelector('.stat-card .stat-trend');
+                        if (trendEl && stats.length >= 2) {
+                            // Simple re-calc if logical
+                            // Skipping to minimize complexity risks, user only asked for counts
+                        }
+
+                        if (window.App) {
+                            window.App.showToast('success', `Task ${newStatus === 'DONE' ? 'completed' : 'reopened'}`);
+                        }
+                    } else {
+                        throw new Error(result.error || 'Failed to toggle task');
+                    }
+                } catch (error) {
+                    console.error('[Dashboard] Task toggle failed:', error);
+                    if (window.App) {
+                        window.App.showToast('error', 'Failed to update task', error.message);
+                    }
+                } finally {
+                    toggleBtn.disabled = false;
+                    toggleBtn.setAttribute('aria-busy', 'false');
                 }
-            };
+            });
+        }
+
+        // Task delete handler
+        document.addEventListener('click', async (e) => {
+            const deleteBtn = e.target.closest('[data-action="delete-task"]');
+            if (!deleteBtn) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const taskRow = deleteBtn.closest('.task-row');
+            if (!taskRow) return;
+
+            const taskId = taskRow.dataset.taskId;
+            const description = taskRow.querySelector('.task-description')?.textContent || 'this task';
+
+            // Confirm deletion
+            if (!confirm(`Delete "${description}"?`)) {
+                return;
+            }
+
+            deleteBtn.disabled = true;
+            deleteBtn.setAttribute('aria-busy', 'true');
+
+            try {
+                const result = await window.apiClient.delete(`/task/${taskId}/delete/`);
+
+                if (result.success) {
+                    // Remove from UI
+                    taskRow.remove();
+
+                    // Update stats
+                    const statsCompleted = document.querySelector('.stat-value');
+                    const wasDone = taskRow.dataset.status === 'DONE';
+                    if (statsCompleted && wasDone) {
+                        const current = parseInt(statsCompleted.textContent);
+                        statsCompleted.textContent = current - 1;
+                    }
+
+                    if (window.App) {
+                        window.App.showToast('success', 'Task deleted');
+                    }
+
+                    // Show empty state if no tasks left
+                    const remainingTasks = document.querySelectorAll('.task-row').length;
+                    if (remainingTasks === 0 && taskList) {
+                        taskList.innerHTML = '<div class="empty-state-sm"><p>No tasks for today. <a href="#" data-action="open-modal" data-modal="add-task">Add one?</a></p></div>';
+                    }
+                } else {
+                    throw new Error(result.error || 'Failed to delete task');
+                }
+            } catch (error) {
+                console.error('[Dashboard] Task delete failed:', error);
+                if (window.App) {
+                    window.App.showToast('error', 'Failed to delete task', error.message);
+                }
+            } finally {
+                deleteBtn.disabled = false;
+                deleteBtn.setAttribute('aria-busy', 'false');
+            }
         });
+
+        console.log('[Dashboard] Initialized with task handlers');
     })();
 </script>

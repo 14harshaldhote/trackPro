@@ -388,11 +388,12 @@ def panel_tracker_detail(request, tracker_id):
     
     todays_tasks = []
     if instance:
-        # Use TaskService
-        todays_tasks_objs = task_svc.get_tasks_for_instance(instance.instance_id)
+        # Use instance_service (get_tasks_for_instance is in instance_service, not TaskService)
+        from core.services.instance_service import get_tasks_for_instance
+        todays_tasks_objs = get_tasks_for_instance(instance.instance_id, request.user)
         # Format for view
         for t in todays_tasks_objs:
-             todays_tasks.append(view_svc.format_task_for_list(t))
+             todays_tasks.append(view_svc.format_task_for_list(t, tracker))
     
     # 2. Historical Stats (Service)
     # We need last 30 days history or simplified stats
@@ -483,77 +484,148 @@ def panel_tracker_detail(request, tracker_id):
     
     return render(request, 'panels/tracker_detail.html', context)
 
-
 @login_required
 @login_required
 @handle_view_errors
 def panel_week(request):
-    """Week view for habits"""
+    """Week view for habits - Aggregated Daily View"""
     today = date.today()
-    start_of_week = today - timedelta(days=today.weekday())
-    end_of_week = start_of_week + timedelta(days=6)
     
-    # 1. Fetch Active Trackers (Service)
-    tracker_svc = TrackerService()
-    trackers = tracker_svc.get_active_trackers(request.user)
+    # Handle date navigation
+    date_param = request.GET.get('date')
+    if date_param:
+        try:
+            start_date = date.fromisoformat(date_param)
+            # Find start of that week
+            start_of_week = start_date - timedelta(days=start_date.weekday())
+        except ValueError:
+            start_of_week = today - timedelta(days=today.weekday())
+    else:
+        start_of_week = today - timedelta(days=today.weekday())
+        
+    end_of_week = start_of_week + timedelta(days=6)
     
     # 2. Fetch Tasks (Service, optimized batch)
     task_svc = TaskService()
+    # Fetch all tasks for the user in this date range
     all_tasks = task_svc.get_all_tasks_for_user_range(request.user, start_of_week, end_of_week)
     
-    # Organize tasks by (tracker_id, date) for O(1) lookup
-    tasks_map = {}
-    for t in all_tasks:
-        t_date = t.tracker_instance.period_start
-        if isinstance(t_date, str):
-            from datetime import date as dt
-            t_date = dt.fromisoformat(t_date)
-            if hasattr(t_date, 'date'):
-                 t_date = t_date.date()
-        elif hasattr(t_date, 'date'):
-             # If datetime, get date
-             t_date = t_date.date()
-             
-        tasks_map[(t.tracker_instance.tracker.tracker_id, t_date)] = t
+    week_stats = {
+        'completed': 0,
+        'completion_rate': 0,
+        'best_day': '-',
+        'streak': 0  # To be populated from analytics
+    }
     
-    dates = [start_of_week + timedelta(days=i) for i in range(7)]
+    # helper for time of day
+    def get_time_segment(task_obj):
+        # Assuming task has time_of_day or we infer from template
+        # If not available, default to 'anytime'
+        return getattr(task_obj, 'time_of_day', 'anytime')
+
+    days_data = []
+    total_week_tasks = 0
+    total_week_completed = 0
+    best_day_rate = -1
+    best_day_date = None
     
-    tracker_data = []
-    
-    for tracker in trackers:
-        week_data = []
-        for d in dates:
-            # Use map lookup
-            instance = tasks_map.get((tracker.tracker_id, d))
-            
-            week_data.append({
-                'date': d,
-                'task': instance,
-                'status': instance.status if instance else 'PENDING',
-                'is_today': d == today
-            })
-            
-        tracker_data.append({
-            'tracker': tracker,
-            'week_data': week_data
+    # Iterate through 7 days
+    for i in range(7):
+        current_date = start_of_week + timedelta(days=i)
+        
+        # Filter tasks for this day
+        # Note: tasks need to be normalized to date objects for comparison
+        day_tasks = []
+        for t in all_tasks:
+            t_start = t.tracker_instance.period_start
+            if hasattr(t_start, 'date'):
+                t_date = t_start.date()
+            elif isinstance(t_start, str):
+                t_date = date.fromisoformat(t_start)
+            else:
+                t_date = t_start
+                
+            if t_date == current_date:
+                day_tasks.append(t)
+        
+        # Calc day stats
+        total = len(day_tasks)
+        completed = sum(1 for t in day_tasks if t.status == 'DONE')
+        progress = int(completed / total * 100) if total > 0 else 0
+        
+        # Time of day stats
+        morning_tasks = [t for t in day_tasks if get_time_segment(t) == 'morning']
+        afternoon_tasks = [t for t in day_tasks if get_time_segment(t) == 'afternoon']
+        evening_tasks = [t for t in day_tasks if get_time_segment(t) == 'evening']
+        
+        def calc_rate(sub_tasks):
+            t = len(sub_tasks)
+            c = sum(1 for task in sub_tasks if task.status == 'DONE')
+            # normalized 0-1 for css opacity
+            return round(c / len(day_tasks), 2) if len(day_tasks) > 0 else 0, c, t
+
+        m_rate, m_c, m_t = calc_rate(morning_tasks)
+        a_rate, a_c, a_t = calc_rate(afternoon_tasks)
+        e_rate, e_c, e_t = calc_rate(evening_tasks)
+
+        days_data.append({
+            'date': current_date,
+            'is_today': current_date == today,
+            'total': total,
+            'completed': completed,
+            'progress': progress,
+            'tasks': day_tasks, # Pass simplified task objects if needed by template
+            'morning_rate': m_rate,
+            'morning_completed': m_c,
+            'morning_total': m_t,
+            'afternoon_rate': a_rate,
+            'afternoon_completed': a_c,
+            'afternoon_total': a_t,
+            'evening_rate': e_rate,
+            'evening_completed': e_c,
+            'evening_total': e_t,
         })
         
+        total_week_tasks += total
+        total_week_completed += completed
+        
+        if total > 0 and progress > best_day_rate:
+            best_day_rate = progress
+            best_day_date = current_date
+
+    # Finalize week stats
+    week_stats['completed'] = total_week_completed
+    week_stats['completion_rate'] = int(total_week_completed / total_week_tasks * 100) if total_week_tasks > 0 else 0
+    week_stats['best_day'] = best_day_date.strftime('%A') if best_day_date else '-'
+    
+    # Streak from analytics
+    from core.services.analytics_service import AnalyticsService
+    try:
+        analytics_svc = AnalyticsService(user=request.user)
+        streak_data = analytics_svc.get_user_overview()
+        week_stats['streak'] = streak_data.get('current_streak', 0)
+    except:
+        week_stats['streak'] = 0
+
     context = {
-        'dates': dates,
-        'tracker_data': tracker_data,
+        'days': days_data, # Use 'days' as expected by template
+        'week_stats': week_stats,
         'today': today,
-        'start_of_week': start_of_week,
-        'end_of_week': end_of_week,
+        'week_start': start_of_week,
+        'week_end': end_of_week,
+        'prev_week': start_of_week - timedelta(days=7),
+        'next_week': start_of_week + timedelta(days=7),
+        'week_number': start_of_week.isocalendar()[1],
+        'is_current_week': start_of_week <= today <= end_of_week,
     }
     
     if request.headers.get('X-Skeleton-Request'):
          return render(request, 'panels/week_content.html', context)
-         
+    
     return render(request, 'panels/week.html', context)
 
 
 @login_required
-@supports_skeleton(default_item_count=30)
 def panel_month(request):
     """Month view panel with full calendar grid and tracker breakdown"""
     from calendar import monthrange, monthcalendar

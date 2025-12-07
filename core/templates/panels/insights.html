@@ -202,3 +202,73 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function initInsightsPanel() {
+        'use strict';
+
+        const container = document.querySelector('.insights-panel');
+        if (!container) return;
+
+        // Add refresh button to header
+        const headerDiv = container.querySelector('.panel-header > div:first-child');
+        if (headerDiv) {
+            const refreshBtn = document.createElement('button');
+            refreshBtn.className = 'btn btn-ghost btn-sm';
+            refreshBtn.style.marginLeft = '1rem';
+            refreshBtn.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                Refresh
+            `;
+            refreshBtn.onclick = async () => {
+                refreshBtn.disabled = true;
+                refreshBtn.innerHTML = '<span class="loading-spinner" style="width:14px;height:14px;"></span> Loading...';
+
+                try {
+                    // Reload panel via SPA navigation
+                    if (window.App) {
+                        window.App.loadPanel('/insights/', false);
+                    } else {
+                        window.location.reload();
+                    }
+                } catch (error) {
+                    console.error('[InsightsPanel] Refresh failed:', error);
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = `
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                        Refresh
+                    `;
+                    if (window.App) window.App.showToast('error', 'Refresh failed');
+                }
+            };
+            headerDiv.appendChild(refreshBtn);
+        }
+
+        // Load insights via API v1 for dynamic content
+        async function loadInsightsFromAPI() {
+            try {
+                if (!window.apiClient) return;
+
+                // API v1: /api/v1/insights/
+                const insights = await window.apiClient.get('/insights/');
+                console.log('[InsightsPanel] Loaded insights:', insights);
+
+                // Could dynamically update sections here if needed
+                // For now, server-side rendering handles initial load
+            } catch (error) {
+                console.log('[InsightsPanel] API load optional - using server-rendered content');
+            }
+        }
+
+        // Load additional insights data in background
+        loadInsightsFromAPI();
+
+        console.log('[InsightsPanel] Initialized with API v1 support');
+    })();
+</script>

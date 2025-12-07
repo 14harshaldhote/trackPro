@@ -316,11 +316,159 @@ def api_tracker_update(request, tracker_id):
     )
 
 
+@login_required
+@require_POST
+@handle_service_errors
+def api_template_activate(request):
+    """
+    Create tracker from predefined template.
+    
+    POST /api/v1/templates/activate/
+    Body: {'template_key': 'morning'}
+    
+    Returns: {'tracker_id': '...', 'message': '...'}
+    """
+    data = json.loads(request.body)
+    template_key = data.get('template_key')
+    
+    # Define all template configurations matching templates.html
+    TEMPLATES = {
+        'morning': {
+            'name': 'Morning Routine',
+            'description': 'Start your day with purpose. Includes meditation, exercise, and planning.',
+            'time_period': 'daily',
+            'tasks': [
+                {'description': 'Wake up at target time', 'category': 'routine', 'weight': 1, 'time_of_day': 'morning'},
+                {'description': 'Meditation (10 min)', 'category': 'mindfulness', 'weight': 2, 'time_of_day': 'morning'},
+                {'description': 'Morning exercise (30 min)', 'category': 'fitness', 'weight': 3, 'time_of_day': 'morning'},
+                {'description': 'Healthy breakfast', 'category': 'nutrition', 'weight': 2, 'time_of_day': 'morning'},
+                {'description': 'Review daily goals', 'category': 'planning', 'weight': 2, 'time_of_day': 'morning'},
+                {'description': 'Shower and get ready', 'category': 'routine', 'weight': 1, 'time_of_day': 'morning'},
+                { 'description': 'Journal (5 min)', 'category': 'mindfulness', 'weight': 1, 'time_of_day': 'morning'},
+                {'description': 'Check calendar and priorities', 'category': 'planning', 'weight': 1, 'time_of_day': 'morning'},
+            ]
+        },
+        'fitness': {
+            'name': 'Fitness Tracker',
+            'description': 'Track workouts, nutrition, and recovery for optimal fitness.',
+            'time_period': 'daily',
+            'tasks': [
+                {'description': 'Cardio workout (30 min)', 'category': 'cardio', 'weight': 3, 'time_of_day': 'morning'},
+                {'description': 'Strength training', 'category': 'strength', 'weight': 3, 'time_of_day': 'afternoon'},
+                {'description': 'Log meals and track calories', 'category': 'nutrition', 'weight': 2, 'time_of_day': 'evening'},
+                {'description': 'Drink 8 glasses of water', 'category': 'hydration', 'weight': 2, 'time_of_day': 'anytime'},
+                {'description': 'Stretching (15 min)', 'category': 'flexibility', 'weight': 1, 'time_of_day': 'evening'},
+                {'description': 'Track weight and measurements', 'category': 'tracking', 'weight': 1, 'time_of_day': 'morning'},
+            ]
+        },
+        'study': {
+            'name': 'Study Plan',
+            'description': 'Structured learning with reading, practice, and review sessions.',
+            'time_period': 'daily',
+            'tasks': [
+                {'description': 'Review notes from previous session', 'category': 'review', 'weight': 2, 'time_of_day': 'morning'},
+                {'description': 'Active learning (2 hours)', 'category': 'study', 'weight': 3, 'time_of_day': 'afternoon'},
+                {'description': 'Practice problems', 'category': 'practice', 'weight': 3, 'time_of_day': 'afternoon'},
+                {'description': 'Create flashcards for new concepts', 'category': 'review', 'weight': 2, 'time_of_day': 'evening'},
+                {'description': 'Evening review (30 min)', 'category': 'review', 'weight': 2, 'time_of_day': 'evening'},
+            ]
+        },
+        'work': {
+            'name': 'Work Productivity',
+            'description': 'Focus blocks, email management, and daily planning.',
+            'time_period': 'daily',
+            'tasks': [
+                {'description': 'Plan top 3 priorities', 'category': 'planning', 'weight': 2, 'time_of_day': 'morning'},
+                {'description': 'Deep work block 1 (2 hours)', 'category': 'focus', 'weight': 3, 'time_of_day': 'morning'},
+                {'description': 'Check and respond to emails', 'category': 'communication', 'weight': 1, 'time_of_day': 'afternoon'},
+                {'description': 'Deep work block 2 (2 hours)', 'category': 'focus', 'weight': 3, 'time_of_day': 'afternoon'},
+                {'description': 'Team meetings and collaboration', 'category': 'collaboration', 'weight': 2, 'time_of_day': 'afternoon'},
+                {'description': 'Review progress and plan tomorrow', 'category': 'planning', 'weight': 2, 'time_of_day': 'evening'},
+                {'description': 'Clear inbox to zero', 'category': 'communication', 'weight': 1, 'time_of_day': 'evening'},
+            ]
+        },
+        'mindfulness': {
+            'name': 'Mindfulness',
+            'description': 'Meditation, gratitude journaling, and mental wellness.',
+            'time_period': 'daily',
+            'tasks': [
+                {'description': 'Morning meditation (15 min)', 'category': 'meditation', 'weight': 3, 'time_of_day': 'morning'},
+                {'description': 'Gratitude journal (3 things)', 'category': 'journaling', 'weight': 2, 'time_of_day': 'morning'},
+                {'description': 'Midday breathing exercise (5 min)', 'category': 'breathwork', 'weight': 1, 'time_of_day': 'afternoon'},
+                {'description': 'Evening reflection', 'category': 'journaling', 'weight': 2, 'time_of_day': 'evening'},
+            ]
+        },
+        'evening': {
+            'name': 'Evening Wind Down',
+            'description': 'Prepare for restful sleep with relaxation routines.',
+            'time_period': 'daily',
+            'tasks': [
+                {'description': 'No screens 1 hour before bed', 'category': 'digital detox', 'weight': 2, 'time_of_day': 'evening'},
+                {'description': 'Light dinner (3 hours before bed)', 'category': 'nutrition', 'weight': 1, 'time_of_day': 'evening'},
+                {'description': 'Evening walk or gentle yoga', 'category': 'movement', 'weight': 2, 'time_of_day': 'evening'},
+                {'description': 'Read for 30 minutes', 'category': 'relaxation', 'weight': 2, 'time_of_day': 'evening'},
+                {'description': 'Bedtime routine (skincare, etc.)', 'category': 'routine', 'weight': 1, 'time_of_day': 'evening'},
+            ]
+        },
+        'weekly-review': {
+            'name': 'Weekly Review',
+            'description': 'Reflect on the week and plan for success ahead.',
+            'time_period': 'weekly',
+            'tasks': [
+                {'description': 'Review completed tasks from week', 'category': 'review', 'weight': 2, 'time_of_day': 'anytime'},
+                {'description': 'Celebrate wins and progress', 'category': 'reflection', 'weight': 1, 'time_of_day': 'anytime'},
+                {'description': 'Identify lessons learned', 'category': 'reflection', 'weight': 2, 'time_of_day': 'anytime'},
+                {'description': 'Plan goals for next week', 'category': 'planning', 'weight': 3, 'time_of_day': 'anytime'},
+                {'description': 'Schedule important tasks', 'category': 'planning', 'weight': 2, 'time_of_day': 'anytime'},
+                {'description': 'Review analytics and adjust habits', 'category': 'optimization', 'weight': 2, 'time_of_day': 'anytime'},
+            ]
+        },
+        'language': {
+            'name': 'Language Learning',
+            'description': 'Vocabulary, grammar, speaking practice, and immersion.',
+            'time_period': 'daily',
+            'tasks': [
+                {'description': 'App practice (15 min)', 'category': 'digital practice', 'weight': 2, 'time_of_day': 'morning'},
+                {'description': 'Learn 10 new vocabulary words', 'category': 'vocabulary', 'weight': 2, 'time_of_day': 'morning'},
+                {'description': 'Grammar exercises', 'category': 'grammar', 'weight': 2, 'time_of_day': 'afternoon'},
+                {'description': 'Speaking practice (10 min)', 'category': 'speaking', 'weight': 3, 'time_of_day': 'afternoon'},
+                {'description': 'Watch content in target language', 'category': 'immersion', 'weight': 2, 'time_of_day': 'evening'},
+            ]
+        },
+    }
+    
+    if not template_key or template_key not in TEMPLATES:
+        return UXResponse.error(
+            message='Template not found',
+            error_code='INVALID_TEMPLATE',
+            status=404
+        )
+    
+    template_config = TEMPLATES[template_key]
+    
+    # Create tracker using TrackerService with template data
+    tracker = tracker_service.create_tracker(request.user, template_config)
+    
+    return UXResponse.success(
+        message=f'Created "{template_config["name"]}" tracker',
+        data={
+            'tracker_id': tracker.get('id') or tracker.get('tracker_id'),
+            'tracker_name': template_config['name'],
+            'task_count': len(template_config['tasks'])
+        },
+        feedback={
+            'type': 'success',
+            'message': f'"{template_config["name"]}" tracker created!',
+            'haptic': 'success',
+            'toast': True
+        }
+    )
+
+
 # ============================================================================
 # SEARCH ENDPOINT (Enhanced with suggestions)
 # ============================================================================
 
-@login_required
 @require_GET
 @handle_service_errors
 def api_search(request):
@@ -704,16 +852,16 @@ def api_chart_data(request):
             
             day_count = 0
             if tracker_id:
-                instances = TrackerInstance.objects.filter(
-                    tracker_definition__tracker_id=tracker_id,
-                    date=day,
+                instances = TaskInstance.objects.filter(
+                    tracker_instance__tracker__tracker_id=tracker_id,
+                    tracker_instance__tracking_date=day,
                     status='DONE'
                 ).count()
                 day_count = instances
             else:
-                instances = TrackerInstance.objects.filter(
-                    tracker_definition__user=request.user,
-                    date=day,
+                instances = TaskInstance.objects.filter(
+                    tracker_instance__tracker__user=request.user,
+                    tracker_instance__tracking_date=day,
                     status='DONE'
                 ).count()
                 day_count = instances
@@ -902,21 +1050,97 @@ def api_mark_overdue_missed(request, tracker_id):
 @login_required
 @require_http_methods(['GET', 'POST'])
 def api_goals(request):
-    """Goals API endpoint for listing and creating goals"""
+    """
+    Goals API endpoint with pagination support
+    
+    GET params:
+        page: Page number (default: 1)
+        per_page: Items per page (default: 20, max: 100)
+        status: Filter by status ('active', 'completed', 'archived')
+        sort: Sort order ('created', '-created', 'priority', 'progress')
+    
+    Returns:
+        Paginated goals list with metadata
+    """
     from .models import Goal
+    from django.core.paginator import Paginator, EmptyPage
     
     if request.method == 'GET':
-        goals = Goal.objects.filter(user=request.user).values(
-            'goal_id', 'title', 'description', 'icon', 'goal_type',
-            'target_date', 'target_value', 'current_value', 'unit',
-            'status', 'priority', 'progress'
-        )
-        return JsonResponse({'success': True, 'goals': list(goals)})
+        # Get query parameters
+        page = int(request.GET.get('page', 1))
+        per_page = min(int(request.GET.get('per_page', 20)), 100)  # Max 100
+        status_filter = request.GET.get('status', 'all')
+        sort_order = request.GET.get('sort', '-created_at')
+        
+        # Build query
+        goals_query = Goal.objects.filter(user=request.user, deleted_at__isnull=True)
+        
+        # Apply status filter
+        if status_filter != 'all':
+            goals_query = goals_query.filter(status=status_filter)
+        
+        # Apply sorting
+        valid_sorts = ['created_at', '-created_at', 'priority', '-priority', 'progress', '-progress', 'target_date']
+        if sort_order in valid_sorts:
+            goals_query = goals_query.order_by(sort_order)
+        else:
+            goals_query = goals_query.order_by('-created_at')
+        
+        # Paginate
+        paginator = Paginator(goals_query, per_page)
+        
+        try:
+            page_obj = paginator.get_page(page)
+        except EmptyPage:
+            return JsonResponse({
+                'success': True,
+                'goals': [],
+                'pagination': {
+                    'current_page': page,
+                    'total_pages': paginator.num_pages,
+                    'total_count': paginator.count,
+                    'has_next': False,
+                    'has_previous': False
+                }
+            })
+        
+        # Serialize goals
+        goals_data = []
+        for goal in page_obj:
+            goals_data.append({
+                'goal_id': goal.goal_id,
+                'title': goal.title,
+                'description': goal.description,
+                'icon': goal.icon,
+                'goal_type': goal.goal_type,
+                'target_date': goal.target_date.isoformat() if goal.target_date else None,
+                'target_value': goal.target_value,
+                'current_value': goal.current_value,
+                'unit': goal.unit,
+                'status': goal.status,
+                'priority': goal.priority,
+                'progress': goal.progress,
+                'created_at': goal.created_at.isoformat() if hasattr(goal, 'created_at') else None
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'goals': goals_data,
+            'pagination': {
+                'current_page': page,
+                'total_pages': paginator.num_pages,
+                'total_count': paginator.count,
+                'has_next': page_obj.has_next(),
+                'has_previous': page_obj.has_previous(),
+                'next_page': page + 1 if page_obj.has_next() else None,
+                'previous_page': page - 1 if page_obj.has_previous() else None,
+                'per_page': per_page
+            }
+        })
     
     elif request.method == 'POST':
         try:
             data = json.loads(request.body)
-            # Accept both 'goal_type' (from form) and 'type' (legacy)
             goal_type = data.get('goal_type') or data.get('type', 'habit')
             goal = Goal.objects.create(
                 user=request.user,
@@ -1416,3 +1640,896 @@ def api_health(request):
     
     status_code = 200 if health_status['status'] == 'healthy' else 503
     return JsonResponse(health_status, status=status_code)
+
+
+# ============================================================================
+# USER PROFILE \u0026 SETTINGS ENDPOINTS (for both Web and iOS)
+# ============================================================================
+
+@login_required
+@require_http_methods(['GET', 'PUT'])
+def api_user_profile(request):
+    """
+    Get or update user profile information.
+    Used by both web frontend and iOS app.
+    
+    GET /api/v1/user/profile/
+    PUT /api/v1/user/profile/
+    
+    PUT Body:
+        {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john@example.com",
+            "timezone": "Asia/Kolkata",
+            "date_format": "DD/MM/YYYY",
+            "week_start": 1
+        }
+    """
+    from .models import UserPreferences
+    
+    if request.method == 'GET':
+        # Get current profile
+        prefs, _ = UserPreferences.objects.get_or_create(user=request.user)
+        
+        return JsonResponse({
+            'success': True,
+            'profile': {
+                'first_name': request.user.first_name,
+                'last_name': request.user.last_name,
+                'email': request.user.email,
+                'username': request.user.username,
+                'timezone': prefs.timezone,
+                'date_format': prefs.date_format,
+                'week_start': prefs.week_start,
+            }
+        })
+    
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            
+            # Update User model fields
+            if 'first_name' in data:
+                request.user.first_name = data['first_name']
+            if 'last_name' in data:
+                request.user.last_name = data['last_name']
+            if 'email' in data:
+                # Validate email is not already taken by another user
+                from django.contrib.auth.models import User
+                email = data['email']
+                if User.objects.filter(email=email).exclude(id=request.user.id).exists():
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Email already in use by another account'
+                    }, status=400)
+                request.user.email = email
+            
+            request.user.save()
+            
+            # Update UserPreferences fields
+            prefs, _ = UserPreferences.objects.get_or_create(user=request.user)
+            if 'timezone' in data:
+                prefs.timezone = data['timezone']
+            if 'date_format' in data:
+                prefs.date_format = data['date_format']
+            if 'week_start' in data:
+                prefs.week_start = int(data['week_start'])
+            
+            prefs.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Profile updated successfully',
+                'profile': {
+                    'first_name': request.user.first_name,
+                    'last_name': request.user.last_name,
+                    'email': request.user.email,
+                    'timezone': prefs.timezone,
+                    'date_format': prefs.date_format,
+                    'week_start': prefs.week_start,
+                }
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid JSON in request body'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+
+
+@login_required
+@require_http_methods(['POST', 'DELETE'])
+def api_user_avatar(request):
+    """
+    Upload or remove user avatar.
+    
+    POST /api/v1/user/avatar/ - Upload avatar (multipart/form-data with 'avatar' file)
+    DELETE /api/v1/user/avatar/ - Remove avatar
+    
+    Returns avatar URL in response for immediate UI update.
+    """
+    from django.core.files.storage import default_storage
+    from django.core.files.base import ContentFile
+    import os
+    from PIL import Image
+    from io import BytesIO
+    
+    if request.method == 'POST':
+        try:
+            # Check if file exists in request
+            if 'avatar' not in request.FILES:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No avatar file provided'
+                }, status=400)
+            
+            avatar_file = request.FILES['avatar']
+            
+            # Validate file type
+            allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+            if avatar_file.content_type not in allowed_types:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'
+                }, status=400)
+            
+            # Validate file size (max 5MB)
+            max_size = 5 * 1024 * 1024  # 5MB
+            if avatar_file.size > max_size:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'File too large. Maximum size is 5MB.'
+                }, status=400)
+            
+            # Process and resize image
+            try:
+                img = Image.open(avatar_file)
+                
+                # Convert to RGB if needed (for JPEG)
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                    img = background
+                
+                # Resize to 400x400 (square)
+                img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+                
+                # Save to BytesIO
+                output = BytesIO()
+                img.save(output, format='JPEG', quality=90)
+                output.seek(0)
+                
+                # Generate filename
+                file_ext = 'jpg'
+                filename = f'avatars/user_{request.user.id}.{file_ext}'
+                
+                # Delete old avatar if exists
+                if default_storage.exists(filename):
+                    default_storage.delete(filename)
+                
+                # Save new avatar
+                path = default_storage.save(filename, ContentFile(output.read()))
+                avatar_url = default_storage.url(path)
+                
+                # Update user model if it has avatar field, or use preferences
+                # For now, we'll store in session/preferences
+                from .models import UserPreferences
+                prefs, _ = UserPreferences.objects.get_or_create(user=request.user)
+                # Note: UserPreferences doesn't have avatar_url field in current model
+                # You may need to add this field to the model or use a different approach
+                # For now, returning the URL for frontend to handle
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Avatar uploaded successfully',
+                    'avatar_url': avatar_url
+                })
+                
+            except Exception as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error processing image: {str(e)}'
+                }, status=400)
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+    
+    elif request.method == 'DELETE':
+        try:
+            # Delete avatar file
+            filename = f'avatars/user_{request.user.id}.jpg'
+            if default_storage.exists(filename):
+                default_storage.delete(filename)
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Avatar removed successfully',
+                'avatar_url': '/static/core/images/default-avatar.svg'
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+
+
+@login_required
+@require_POST
+def api_data_export(request):
+    """
+    Export user data in JSON or CSV format.
+    
+    POST /api/v1/data/export/
+    Body: {"format": "json"|"csv"}
+    
+    Returns JSON with download_url or direct file data.
+    """
+    try:
+        data = json.loads(request.body)
+        export_format = data.get('format', 'json').lower()
+        
+        if export_format not in ['json', 'csv']:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid format. Use "json" or "csv".'
+            }, status=400)
+        
+        # Gather user data
+        user_data = {
+            'export_date': timezone.now().isoformat(),
+            'user': {
+                'username': request.user.username,
+                'email': request.user.email,
+                'first_name': request.user.first_name,
+                'last_name': request.user.last_name,
+            },
+            'trackers': [],
+            'preferences': {}
+        }
+        
+        # Get all trackers
+        trackers = TrackerDefinition.objects.filter(user=request.user, deleted_at__isnull=True)
+        for tracker in trackers:
+            tracker_data = {
+                'tracker_id': tracker.tracker_id,
+                'name': tracker.name,
+                'description': tracker.description,
+                'time_mode': tracker.time_mode,
+                'status': tracker.status,
+                'created_at': tracker.created_at.isoformat(),
+                'tasks': []
+            }
+            
+            # Get task templates
+            templates = TaskTemplate.objects.filter(tracker=tracker, deleted_at__isnull=True)
+            for template in templates:
+                tracker_data['tasks'].append({
+                    'template_id': template.template_id,
+                    'description': template.description,
+                    'category': template.category,
+                    'weight': template.weight,
+                    'time_of_day': template.time_of_day,
+                })
+            
+            user_data['trackers'].append(tracker_data)
+        
+        # Get preferences
+        from .models import UserPreferences
+        try:
+            prefs = UserPreferences.objects.get(user=request.user)
+            user_data['preferences'] = {
+                'theme': prefs.theme,
+                'timezone': prefs.timezone,
+                'date_format': prefs.date_format,
+                'week_start': prefs.week_start,
+                'default_view': prefs.default_view,
+                'compact_mode': prefs.compact_mode,
+                'animations': prefs.animations,
+            }
+        except UserPreferences.DoesNotExist:
+            pass
+        
+        if export_format == 'json':
+            # Return JSON data directly for download
+            response = JsonResponse(user_data, json_dumps_params={'indent': 2})
+            response['Content-Disposition'] = f'attachment; filename="tracker_export_{timezone.now().strftime("%Y%m%d")}.json"'
+            return response
+        
+        else:  # CSV format
+            import csv
+            from io import StringIO
+            
+            output = StringIO()
+            writer = csv.writer(output)
+            
+            # Write trackers and tasks
+            writer.writerow(['Type', 'Tracker Name', 'Task Description', 'Category', 'Time Mode', 'Status'])
+            for tracker in user_data['trackers']:
+                for task in tracker['tasks']:
+                    writer.writerow([
+                        'Task',
+                        tracker['name'],
+                        task['description'],
+                        task['category'],
+                        tracker['time_mode'],
+                        tracker['status']
+                    ])
+            
+            from django.http import HttpResponse
+            response = HttpResponse(output.getvalue(), content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename="tracker_export_{timezone.now().strftime("%Y%m%d")}.csv"'
+            return response
+            
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON in request body'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+@require_POST
+def api_data_import(request):
+    """
+    Import user data from JSON file.
+    
+    POST /api/v1/data/import/
+    Body: multipart/form-data with 'file' field containing JSON export
+    
+    Returns count of imported trackers and tasks.
+    """
+    try:
+        if 'file' not in request.FILES:
+            return JsonResponse({
+                'success': False,
+                'error': 'No file provided'
+            }, status=400)
+        
+        import_file = request.FILES['file']
+        
+        # Validate file type
+        if not import_file.name.endswith('.json'):
+            return JsonResponse({
+                'success': False,
+                'error': 'Only JSON files are supported'
+            }, status=400)
+        
+        # Parse JSON
+        try:
+            import_data = json.loads(import_file.read().decode('utf-8'))
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid JSON file'
+            }, status=400)
+        
+        # Validate structure
+        if 'trackers' not in import_data:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid export format: missing trackers data'
+            }, status=400)
+        
+        # Import trackers and tasks
+        imported_trackers = 0
+        imported_tasks = 0
+        
+        for tracker_data in import_data['trackers']:
+            # Create tracker (with new UUID to avoid conflicts)
+            tracker = TrackerDefinition.objects.create(
+                user=request.user,
+                name=tracker_data['name'],
+                description=tracker_data.get('description', ''),
+                time_mode=tracker_data.get('time_mode', 'daily'),
+                status='active'  # Import as active
+            )
+            imported_trackers += 1
+            
+            # Create task templates
+            for task_data in tracker_data.get('tasks', []):
+                TaskTemplate.objects.create(
+                    tracker=tracker,
+                    description=task_data['description'],
+                    category=task_data.get('category', ''),
+                    weight=task_data.get('weight', 1),
+                    time_of_day=task_data.get('time_of_day', 'anytime')
+                )
+                imported_tasks += 1
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Imported {imported_trackers} trackers with {imported_tasks} tasks',
+            'imported_trackers': imported_trackers,
+            'imported_tasks': imported_tasks
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+@require_POST
+def api_data_clear(request):
+    """
+    Clear all user data (trackers, tasks, goals, etc.).
+    Requires confirmation string to prevent accidental deletion.
+    
+    POST /api/v1/data/clear/
+    Body: {"confirmation": "DELETE ALL DATA"}
+    
+    This is a DESTRUCTIVE operation. Use with extreme caution.
+    """
+    try:
+        data = json.loads(request.body)
+        confirmation = data.get('confirmation', '')
+        
+        if confirmation != 'DELETE ALL DATA':
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid confirmation. Please type "DELETE ALL DATA" to confirm.'
+            }, status=400)
+        
+        # Soft delete all user data
+        from .models import Goal
+        
+        deleted_counts = {}
+        
+        # Soft delete trackers (cascades to instances and tasks via Django ORM)
+        trackers = TrackerDefinition.objects.filter(user=request.user, deleted_at__isnull=True)
+        deleted_counts['trackers'] = trackers.count()
+        for tracker in trackers:
+            tracker.soft_delete()
+        
+        # Soft delete goals
+        goals = Goal.objects.filter(user=request.user, deleted_at__isnull=True)
+        deleted_counts['goals'] = goals.count()
+        for goal in goals:
+            goal.soft_delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'All data cleared successfully',
+            'deleted_counts': deleted_counts
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON in request body'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+@require_http_methods(['DELETE'])
+def api_user_delete(request):
+    """
+    Permanently delete user account and all associated data.
+    Requires password confirmation to prevent accidental deletion.
+    
+    DELETE /api/v1/user/delete/
+    Body: {"confirmation": "DELETE MY ACCOUNT", "password": "user_password"}
+    
+    This is an IRREVERSIBLE operation.
+    """
+    try:
+        data = json.loads(request.body)
+        confirmation = data.get('confirmation', '')
+        password = data.get('password', '')
+        
+        if confirmation != 'DELETE MY ACCOUNT':
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid confirmation. Please type "DELETE MY ACCOUNT" to confirm.'
+            }, status=400)
+        
+        # Verify password
+        from django.contrib.auth import authenticate
+        user = authenticate(username=request.user.username, password=password)
+        if user is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'Incorrect password'
+            }, status=401)
+        
+        # Hard delete all user data (not soft delete, permanent)
+        username = request.user.username
+        
+        # Delete user (cascades to all related data via ON_DELETE CASCADE)
+        request.user.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Account {username} permanently deleted',
+            'redirect': '/logout/'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON in request body'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+# =============================================================================
+# ANALYTICS & EXPORT APIs
+# =============================================================================
+
+@login_required
+@require_http_methods(['GET'])
+def api_analytics_data(request):
+    """
+    Get analytics data for charts dashboard
+    
+    Query params:
+        days: number of days of data (default: 30)
+        tracker_id: optional tracker UUID to filter
+    
+    Returns:
+        {
+            'success': true,
+            'data': {
+                'completion_trend': {...},
+                'category_distribution': {...},
+                'time_of_day': {...},
+                'heatmap': [...],
+                'insights': [...],
+                'summary': {...}
+            }
+        }
+    """
+    from core.services.analytics_service import AnalyticsService
+    
+    try:
+        days = int(request.GET.get('days', 30))
+        tracker_id = request.GET.get('tracker_id', None)
+        
+        # Validate days range
+        if days < 1 or days > 365:
+            return JsonResponse({
+                'success': False,
+                'error': 'Days must be between 1 and 365'
+            }, status=400)
+        
+        # Initialize service
+        service = AnalyticsService(tracker_id=tracker_id, user=request.user)
+        
+        # Get all analytics data
+        analytics_data = service.get_analytics_data(days=days)
+        
+        return JsonResponse({
+            'success': True,
+            'data': analytics_data,
+            'days': days
+        })
+        
+    except PermissionError as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=403)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+@require_http_methods(['POST'])
+def api_export_month(request):
+    """
+    Export data for a specific month
+    
+    Body:
+        {
+            "year": 2024,
+            "month": 12,
+            "format": "json"|"csv"|"xlsx",
+            "tracker_id": "optional-uuid"
+        }
+    
+    Returns:
+        File download (JSON/CSV/Excel)
+    """
+    from core.services.export_service import ExportService
+    
+    try:
+        data = json.loads(request.body)
+        
+        year = data.get('year')
+        month = data.get('month')
+        format = data.get('format', 'json')
+        tracker_id = data.get('tracker_id', None)
+        
+        # Validate inputs
+        if not year or not month:
+            return JsonResponse({
+                'success': False,
+                'error': 'Year and month are required'
+            }, status=400)
+        
+        if not isinstance(year, int) or not isinstance(month, int):
+            return JsonResponse({
+                'success': False,
+                'error': 'Year and month must be integers'
+            }, status=400)
+        
+        if month < 1 or month > 12:
+            return JsonResponse({
+                'success': False,
+                'error': 'Month must be between 1 and 12'
+            }, status=400)
+        
+        if format not in ['json', 'csv', 'xlsx']:
+            return JsonResponse({
+                'success': False,
+                'error': 'Format must be json, csv, or xlsx'
+            }, status=400)
+        
+        # Initialize service and export
+        service = ExportService(user=request.user)
+        response = service.export_month(year, month, format, tracker_id)
+        
+        return response
+        
+    except ValueError as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+@require_http_methods(['GET'])
+def api_analytics_forecast(request):
+    """
+    Get completion rate forecast using statistical analysis
+    
+    Query params:
+        days: number of days to forecast (default: 7, max: 30)
+        history_days: historical data to analyze (default: 30)
+        tracker_id: optional tracker UUID to filter
+    
+    Returns:
+        {
+            'success': true,
+            'forecast': {
+                'predictions': [85.2, 86.1, ...],
+                'upper_bound': [90.5, 91.2, ...],
+                'lower_bound': [79.9, 81.0, ...],
+                'confidence': 0.85,
+                'trend': 'increasing',
+                'dates': [...],
+                'labels': [...]
+            },
+            'summary': {
+                'message': '...',
+                'recommendation': '...',
+                'predicted_change': +5.2
+            }
+        }
+    """
+    from core.services.forecast_service import ForecastService
+    
+    try:
+        days = int(request.GET.get('days', 7))
+        history_days = int(request.GET.get('history_days', 30))
+        tracker_id = request.GET.get('tracker_id', None)
+        
+        # Validate inputs
+        if days < 1 or days > 30:
+            return JsonResponse({
+                'success': False,
+                'error': 'Days must be between 1 and 30'
+            }, status=400)
+        
+        if history_days < 7 or history_days > 365:
+            return JsonResponse({
+                'success': False,
+                'error': 'History days must be between 7 and 365'
+            }, status=400)
+        
+        # Initialize service
+        service = ForecastService(user=request.user)
+        
+        # Get forecast
+        forecast = service.forecast_completion_rate(
+            days_ahead=days,
+            history_days=history_days,
+            tracker_id=tracker_id
+        )
+        
+        if not forecast['success']:
+            return JsonResponse(forecast, status=400)
+        
+        # Get summary
+        summary = service.get_forecast_summary(days_ahead=days)
+        
+        return JsonResponse({
+            'success': True,
+            'forecast': forecast,
+            'summary': summary
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+# =============================================================================
+# UNDO SYSTEM
+# =============================================================================
+
+@login_required
+@require_POST
+def api_undo(request):
+    """
+    Undo a recent destructive action
+    
+    Body:
+        {
+            "action_id": "undo_123_abc",
+            "action_type": "delete_task"|"delete_goal"|"delete_tracker",
+            "action_data": { "task_id": "...", ... }
+        }
+    
+    Returns:
+        {"success": true, "message": "Action undone"}
+    """
+    try:
+        data = json.loads(request.body)
+        
+        action_type = data.get('action_type')
+        action_data = data.get('action_data', {})
+        
+        if not action_type:
+            return JsonResponse({
+                'success': False,
+                'error': 'action_type is required'
+            }, status=400)
+        
+        # Handle different action types
+        if action_type == 'delete_task':
+            task_id = action_data.get('task_id')
+            if not task_id:
+                return JsonResponse({'success': False, 'error': 'task_id required'}, status=400)
+            
+            task = TaskInstance.objects.filter(
+                task_instance_id=task_id,
+                tracker__user=request.user
+            ).first()
+            
+            if not task:
+                return JsonResponse({'success': False, 'error': 'Task not found'}, status=404)
+            
+            task.deleted_at = None
+            task.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Task restored',
+                'task_id': task_id
+            })
+        
+        elif action_type == 'delete_goal':
+            from .models import Goal
+            
+            goal_id = action_data.get('goal_id')
+            if not goal_id:
+                return JsonResponse({'success': False, 'error': 'goal_id required'}, status=400)
+            
+            goal = Goal.objects.filter(
+                goal_id=goal_id,
+                user=request.user
+            ).first()
+            
+            if not goal:
+                return JsonResponse({'success': False, 'error': 'Goal not found'}, status=404)
+            
+            goal.deleted_at = None
+            goal.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Goal restored',
+                'goal_id': goal_id
+            })
+        
+        elif action_type == 'delete_tracker':
+            tracker_id = action_data.get('tracker_id')
+            if not tracker_id:
+                return JsonResponse({'success': False, 'error': 'tracker_id required'}, status=400)
+            
+            tracker = TrackerDefinition.objects.filter(
+                tracker_id=tracker_id,
+                user=request.user
+            ).first()
+            
+            if not tracker:
+                return JsonResponse({'success': False, 'error': 'Tracker not found'}, status=404)
+            
+            tracker.deleted_at = None
+            tracker.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Tracker restored',
+                'tracker_id': tracker_id
+            })
+        
+        else:
+             return JsonResponse({
+                'success': False,
+                'error': f'Unsupported action_type: {action_type}'
+            }, status=400)
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+# =============================================================================
+# FEATURE FLAGS
+# =============================================================================
+
+@login_required
+@require_GET
+def api_feature_flag(request, flag_name):
+    """
+    Simple feature flag endpoint.
+    Returns enabled status for requested feature flag.
+    """
+    # Define feature flags and their status
+    FEATURE_FLAGS = {
+        'behavioral_insights': True,  # Behavioral analytics and forecasting
+        'export': True,               # Data export functionality
+        'undo': True,                 # Undo/redo actions
+        'pagination': True,           # Infinite scroll pagination
+        'offline': True,              # Service worker offline support
+    }
+    
+    enabled = FEATURE_FLAGS.get(flag_name, False)
+    
+    return JsonResponse({
+        'enabled': enabled,
+        'flag': flag_name
+    })

@@ -278,6 +278,8 @@
         const container = document.querySelector('.tracker-detail-panel');
         if (!container) return;
 
+        const trackerId = container.dataset.trackerId;
+
         // ===== SELECT ALL & BULK SELECTION =====
         const selectAllCheckbox = container.querySelector('#select-all');
         const bulkToolbar = container.querySelector('#bulk-toolbar');
@@ -295,7 +297,6 @@
                 bulkToolbar.style.display = 'none';
             }
 
-            // Update select all checkbox state
             const allCheckboxes = container.querySelectorAll('.bulk-select');
             if (selectAllCheckbox) {
                 selectAllCheckbox.checked = count > 0 && count === allCheckboxes.length;
@@ -303,7 +304,6 @@
             }
         }
 
-        // Select All handler
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', function () {
                 const checkboxes = container.querySelectorAll('.bulk-select');
@@ -312,14 +312,12 @@
             });
         }
 
-        // Individual checkbox handlers
         container.addEventListener('change', function (e) {
             if (e.target.classList.contains('bulk-select')) {
                 updateBulkToolbar();
             }
         });
 
-        // Cancel bulk selection
         if (bulkCancelBtn) {
             bulkCancelBtn.addEventListener('click', function () {
                 container.querySelectorAll('.bulk-select').forEach(cb => cb.checked = false);
@@ -327,6 +325,44 @@
                 updateBulkToolbar();
             });
         }
+
+        // ===== BULK ACTIONS (using apiClient with API v1 endpoints) =====
+        container.querySelectorAll('[data-bulk-action]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const action = btn.dataset.bulkAction;
+                const selected = Array.from(container.querySelectorAll('.bulk-select:checked'))
+                    .map(cb => cb.dataset.taskId);
+
+                if (selected.length === 0) return;
+
+                const statusMap = {
+                    'complete': 'DONE',
+                    'skip': 'SKIPPED'
+                };
+
+                try {
+                    if (action === 'delete') {
+                        // Delete each task individually via API v1
+                        for (const taskId of selected) {
+                            await window.apiClient.post(`/task/${taskId}/delete/`);
+                        }
+                        if (window.App) window.App.showToast('success', `${selected.length} tasks deleted`);
+                    } else if (statusMap[action]) {
+                        // API v1: /api/v1/tasks/bulk-update/
+                        await window.apiClient.post('/tasks/bulk-update/', {
+                            task_ids: selected,
+                            status: statusMap[action]
+                        });
+                        if (window.App) window.App.showToast('success', `${selected.length} tasks updated`);
+                    }
+
+                    if (window.App) window.App.loadPanel(window.location.pathname, false);
+                } catch (error) {
+                    console.error('[TrackerDetail] Bulk action failed:', error);
+                    if (window.App) window.App.showToast('error', 'Bulk action failed', error.message);
+                }
+            });
+        });
 
         // ===== FILTER TABS =====
         const filterTabs = container.querySelectorAll('.filter-tab');
@@ -375,6 +411,84 @@
             }
         });
 
+        // ===== QUICK TASK ADD (using apiClient with API v1 endpoint) =====
+        const quickInput = container.querySelector('#quick-task-input');
+        const quickAddBtn = container.querySelector('#quick-add-btn');
+
+        async function addQuickTask() {
+            const description = quickInput?.value.trim();
+            if (!description) return;
+
+            quickAddBtn.disabled = true;
+            quickAddBtn.textContent = 'Adding...';
+
+            try {
+                // API v1: /api/v1/tracker/{id}/task/add/
+                await window.apiClient.post(`/tracker/${trackerId}/task/add/`, {
+                    description: description
+                });
+
+                quickInput.value = '';
+                if (window.App) {
+                    window.App.showToast('success', 'Task added');
+                    window.App.loadPanel(window.location.pathname, false);
+                }
+            } catch (error) {
+                console.error('[TrackerDetail] Quick add failed:', error);
+                if (window.App) window.App.showToast('error', 'Failed to add task');
+            } finally {
+                quickAddBtn.disabled = false;
+                quickAddBtn.textContent = 'Add';
+            }
+        }
+
+        if (quickAddBtn) {
+            quickAddBtn.addEventListener('click', addQuickTask);
+        }
+        if (quickInput) {
+            quickInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') addQuickTask();
+            });
+        }
+
+        // ===== TASK STATUS TOGGLE (using apiClient with API v1 endpoint) =====
+        container.addEventListener('click', async function (e) {
+            const toggleBtn = e.target.closest('[data-action="toggle"]');
+            if (toggleBtn) {
+                e.preventDefault();
+                const taskRow = toggleBtn.closest('.task-row');
+                const taskId = taskRow?.dataset.taskId;
+                const currentStatus = taskRow?.dataset.status?.toUpperCase();
+
+                if (!taskId) return;
+
+                try {
+                    // API v1: /api/v1/task/{id}/toggle/ - cycles through statuses
+                    const result = await window.apiClient.post(`/task/${taskId}/toggle/`);
+                    const newStatus = result.new_status || (currentStatus === 'DONE' ? 'TODO' : 'DONE');
+
+                    // Update UI immediately
+                    taskRow.dataset.status = newStatus;
+                    const statusIcon = toggleBtn.querySelector('.status-icon');
+                    if (statusIcon) {
+                        statusIcon.className = `status-icon status-${newStatus.toLowerCase()}`;
+                    }
+
+                    const descSpan = taskRow.querySelector('.task-description');
+                    if (descSpan) {
+                        descSpan.classList.toggle('completed', newStatus === 'DONE');
+                    }
+
+                    if (window.App) {
+                        window.App.showToast('success', newStatus === 'DONE' ? 'Task completed!' : 'Task reopened');
+                    }
+                } catch (error) {
+                    console.error('[TrackerDetail] Toggle failed:', error);
+                    if (window.App) window.App.showToast('error', 'Failed to update task');
+                }
+            }
+        });
+
         // ===== EDIT BUTTON HANDLER =====
         container.addEventListener('click', function (e) {
             const editBtn = e.target.closest('[data-action="edit"]');
@@ -415,51 +529,49 @@
                 }
             });
 
-            contextMenu.addEventListener('click', (e) => {
+            contextMenu.addEventListener('click', async (e) => {
                 const actionBtn = e.target.closest('[data-action]');
-                if (!actionBtn) return;
+                if (!actionBtn || !activeTaskId) return;
 
                 const action = actionBtn.dataset.action;
                 contextMenu.style.display = 'none';
 
-                if (window.App && activeTaskId) {
+                try {
                     if (action === 'edit') {
-                        window.App.loadModal(`/modals/edit_task/?task_id=${activeTaskId}`);
+                        if (window.App) window.App.loadModal(`/modals/edit_task/?task_id=${activeTaskId}`);
                     } else if (action === 'delete') {
-                        window.App.handleTaskAction('delete', activeTaskId);
+                        // API v1: /api/v1/task/{id}/delete/
+                        await window.apiClient.post(`/task/${activeTaskId}/delete/`);
+                        if (window.App) {
+                            window.App.showToast('success', 'Task Deleted');
+                            window.App.loadPanel(window.location.pathname, false);
+                        }
                     } else if (action === 'complete') {
-                        fetch(`/api/task/${activeTaskId}/status/`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': window.App.getCsrfToken()
-                            },
-                            body: JSON.stringify({ status: 'DONE' })
-                        }).then(r => r.json()).then(data => {
-                            if (data.success) {
-                                window.App.showToast('success', 'Task Completed');
-                                window.App.loadPanel(window.location.pathname, false);
-                            }
-                        });
+                        // API v1: /api/v1/task/{id}/status/
+                        await window.apiClient.post(`/task/${activeTaskId}/status/`, { status: 'DONE' });
+                        if (window.App) {
+                            window.App.showToast('success', 'Task Completed');
+                            window.App.loadPanel(window.location.pathname, false);
+                        }
                     } else if (action === 'skip') {
-                        fetch(`/api/task/${activeTaskId}/status/`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': window.App.getCsrfToken()
-                            },
-                            body: JSON.stringify({ status: 'SKIPPED' })
-                        }).then(r => r.json()).then(data => {
-                            if (data.success) {
-                                window.App.showToast('info', 'Task Skipped');
-                                window.App.loadPanel(window.location.pathname, false);
-                            }
-                        });
+                        await window.apiClient.post(`/task/${activeTaskId}/status/`, { status: 'SKIPPED' });
+                        if (window.App) {
+                            window.App.showToast('info', 'Task Skipped');
+                            window.App.loadPanel(window.location.pathname, false);
+                        }
+                    } else if (action === 'duplicate') {
+                        // Note: Duplicate not in API v1 - show info message
+                        if (window.App) {
+                            window.App.showToast('info', 'Use edit to copy task settings');
+                        }
                     }
+                } catch (error) {
+                    console.error('[TrackerDetail] Action failed:', error);
+                    if (window.App) window.App.showToast('error', 'Action failed', error.message);
                 }
             });
         }
 
-        console.log('[TrackerDetail] All handlers initialized');
+        console.log('[TrackerDetail] Initialized with apiClient support');
     })();
 </script>

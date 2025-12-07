@@ -92,34 +92,101 @@ const ChartManager = {
     },
 
     initAllCharts() {
-        // Line/Bar chart
-        this.initCompletionChart();
+        analyticsLog('ChartManager', 'LOADING_DATA', { status: 'INFO', message: 'Fetching analytics data from API' });
 
-        // Pie chart
-        this.initCategoryChart();
+        // Fetch real data from API
+        this.loadAnalyticsData().then(data => {
+            analyticsLog('ChartManager', 'DATA_LOADED', { status: 'SUCCESS', message: 'Analytics data received', dataKeys: Object.keys(data) });
 
-        // Time of day bar chart
-        this.initTimeChart();
+            // Initialize charts with real data
+            this.initCompletionChart(data.completion_trend);
+            this.initCategoryChart(data.category_distribution);
+            this.initTimeChart(data.time_of_day);
+            this.initHeatmap(data.heatmap);
+            this.initComparisonChart();
 
-        // Heatmap (custom, not Chart.js)
-        this.initHeatmap();
+            // Render insights
+            if (data.insights && data.insights.length > 0) {
+                this.renderInsights(data.insights);
+            }
 
-        // Comparison chart
-        this.initComparisonChart();
+        }).catch(err => {
+            analyticsLog('ChartManager', 'DATA_ERROR', { status: 'ERROR', error: err.message });
+            this.showErrorState(err.message);
+        });
+    },
+
+    showErrorState(message) {
+        document.querySelectorAll('.chart-wrapper canvas').forEach(canvas => {
+            const wrapper = canvas.closest('.chart-wrapper');
+            if (wrapper) {
+                // Remove loading
+                const loading = wrapper.querySelector('.chart-loading');
+                if (loading) loading.style.display = 'none';
+
+                // Add error message
+                let errorMsg = wrapper.querySelector('.chart-error');
+                if (!errorMsg) {
+                    errorMsg = document.createElement('div');
+                    errorMsg.className = 'chart-error';
+                    errorMsg.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--color-danger);';
+                    wrapper.appendChild(errorMsg);
+                }
+                errorMsg.innerHTML = `<p>⚠️ Failed to load data</p><small>${message}</small>`;
+                canvas.style.opacity = '0.3';
+            }
+        });
+
+        const heatmapGrid = document.getElementById('heatmap-grid');
+        if (heatmapGrid) {
+            heatmapGrid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--color-text-muted);">Unable to load activity heatmap</div>`;
+        }
+    },
+
+    async loadAnalyticsData(days = 30) {
+        const url = `/api/v1/analytics/data/?days=${days}`;
+
+        analyticsLog('ChartManager', 'API_REQUEST', { status: 'INFO', url, method: 'GET' });
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to load analytics data');
+        }
+
+        return result.data;
     },
 
     // =========================================================================
     // COMPLETION TREND CHART
     // =========================================================================
-    initCompletionChart() {
+    initCompletionChart(chartData) {
         const canvas = document.getElementById('completion-chart');
         if (!canvas) return;
 
         const ctx = canvas.getContext('2d');
 
-        // Generate sample data (replace with real data from API)
-        const labels = this.getLast30Days();
-        const data = this.generateSampleData(30, 0, 100);
+        // Use real data if provided, otherwise fall back to sample
+        // Use real data if provided
+        const labels = chartData?.labels || [];
+        const data = chartData?.data || [];
+
+        if (labels.length === 0) {
+            this.showNoDataState(canvas, 'No completion data available');
+            return;
+        }
 
         this.charts.completion = new Chart(ctx, {
             type: 'line',
@@ -156,9 +223,9 @@ const ChartManager = {
                     }
                 },
                 onClick: (e, elements) => {
-                    if (elements.length) {
+                    if (elements.length && chartData?.dates) {
                         const index = elements[0].index;
-                        const date = labels[index];
+                        const date = chartData.dates[index];
                         this.drillDown(date);
                     }
                 }
@@ -171,22 +238,28 @@ const ChartManager = {
     // =========================================================================
     // CATEGORY PIE CHART
     // =========================================================================
-    initCategoryChart() {
+    initCategoryChart(chartData) {
         const canvas = document.getElementById('category-chart');
         if (!canvas) return;
 
         const ctx = canvas.getContext('2d');
 
+        if (!chartData || !chartData.data || chartData.data.length === 0) {
+            this.showNoDataState(canvas, 'No category data available');
+            return;
+        }
+
         const data = {
-            labels: ['Work', 'Health', 'Learning', 'Personal', 'Other'],
+            labels: chartData.labels,
             datasets: [{
-                data: [35, 25, 20, 15, 5],
+                data: chartData.data,
                 backgroundColor: [
                     ChartConfig.colors.primary,
                     ChartConfig.colors.success,
                     ChartConfig.colors.warning,
                     '#8B5CF6',
-                    ChartConfig.colors.gray
+                    ChartConfig.colors.gray,
+                    '#EC4899'
                 ],
                 borderWidth: 0,
                 hoverOffset: 8
@@ -231,18 +304,23 @@ const ChartManager = {
     // =========================================================================
     // TIME OF DAY BAR CHART
     // =========================================================================
-    initTimeChart() {
+    initTimeChart(chartData) {
         const canvas = document.getElementById('time-chart');
         if (!canvas) return;
 
         const ctx = canvas.getContext('2d');
 
+        if (!chartData || !chartData.data || chartData.data.length === 0) {
+            this.showNoDataState(canvas, 'No time data available');
+            return;
+        }
+
         this.charts.time = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['Morning', 'Afternoon', 'Evening', 'Night'],
+                labels: chartData.labels,
                 datasets: [{
-                    data: [45, 65, 40, 15],
+                    data: chartData.data,
                     backgroundColor: [
                         `rgba(${ChartConfig.colors.primaryRgb}, 0.6)`,
                         ChartConfig.colors.primary,
@@ -271,42 +349,44 @@ const ChartManager = {
     // =========================================================================
     // HEATMAP (Custom Implementation)
     // =========================================================================
-    initHeatmap() {
+    initHeatmap(heatmapData) {
         const grid = document.getElementById('heatmap-grid');
         if (!grid) return;
 
-        // Generate 365 days of data
-        const today = new Date();
-        const oneYearAgo = new Date(today);
-        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-        // Align to Sunday
-        const startDay = oneYearAgo.getDay();
-        oneYearAgo.setDate(oneYearAgo.getDate() - startDay);
-
+        // Use real data if provided
         const cells = [];
-        const currentDate = new Date(oneYearAgo);
 
-        while (currentDate <= today) {
-            const dateStr = currentDate.toISOString().split('T')[0];
-            // Generate random level 0-4 (replace with real data)
-            const level = Math.floor(Math.random() * 5);
-            const count = level * 3;
+        if (heatmapData && heatmapData.length > 0) {
+            // Use API data
+            heatmapData.forEach(day => {
+                cells.push(`
+                    <span 
+                        class="heatmap-cell" 
+                        data-level="${day.level}" 
+                        data-date="${day.date}"
+                        data-count="${day.count}"
+                        title="${day.count} tasks on ${day.date}"
+                        role="gridcell"
+                        tabindex="0"
+                        aria-label="${day.count} tasks on ${day.date}"
+                    ></span>
+                `);
+            });
+            grid.innerHTML = cells.join('');
 
-            cells.push(`
-                <span 
-                    class="heatmap-cell" 
-                    data-level="${level}" 
-                    data-date="${dateStr}"
-                    data-count="${count}"
-                    title="${count} tasks on ${dateStr}"
-                ></span>
-            `);
+            // Add responsiveness
+            const wrapper = grid.closest('.heatmap-wrapper');
+            if (wrapper) {
+                wrapper.style.overflowX = 'auto';
+                wrapper.style.paddingBottom = '10px';
+            }
+            grid.style.minWidth = 'max-content'; // Ensure horizontal scroll triggers
+            grid.setAttribute('role', 'grid');
 
-            currentDate.setDate(currentDate.getDate() + 1);
+        } else {
+            // No data state
+            grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--color-text-muted);">No activity data recorded yet</div>`;
         }
-
-        grid.innerHTML = cells.join('');
 
         // Tooltip handling
         grid.addEventListener('mouseover', (e) => {
@@ -339,6 +419,27 @@ const ChartManager = {
                 this.drillDown(cell.dataset.date);
             }
         });
+    },
+
+    // =========================================================================
+    // INSIGHTS RENDERER
+    // =========================================================================
+    renderInsights(insights) {
+        const container = document.getElementById('insights-container');
+        if (!container) return;
+
+        const html = insights.map(insight => `
+            <div class="insight-card insight-${insight.type}">
+                <div class="insight-icon">${insight.icon}</div>
+                <div class="insight-content">
+                    <h3 class="insight-title">${insight.title}</h3>
+                    <p class="insight-message">${insight.message}</p>
+                </div>
+            </div>
+        `).join('');
+
+        container.innerHTML = html;
+        analyticsLog('Charts', 'INSIGHTS_RENDERED', { status: 'SUCCESS', count: insights.length });
     },
 
     // =========================================================================
@@ -395,14 +496,29 @@ const ChartManager = {
     },
 
     updateChartsRange(days) {
-        const labels = this.getLastNDays(days);
-        const data = this.generateSampleData(days, 0, 100);
+        // Since we removed fake data generation, this needs to fetch new data
+        // For now, we can just reload the full analytics data or implement range fetching
+        // But given the scope, reloading is safest to ensure consistency
 
-        if (this.charts.completion) {
-            this.charts.completion.data.labels = labels;
-            this.charts.completion.data.datasets[0].data = data;
-            this.charts.completion.update('active');
+        if (window.App && window.App.showLoading) {
+            window.App.showLoading('Updating charts...');
         }
+
+        this.loadAnalyticsData(days).then(data => {
+            if (this.charts.completion) {
+                this.charts.completion.data.labels = data.completion_trend.labels;
+                this.charts.completion.data.datasets[0].data = data.completion_trend.data;
+                this.charts.completion.update();
+            }
+            if (window.App && window.App.hideLoading) {
+                window.App.hideLoading();
+            }
+        }).catch(err => {
+            if (window.App && window.App.hideLoading) {
+                window.App.hideLoading();
+            }
+            console.error('Failed to update chart range', err);
+        });
     },
 
     // =========================================================================
@@ -501,6 +617,81 @@ const ChartManager = {
     },
 
     // =========================================================================
+    // MONTH EXPORT
+    // =========================================================================
+    async exportMonth(year, month, format = 'json') {
+        analyticsLog('Export', 'EXPORT_START', { status: 'INFO', year, month, format });
+
+        try {
+            if (window.App && window.App.showLoading) {
+                window.App.showLoading('Exporting data...');
+            }
+
+            const response = await fetch('/api/v1/export/month/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': window.apiClient?.getCsrfToken() || this.getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ year, month, format })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || `HTTP ${response.status}`);
+            }
+
+            // Download file
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+
+            // Get filename from Content-Disposition header
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = `export_${year}_${month}.${format}`;
+            if (contentDisposition) {
+                const matches = /filename="?([^"]+)"?/.exec(contentDisposition);
+                if (matches) filename = matches[1];
+            }
+
+            link.download = filename;
+            link.click();
+
+            // Cleanup
+            window.URL.revokeObjectURL(url);
+
+            if (window.App && window.App.hideLoading) {
+                window.App.hideLoading();
+            }
+
+            if (window.App && window.App.showToast) {
+                window.App.showToast('success', 'Export complete', `Downloaded ${filename}`);
+            }
+
+            analyticsLog('Export', 'EXPORT_SUCCESS', { status: 'SUCCESS', filename });
+
+        } catch (error) {
+            analyticsLog('Export', 'EXPORT_ERROR', { status: 'ERROR', error: error.message });
+
+            if (window.App && window.App.hideLoading) {
+                window.App.hideLoading();
+            }
+
+            if (window.App && window.App.showToast) {
+                window.App.showToast('error', 'Export failed', error.message);
+            }
+        }
+    },
+
+    getCsrfToken() {
+        const cookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+        return cookie ? cookie.split('=')[1] : '';
+    },
+
+    // =========================================================================
     // DRILL DOWN
     // =========================================================================
     drillDown(date) {
@@ -525,11 +716,24 @@ const ChartManager = {
         return dates;
     },
 
-    generateSampleData(length, min, max) {
-        // Replace with actual API call
-        return Array.from({ length }, () =>
-            Math.floor(Math.random() * (max - min + 1)) + min
-        );
+    showNoDataState(canvas, message) {
+        const wrapper = canvas.closest('.chart-wrapper');
+        if (wrapper) {
+            // Remove loading
+            const loading = wrapper.querySelector('.chart-loading');
+            if (loading) loading.style.display = 'none';
+
+            // Add no data message
+            let msgEl = wrapper.querySelector('.chart-no-data');
+            if (!msgEl) {
+                msgEl = document.createElement('div');
+                msgEl.className = 'chart-no-data';
+                msgEl.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--color-text-muted);';
+                wrapper.appendChild(msgEl);
+            }
+            msgEl.innerHTML = `<p>${message}</p>`;
+            canvas.style.opacity = '0.1';
+        }
     }
 };
 
@@ -680,6 +884,170 @@ const InsightsEngine = {
             message: `At your current pace, you'll reach your goal in ${daysToComplete} days`,
             days_analyzed: 30
         };
+    },
+
+    async loadForecast(days = 7) {
+        /**
+         * Load forecast from API
+         */
+        try {
+            const url = `/api/v1/analytics/forecast/?days=${days}`;
+
+            analyticsLog('Forecast', 'LOADING', { status: 'INFO', url });
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || 'Forecast failed');
+            }
+
+            analyticsLog('Forecast', 'LOADED', { status: 'SUCCESS', confidence: result.forecast.confidence });
+
+            return result;
+
+        } catch (error) {
+            analyticsLog('Forecast', 'ERROR', { status: 'ERROR', error: error.message });
+            return null;
+        }
+    },
+
+    renderForecast(forecastData) {
+        /**
+         * Render forecast visualization and summary
+         */
+        const container = document.getElementById('forecast-container');
+        if (!container) return;
+
+        if (!forecastData) {
+            container.innerHTML = '<p class="forecast-error">Unable to load forecast</p>';
+            return;
+        }
+
+        const { forecast, summary } = forecastData;
+
+        // Get trend icon
+        const trendIcons = {
+            'increasing': '📈',
+            'decreasing': '📉',
+            'stable': '➡️'
+        };
+
+        const trendIcon = trendIcons[forecast.trend] || '📊';
+
+        // Render summary
+        const html = `
+            <div class="forecast-summary">
+                <div class="forecast-header">
+                    <span class="forecast-icon">${trendIcon}</span>
+                    <h3>7-Day Forecast</h3>
+                    <span class="forecast-confidence">${Math.round(forecast.confidence * 100)}% confidence</span>
+                </div>
+                <p class="forecast-message">${summary.message}</p>
+                <p class="forecast-recommendation">${summary.recommendation}</p>
+                <div class="forecast-stats">
+                    <div class="forecast-stat">
+                        <span class="stat-label">Current Rate</span>
+                        <span class="stat-value">${forecast.current_rate}%</span>
+                    </div>
+                    <div class="forecast-stat">
+                        <span class="stat-label">Predicted</span>
+                        <span class="stat-value">${forecast.predictions[forecast.predictions.length - 1]}%</span>
+                    </div>
+                    <div class="forecast-stat">
+                        <span class="stat-label">Change</span>
+                        <span class="stat-value stat-${summary.predicted_change >= 0 ? 'positive' : 'negative'}">
+                            ${summary.predicted_change >= 0 ? '+' : ''}${summary.predicted_change}%
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = html;
+
+        // If there's a forecast chart canvas, render it
+        this.renderForecastChart(forecast);
+    },
+
+    renderForecastChart(forecast) {
+        /**
+         * Render forecast as a line chart with confidence intervals
+         */
+        const canvas = document.getElementById('forecast-chart');
+        if (!canvas || !window.Chart) return;
+
+        const ctx = canvas.getContext('2d');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: forecast.labels,
+                datasets: [
+                    {
+                        label: 'Predicted',
+                        data: forecast.predictions,
+                        borderColor: ChartConfig.colors.primary,
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Upper Bound',
+                        data: forecast.upper_bound,
+                        borderColor: `rgba(${ChartConfig.colors.primaryRgb}, 0.3)`,
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        tension: 0.4,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'Lower Bound',
+                        data: forecast.lower_bound,
+                        borderColor: `rgba(${ChartConfig.colors.primaryRgb}, 0.3)`,
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        tension: 0.4,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                ...ChartConfig.defaultOptions,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false }
+                    },
+                    y: {
+                        min: 0,
+                        max: 100,
+                        grid: { color: ChartConfig.colors.gridColor },
+                        ticks: {
+                            callback: value => `${value}%`
+                        }
+                    }
+                }
+            }
+        });
     }
 };
 
@@ -689,6 +1057,15 @@ const InsightsEngine = {
 App.initAnalytics = function () {
     if (document.querySelector('.analytics-panel')) {
         ChartManager.init();
+
+        // Load forecast if container exists
+        if (document.getElementById('forecast-container')) {
+            InsightsEngine.loadForecast(7).then(forecastData => {
+                if (forecastData) {
+                    InsightsEngine.renderForecast(forecastData);
+                }
+            });
+        }
     }
     if (document.querySelector('.goals-panel')) {
         GoalAnimations.init();
@@ -700,4 +1077,13 @@ const originalBindPanelEvents3 = App.bindPanelEvents.bind(App);
 App.bindPanelEvents = function () {
     originalBindPanelEvents3();
     this.initAnalytics();
+};
+
+// Expose exportMonth globally for button clicks
+window.exportMonth = function (format = 'json') {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    ChartManager.exportMonth(year, month, format);
 };
