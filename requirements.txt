@@ -1,33 +1,52 @@
+# Django Core
 Django>=5.0.0
-django-allauth>=0.57.0
 djangorestframework
+django-allauth>=65.0.0
 django-oauth-toolkit
-openpyxl
+django-simple-history>=3.4.0
+
+# Database
+dj-database-url
+psycopg2-binary
+
+# Data Processing
 pandas
-filelock
-mysqlclient>=2.2.0
 numpy
 scipy
 statsmodels
-nltk
-python-dotenv
+openpyxl
 xlsxwriter
+tablib
+
+# NLP & ML
+nltk
+spacy
+
+# Visualization
 matplotlib
 seaborn
-apscheduler
-marshmallow
-tablib
-watchdog
-xlrd
-xlwt
-spacy
-requests
 pillow
+
+# API & Serialization
+marshmallow
 pydantic
+requests
+
+# Authentication & Security
 pyjwt
 cryptography
-dj-database-url
-psycopg2-binary
-whitenoise
+
+# Configuration
+python-dotenv
+python-decouple
+
+# Scheduling
+apscheduler
+
+# Production Server
 gunicorn
-django-simple-history>=3.4.0
+whitenoise
+
+# HTTP
+certifi
+urllib3
