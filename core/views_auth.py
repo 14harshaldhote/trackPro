@@ -8,7 +8,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from rest_framework import serializers
@@ -108,6 +108,7 @@ class SignupSerializer(serializers.Serializer):
 # ============================================================================
 
 @require_http_methods(["POST"])
+@csrf_exempt  # Mobile apps don't send CSRF tokens
 @rate_limit(max_requests=5, window_seconds=300, key_prefix='login')  # 5 attempts per 5 minutes
 def api_login(request):
     """
@@ -183,6 +184,7 @@ def api_login(request):
 
 
 @require_http_methods(["POST"])
+@csrf_exempt  # Mobile apps don't send CSRF tokens
 @rate_limit(max_requests=3, window_seconds=3600, key_prefix='signup')  # 3 signups per hour
 def api_signup(request):
     """
