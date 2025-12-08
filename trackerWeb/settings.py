@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-build-key-replace-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='', cast=Csv())
 # Add Vercel domains
@@ -278,9 +278,9 @@ SIMPLE_JWT = {
 
 # Google OAuth2 Client IDs for mobile apps
 # Web client ID (used for allauth)
-GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='333674354840-u0avbnvibh2c8e9d6qs3livmdbna1g6p.apps.googleusercontent.com')
+GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
 # iOS-specific client ID (from Google Cloud Console -> iOS OAuth Client)
-GOOGLE_IOS_CLIENT_ID = config('GOOGLE_IOS_CLIENT_ID', default='333674354840-mciolh2qj5iki87rn7b9qosl3q9ob5ao.apps.googleusercontent.com')
+GOOGLE_IOS_CLIENT_ID = config('GOOGLE_IOS_CLIENT_ID', default='')
 
 # Email backend (for development - prints to console)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
