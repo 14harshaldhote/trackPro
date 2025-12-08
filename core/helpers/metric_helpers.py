@@ -434,3 +434,56 @@ def exponential_moving_average(values: List[float], alpha: float = 0.3) -> List[
         new_val = alpha * values[i] + (1 - alpha) * ema[-1]
         ema.append(new_val)
     return ema
+
+
+def calculate_trend(values: List[float]) -> Dict[str, float]:
+    """
+    Calculate trend direction and magnitude from a series of values.
+    
+    Args:
+        values: List of float values (e.g., daily completion rates)
+    
+    Returns:
+        {
+            'direction': float (-1 to 1, negative = decreasing, positive = increasing),
+            'slope': float,
+            'strength': float (0-1, how strong the trend is)
+        }
+    """
+    if not values or len(values) < 2:
+        return {'direction': 0, 'slope': 0.0, 'strength': 0.0}
+    
+    n = len(values)
+    x_values = list(range(n))
+    
+    # Use linear regression to determine trend
+    trend = compute_trend_line_pure_python(x_values, values)
+    
+    slope = trend['slope']
+    r_squared = trend['r_squared']
+    
+    # Direction: normalize slope to -1 to 1 range
+    # Use a reasonable threshold for what counts as "significant" slope
+    max_expected_slope = max(abs(max(values) - min(values)) / n, 1.0)
+    direction = max(-1, min(1, slope / max_expected_slope)) if max_expected_slope > 0 else 0
+    
+    return {
+        'direction': direction,
+        'slope': slope,
+        'strength': r_squared  # R-squared indicates how reliable the trend is
+    }
+
+
+def calculate_ema(values: List[float], span: int = 7) -> List[float]:
+    """
+    Calculate Exponential Moving Average.
+    Alias for _calculate_ema_pure_python for backward compatibility.
+    
+    Args:
+        values: List of values to smooth
+        span: EMA span (window size)
+    
+    Returns:
+        List of smoothed values
+    """
+    return _calculate_ema_pure_python(values, span)
