@@ -1,26 +1,238 @@
 """
-Enhanced Forecast Service with Behavioral Analytics Integration
+Enhanced Forecast Service - Pure NumPy/Pandas Implementation
 
-Combines statistical forecasting with behavioral insights for more accurate predictions.
-Integrates with the behavioral insights engine for context-aware forecasting.
+Uses ONLY lightweight, serverless-safe libraries:
+- numpy: Core numerical operations
+- pandas: Data manipulation
+- polars: Fast dataframe operations (optional, Rust-based)
+
+NO heavy dependencies: scipy ❌, scikit-learn ❌, matplotlib ❌, statsmodels ❌
+All forecasting uses pure mathematical implementations.
 """
 import numpy as np
-from scipy import stats
+import pandas as pd
 from datetime import datetime, timedelta
 from django.utils import timezone
 from typing import Dict, List, Optional, Tuple
+import logging
 
-from core.models import TaskInstance
-from core import analytics
-from core.behavioral.insights_engine import InsightsEngine, InsightType
+from core.models import TaskInstance, TrackerInstance
+
+logger = logging.getLogger(__name__)
+
+# Optional Polars for faster data processing
+try:
+    import polars as pl
+    POLARS_AVAILABLE = True
+except ImportError:
+    POLARS_AVAILABLE = False
+
+
+def _linregress_numpy(x: np.ndarray, y: np.ndarray) -> Dict:
+    """
+    Pure numpy implementation of linear regression.
+    
+    Returns:
+        Dict with slope, intercept, r_value, r_squared, std_err
+    """
+    n = len(x)
+    if n < 2:
+        return {'slope': 0, 'intercept': 0, 'r_value': 0, 'r_squared': 0, 'std_err': 0}
+    
+    # Calculate means
+    x_mean = np.mean(x)
+    y_mean = np.mean(y)
+    
+    # Calculate slope and intercept
+    numerator = np.sum((x - x_mean) * (y - y_mean))
+    denominator = np.sum((x - x_mean) ** 2)
+    
+    if denominator == 0:
+        return {'slope': 0, 'intercept': y_mean, 'r_value': 0, 'r_squared': 0, 'std_err': 0}
+    
+    slope = numerator / denominator
+    intercept = y_mean - slope * x_mean
+    
+    # Calculate R-value (correlation coefficient)
+    y_pred = slope * x + intercept
+    ss_res = np.sum((y - y_pred) ** 2)
+    ss_tot = np.sum((y - y_mean) ** 2)
+    
+    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+    r_value = np.sqrt(abs(r_squared)) * (1 if slope >= 0 else -1)
+    
+    # Standard error of the estimate
+    if n > 2:
+        std_err = np.sqrt(ss_res / (n - 2)) / np.sqrt(denominator) if denominator > 0 else 0
+    else:
+        std_err = 0
+    
+    return {
+        'slope': float(slope),
+        'intercept': float(intercept),
+        'r_value': float(r_value),
+        'r_squared': float(r_squared),
+        'std_err': float(std_err)
+    }
+
+
+def _simple_exponential_smoothing(y: np.ndarray, alpha: float = 0.3) -> np.ndarray:
+    """
+    Simple Exponential Smoothing (pure numpy)
+    
+    Args:
+        y: Time series values
+        alpha: Smoothing parameter (0-1)
+    
+    Returns:
+        Smoothed values
+    """
+    if len(y) == 0:
+        return np.array([])
+    
+    smoothed = np.zeros(len(y))
+    smoothed[0] = y[0]
+    
+    for i in range(1, len(y)):
+        smoothed[i] = alpha * y[i] + (1 - alpha) * smoothed[i-1]
+    
+    return smoothed
+
+
+def _double_exponential_smoothing(y: np.ndarray, alpha: float = 0.3, beta: float = 0.1, periods: int = 7) -> Dict:
+    """
+    Double Exponential Smoothing (Holt's method) - Pure NumPy
+    Handles trends better than simple exponential smoothing
+    
+    Args:
+        y: Time series values
+        alpha: Level smoothing parameter
+        beta: Trend smoothing parameter
+        periods: Number of periods to forecast
+    
+    Returns:
+        Dict with forecast, level, and trend
+    """
+    if len(y) < 2:
+        return {
+            'forecast': [y[0]] * periods if len(y) > 0 else [0] * periods,
+            'level': y[0] if len(y) > 0 else 0,
+            'trend': 0
+        }
+    
+    n = len(y)
+    level = np.zeros(n)
+    trend = np.zeros(n)
+    
+    # Initialize
+    level[0] = y[0]
+    trend[0] = y[1] - y[0] if n > 1 else 0
+    
+    # Smooth
+    for i in range(1, n):
+        level[i] = alpha * y[i] + (1 - alpha) * (level[i-1] + trend[i-1])
+        trend[i] = beta * (level[i] - level[i-1]) + (1 - beta) * trend[i-1]
+    
+    # Forecast
+    forecast = []
+    for p in range(1, periods + 1):
+        forecast.append(level[-1] + p * trend[-1])
+    
+    return {
+        'forecast': forecast,
+        'level': float(level[-1]),
+        'trend': float(trend[-1])
+    }
+
+
+def _triple_exponential_smoothing(y: np.ndarray, season_length: int = 7, 
+                                    alpha: float = 0.3, beta: float = 0.1, 
+                                    gamma: float = 0.1, periods: int = 7) -> Dict:
+    """
+    Triple Exponential Smoothing (Holt-Winters) - Pure NumPy
+    Handles trends AND seasonality
+    
+    Args:
+        y: Time series values
+        season_length: Length of seasonal cycle (7 for weekly)
+        alpha: Level smoothing
+        beta: Trend smoothing
+        gamma: Seasonality smoothing
+        periods: Periods to forecast
+    
+    Returns:
+        Dict with forecast and components
+    """
+    n = len(y)
+    
+    # Need at least 2 full seasonal cycles
+    if n < 2 * season_length:
+        # Fallback to double exponential smoothing
+        return _double_exponential_smoothing(y, alpha, beta, periods)
+    
+    # Initialize components
+    level = np.zeros(n)
+    trend = np.zeros(n)
+    seasonal = np.zeros(n)
+    
+    # Initial seasonal component (simple average of first season)
+    seasonal_init = np.zeros(season_length)
+    for i in range(season_length):
+        seasonal_init[i] = np.mean(y[i::season_length][:min(4, len(y[i::season_length]))])
+    
+    seasonal_avg = np.mean(seasonal_init)
+    if seasonal_avg != 0:
+        seasonal_init = seasonal_init / seasonal_avg
+    else:
+        seasonal_init = np.ones(season_length)
+    
+    # Initialize level and trend
+    level[0] = y[0] / seasonal_init[0]
+    trend[0] = (y[season_length] - y[0]) / season_length if n > season_length else 0
+    seasonal[:season_length] = seasonal_init
+    
+    # Smooth through the series
+    for i in range(n):
+        season_idx = i % season_length
+        
+        if i == 0:
+            continue
+        
+        # Level
+        level[i] = alpha * (y[i] / seasonal[season_idx]) + (1 - alpha) * (level[i-1] + trend[i-1])
+        
+        # Trend
+        trend[i] = beta * (level[i] - level[i-1]) + (1 - beta) * trend[i-1]
+        
+        # Seasonal
+        if i >= season_length:
+            seasonal[i] = gamma * (y[i] / level[i]) + (1 - gamma) * seasonal[i - season_length]
+    
+    # Forecast
+    forecast = []
+    for p in range(1, periods + 1):
+        season_idx = (n - 1 + p) % season_length
+        forecast_value = (level[-1] + p * trend[-1]) * seasonal[season_idx]
+        forecast.append(forecast_value)
+    
+    return {
+        'forecast': forecast,
+        'level': float(level[-1]),
+        'trend': float(trend[-1]),
+        'seasonal': seasonal[-season_length:].tolist()
+    }
 
 
 class ForecastService:
     """
-    Advanced forecast service that combines:
-    1. Statistical regression (trend analysis)
-    2. Behavioral pattern recognition (weekend dips, mood impacts, etc.)
-    3. Contextual adjustments (upcoming patterns, historical performance)
+    Advanced forecast service using pure NumPy/Pandas
+    
+    Methods available (all serverless-safe):
+    1. Linear Regression (baseline)
+    2. Simple Exponential Smoothing (fast, no trend)
+    3. Double Exponential Smoothing (captures trends)
+    4. Triple Exponential Smoothing (captures trends + seasonality)
+    5. Behavioral adjustments (integrates insights)
     """
     
     def __init__(self, user):
@@ -31,38 +243,40 @@ class ForecastService:
         days_ahead=7, 
         history_days=30, 
         tracker_id=None,
+        method='auto',
         include_behavioral_adjustments=True
     ):
         """
-        Advanced forecast using behavioral analytics
+        Advanced forecast using multiple methods
         
         Args:
             days_ahead: Number of days to forecast
             history_days: Historical data window
             tracker_id: Optional tracker UUID
+            method: 'auto', 'linear', 'ses', 'des', 'tes'
             include_behavioral_adjustments: Apply behavioral corrections
         
         Returns:
             Enhanced forecast with behavioral context
         """
-        # Step 1: Get baseline statistical forecast
-        baseline_forecast = self._statistical_forecast(
-            days_ahead, 
-            history_days, 
-            tracker_id
+        # Step 1: Get baseline forecast
+        baseline_forecast = self._forecast_with_method(
+            days_ahead,
+            history_days,
+            tracker_id,
+            method
         )
         
         if not baseline_forecast['success']:
             return baseline_forecast
         
-        # Step 2: Apply behavioral adjustments if enabled
+        # Step 2: Apply behavioral adjustments
         if include_behavioral_adjustments and tracker_id:
             behavioral_adjustments = self._get_behavioral_adjustments(
                 tracker_id, 
                 baseline_forecast
             )
             
-            # Adjust predictions based on behavioral patterns
             adjusted_forecast = self._apply_behavioral_corrections(
                 baseline_forecast,
                 behavioral_adjustments
@@ -71,100 +285,113 @@ class ForecastService:
             return {
                 **adjusted_forecast,
                 'behavioral_factors': behavioral_adjustments,
-                'model': 'behavioral_regression',
-                'baseline_model': 'linear_regression'
+                'baseline_model': baseline_forecast.get('model', 'unknown')
             }
         
-        return {
-            **baseline_forecast,
-            'model': 'linear_regression'
-        }
+        return baseline_forecast
     
-    def _statistical_forecast(
-        self, 
-        days_ahead: int, 
-        history_days: int, 
-        tracker_id: Optional[str]
+    def _forecast_with_method(
+        self,
+        days_ahead: int,
+        history_days: int,
+        tracker_id: Optional[str],
+        method: str
     ) -> Dict:
         """
-        Pure statistical forecast using linear regression
-        (Original implementation - now baseline)
+        Generate forecast using specified method
         """
+        # Fetch data
         end_date = timezone.now().date()
         start_date = end_date - timedelta(days=history_days - 1)
         
         tasks = TaskInstance.objects.filter(
-            tracker__user=self.user,
-            date__gte=start_date,
-            date__lte=end_date,
+            tracker_instance__tracker__user=self.user,
+            tracker_instance__tracking_date__gte=start_date,
+            tracker_instance__tracking_date__lte=end_date,
             deleted_at__isnull=True
         )
         
         if tracker_id:
-            tasks = tasks.filter(tracker__tracker__tracker_id=tracker_id)
+            tasks = tasks.filter(tracker_instance__tracker__tracker_id=tracker_id)
         
         # Build daily completion rates
-        daily_rates = []
-        date_index = []
+        daily_data = []
         current_date = start_date
         
         while current_date <= end_date:
-            day_tasks = tasks.filter(date=current_date)
+            day_tasks = tasks.filter(tracker_instance__tracking_date=current_date)
             total = day_tasks.count()
-            completed = day_tasks.filter(status='completed').count()
+            completed = day_tasks.filter(status='DONE').count()
             
-            rate = (completed / total * 100) if total > 0 else None
-            
-            if rate is not None:
-                daily_rates.append(rate)
-                date_index.append(current_date)
+            if total > 0:
+                rate = (completed / total * 100)
+                daily_data.append({
+                    'date': current_date.isoformat(),
+                    'rate': rate,
+                    'total': total,
+                    'completed': completed
+                })
             
             current_date += timedelta(days=1)
         
-        # Check minimum data requirement
-        if len(daily_rates) < 7:
+        if len(daily_data) < 7:
             return {
                 'success': False,
                 'error': 'Insufficient data for forecasting (need at least 7 days)',
-                'days_analyzed': len(daily_rates)
+                'days_analyzed': len(daily_data)
             }
         
-        # Linear regression
-        x = np.arange(len(daily_rates))
-        y = np.array(daily_rates)
+        # Convert to numpy
+        rates = np.array([d['rate'] for d in daily_data])
         
-        slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+        # Auto-select method
+        if method == 'auto':
+            if len(rates) >= 21:
+                method = 'tes'  # Use triple exp smoothing for sufficient data
+            elif len(rates) >= 14:
+                method = 'des'  # Use double exp smoothing
+            else:
+                method = 'linear'
         
-        # Calculate variance-weighted confidence
-        variance = np.var(y)
-        data_quality = 1.0 - min(variance / 1000, 0.5)  # Lower variance = higher quality
+        # Generate forecast
+        if method == 'tes':
+            result = _triple_exponential_smoothing(rates, season_length=7, periods=days_ahead)
+            forecast_values = result['forecast']
+            model_name = 'triple_exponential_smoothing'
+        elif method == 'des':
+            result = _double_exponential_smoothing(rates, periods=days_ahead)
+            forecast_values = result['forecast']
+            model_name = 'double_exponential_smoothing'
+        elif method == 'ses':
+            smoothed = _simple_exponential_smoothing(rates)
+            forecast_values = [smoothed[-1]] * days_ahead
+            model_name = 'simple_exponential_smoothing'
+        else:  # linear
+            return self._linear_regression_forecast(rates, days_ahead, daily_data)
         
-        # Forecast future
-        future_x = np.arange(len(daily_rates), len(daily_rates) + days_ahead)
-        predictions = slope * future_x + intercept
-        predictions = np.clip(predictions, 0, 100)
+        # Calculate confidence intervals (using residual std)
+        fitted = _simple_exponential_smoothing(rates)
+        residuals = rates - fitted
+        std_err = float(np.std(residuals))
         
-        # Enhanced confidence intervals considering variance
-        base_stderr = std_err * np.sqrt(
-            1 + 1/len(x) + (future_x - x.mean())**2 / ((x - x.mean())**2).sum()
-        )
+        predictions = np.clip(forecast_values, 0, 100)
+        upper = np.clip(predictions + 1.96 * std_err, 0, 100)
+        lower = np.clip(predictions - 1.96 * std_err, 0, 100)
         
-        # Adjust by data quality
-        adjusted_stderr = base_stderr * (1 + (1 - data_quality))
-        confidence_interval = 1.96 * adjusted_stderr
-        
-        upper_bound = np.clip(predictions + confidence_interval, 0, 100)
-        lower_bound = np.clip(predictions - confidence_interval, 0, 100)
+        # Calculate metrics
+        variance = float(np.var(rates))
+        data_quality = 1.0 - min(variance / 1000, 0.5)
         
         # Determine trend
-        if slope > 0.5:
+        recent_trend = np.mean(rates[-3:]) - np.mean(rates[-7:-4]) if len(rates) >= 7 else rates[-1] - rates[0]
+        if recent_trend > 2:
             trend = 'increasing'
-        elif slope < -0.5:
+        elif recent_trend < -2:
             trend = 'decreasing'
         else:
             trend = 'stable'
         
-        # Generate dates and labels
+        # Generate dates
         forecast_dates = []
         forecast_labels = []
         forecast_weekdays = []
@@ -178,31 +405,90 @@ class ForecastService:
         
         return {
             'success': True,
-            'predictions': [round(p, 1) for p in predictions.tolist()],
-            'upper_bound': [round(u, 1) for u in upper_bound.tolist()],
-            'lower_bound': [round(l, 1) for l in lower_bound.tolist()],
-            'confidence': round(r_value ** 2 * data_quality, 2),  # Adjusted R²
+            'predictions': [round(float(p), 1) for p in predictions],
+            'upper_bound': [round(float(u), 1) for u in upper],
+            'lower_bound': [round(float(l), 1) for l in lower],
+            'confidence': round(data_quality, 2),
             'trend': trend,
-            'slope': round(slope, 3),
-            'days_analyzed': len(daily_rates),
+            'days_analyzed': len(rates),
             'dates': forecast_dates,
             'labels': forecast_labels,
-            'weekdays': forecast_weekdays,  # For behavioral adjustments
-            'current_rate': round(y[-1], 1) if len(y) > 0 else 0,
+            'weekdays': forecast_weekdays,
+            'current_rate': round(float(rates[-1]), 1),
             'variance': round(variance, 1),
-            'data_quality': round(data_quality, 2)
+            'data_quality': round(data_quality, 2),
+            'model': model_name
         }
     
-    def _get_behavioral_adjustments(
-        self, 
-        tracker_id: str, 
-        baseline_forecast: Dict
-    ) -> Dict:
-        """
-        Identify behavioral patterns that should adjust the forecast
+    def _linear_regression_forecast(self, y: np.ndarray, periods: int, daily_data: List[Dict]) -> Dict:
+        """Linear regression baseline"""
+        x = np.arange(len(y))
+        reg_result = _linregress_numpy(x, y)
         
-        Returns dict with adjustment factors and reasons
-        """
+        slope = reg_result['slope']
+        intercept = reg_result['intercept']
+        std_err = reg_result['std_err']
+        
+        # Forecast
+        future_x = np.arange(len(y), len(y) + periods)
+        predictions = slope * future_x + intercept
+        
+        # Confidence intervals
+        x_mean = np.mean(x)
+        ss_x = np.sum((x - x_mean) ** 2)
+        
+        if ss_x > 0 and std_err > 0:
+            stderr_forecast = std_err * np.sqrt(1 + 1/len(x) + (future_x - x_mean)**2 / ss_x)
+        else:
+            stderr_forecast = np.ones(periods) * max(np.std(y) * 0.1, 5)
+        
+        confidence_interval = 1.96 * stderr_forecast
+        
+        predictions_clipped = np.clip(predictions, 0, 100)
+        upper = np.clip(predictions + confidence_interval, 0, 100)
+        lower = np.clip(predictions - confidence_interval, 0, 100)
+        
+        # Determine trend
+        if slope > 0.5:
+            trend = 'increasing'
+        elif slope < -0.5:
+            trend = 'decreasing'
+        else:
+            trend = 'stable'
+        
+        # Generate dates
+        end_date = datetime.fromisoformat(daily_data[-1]['date']).date()
+        forecast_dates = []
+        forecast_labels = []
+        forecast_weekdays = []
+        current_date = end_date + timedelta(days=1)
+        
+        for _ in range(periods):
+            forecast_dates.append(current_date.isoformat())
+            forecast_labels.append(current_date.strftime('%b %d'))
+            forecast_weekdays.append(current_date.weekday())
+            current_date += timedelta(days=1)
+        
+        return {
+            'success': True,
+            'predictions': [round(float(p), 1) for p in predictions_clipped],
+            'upper_bound': [round(float(u), 1) for u in upper],
+            'lower_bound': [round(float(l), 1) for l in lower],
+            'confidence': round(reg_result['r_squared'], 2),
+            'trend': trend,
+            'days_analyzed': len(y),
+            'dates': forecast_dates,
+            'labels': forecast_labels,
+            'weekdays': forecast_weekdays,
+            'current_rate': round(float(y[-1]), 1),
+            'variance': round(float(np.var(y)), 1),
+            'data_quality': round(reg_result['r_squared'], 2),
+            'model': 'linear_regression',
+            'slope': round(slope, 3)
+        }
+    
+    def _get_behavioral_adjustments(self, tracker_id: str, baseline_forecast: Dict) -> Dict:
+        """Identify behavioral patterns for forecast adjustment"""
         adjustments = {
             'weekend_factor': 0,
             'mood_factor': 0,
@@ -213,22 +499,18 @@ class ForecastService:
         }
         
         try:
-            # Get behavioral insights
+            from core.behavioral.insights_engine import InsightsEngine, InsightType
+            
             engine = InsightsEngine(tracker_id)
             insights = engine.generate_insights()
             
-            # Get historical metrics
-            completion_data = analytics.compute_completion_rate(tracker_id)
-            consistency_data = analytics.compute_consistency_score(tracker_id)
-            
-            # Check for weekend pattern
+            # Weekend pattern
             weekend_insight = next(
                 (i for i in insights if i.insight_type == InsightType.WEEKEND_DIP), 
                 None
             )
             
             if weekend_insight:
-                # Apply weekend penalty to weekend days in forecast
                 weekday_avg = weekend_insight.evidence.get('weekday_average', 0)
                 weekend_avg = weekend_insight.evidence.get('weekend_average', 0)
                 
@@ -238,7 +520,7 @@ class ForecastService:
                         f"Weekend completion typically {abs(adjustments['weekend_factor']*100):.0f}% lower"
                     )
             
-            # Check for low consistency
+            # Low consistency
             consistency_insight = next(
                 (i for i in insights if i.insight_type == InsightType.LOW_CONSISTENCY),
                 None
@@ -247,26 +529,22 @@ class ForecastService:
             if consistency_insight:
                 consistency_score = consistency_insight.evidence.get('consistency_score', 100)
                 if consistency_score < 60:
-                    # Reduce confidence for inconsistent patterns
                     adjustments['consistency_penalty'] = (60 - consistency_score) / 100
                     adjustments['reasons'].append(
                         f"Low consistency ({consistency_score:.0f}%) increases uncertainty"
                     )
             
-            # Check for streak at risk
+            # Streak boost
             streak_insight = next(
                 (i for i in insights if i.insight_type == InsightType.STREAK_RISK),
                 None
             )
             
             if streak_insight:
-                # Users work harder to maintain streaks (research-backed)
-                adjustments['streak_boost'] = 0.1  # 10% boost when protecting streak
-                adjustments['reasons'].append(
-                    f"Active streak provides motivation boost"
-                )
+                adjustments['streak_boost'] = 0.1
+                adjustments['reasons'].append("Active streak provides motivation boost")
             
-            # Check if recovery needed (high effort)
+            # Recovery needed
             recovery_insight = next(
                 (i for i in insights if i.insight_type == InsightType.HIGH_EFFORT_RECOVERY),
                 None
@@ -274,43 +552,16 @@ class ForecastService:
             
             if recovery_insight:
                 adjustments['recovery_needed'] = True
-                adjustments['reasons'].append(
-                    "Recent high effort may lead to recovery dip"
-                )
-            
-            # Check trend insights for additional context
-            improving_insight = next(
-                (i for i in insights if i.insight_type == InsightType.IMPROVEMENT_TREND),
-                None
-            )
-            
-            if improving_insight:
-                # Positive momentum
-                adjustments['reasons'].append("Positive improvement momentum detected")
-            
-            declining_insight = next(
-                (i for i in insights if i.insight_type == InsightType.DECLINING_TREND),
-                None
-            )
-            
-            if declining_insight:
-                # Declining pattern already captured in slope, just note it
-                adjustments['reasons'].append("Declining trend pattern identified")
-            
+                adjustments['reasons'].append("Recent high effort may lead to recovery dip")
+                    
         except Exception as e:
-            # Behavioral adjustments are optional - don't fail forecast
-            adjustments['reasons'].append(f"Unable to load behavioral context: {str(e)}")
+            logger.warning(f"Behavioral insights unavailable: {e}")
+            adjustments['reasons'].append("Behavioral insights module not available")
         
         return adjustments
     
-    def _apply_behavioral_corrections(
-        self, 
-        baseline: Dict, 
-        adjustments: Dict
-    ) -> Dict:
-        """
-        Apply behavioral corrections to baseline statistical forecast
-        """
+    def _apply_behavioral_corrections(self, baseline: Dict, adjustments: Dict) -> Dict:
+        """Apply behavioral corrections to forecast"""
         corrected_predictions = []
         corrected_upper = []
         corrected_lower = []
@@ -321,42 +572,41 @@ class ForecastService:
         weekdays = baseline['weekdays']
         
         for i, (pred, up, low, weekday) in enumerate(zip(predictions, upper, lower, weekdays)):
-            # Start with baseline
             corrected_pred = pred
             corrected_up = up
             corrected_low = low
             
-            # Apply weekend adjustment (weekday: 0=Mon, 5=Sat, 6=Sun)
+            # Weekend adjustment
             if weekday >= 5 and adjustments['weekend_factor'] != 0:
                 weekend_adj = corrected_pred * adjustments['weekend_factor']
                 corrected_pred += weekend_adj
                 corrected_up += weekend_adj
                 corrected_low += weekend_adj
             
-            # Apply streak boost (affects all days)
+            # Streak boost
             if adjustments['streak_boost'] > 0:
                 boost = corrected_pred * adjustments['streak_boost']
                 corrected_pred += boost
                 corrected_up += boost
                 corrected_low += boost
             
-            # Apply recovery dip (affects days 1-2 after high effort)
+            # Recovery dip
             if adjustments['recovery_needed'] and i < 2:
-                recovery_dip = corrected_pred * 0.15  # 15% temporary dip
+                recovery_dip = corrected_pred * 0.15
                 corrected_pred -= recovery_dip
                 corrected_up -= recovery_dip * 0.5
                 corrected_low -= recovery_dip
             
             # Clip to valid range
-            corrected_pred = np.clip(corrected_pred, 0, 100)
-            corrected_up = np.clip(corrected_up, 0, 100)
-            corrected_low = np.clip(corrected_low, 0, 100)
+            corrected_pred = float(np.clip(corrected_pred, 0, 100))
+            corrected_up = float(np.clip(corrected_up, 0, 100))
+            corrected_low = float(np.clip(corrected_low, 0, 100))
             
             corrected_predictions.append(round(corrected_pred, 1))
             corrected_upper.append(round(corrected_up, 1))
             corrected_lower.append(round(corrected_low, 1))
         
-        # Adjust confidence based on consistency
+        # Adjust confidence
         adjusted_confidence = baseline['confidence'] * (1 - adjustments['consistency_penalty'])
         
         return {
@@ -369,9 +619,7 @@ class ForecastService:
         }
     
     def get_forecast_summary(self, days_ahead=7, tracker_id=None):
-        """
-        Enhanced summary with behavioral context
-        """
+        """Enhanced summary with behavioral context"""
         forecast = self.forecast_completion_rate(
             days_ahead=days_ahead,
             tracker_id=tracker_id,
@@ -391,10 +639,7 @@ class ForecastService:
         trend = forecast['trend']
         confidence = forecast['confidence']
         
-        # Generate context-aware message
         confidence_text = self._get_confidence_text(confidence)
-        
-        # Build message with behavioral context
         base_message = f"Your completion rate is trending {trend}"
         
         if 'behavioral_factors' in forecast:
@@ -403,10 +648,8 @@ class ForecastService:
                 base_message += f". {behavioral_notes[0]}"
         
         prediction_text = f"Expected to {('reach' if change >= 0 else 'drop to')} {future}% in {days_ahead} days"
-        
         message = f"{base_message} ({confidence_text}). {prediction_text}."
         
-        # Generate smart recommendation
         recommendation = self._generate_recommendation(forecast, change)
         
         return {
@@ -415,6 +658,7 @@ class ForecastService:
             'predicted_change': round(change, 1),
             'confidence': confidence,
             'trend': trend,
+            'method': forecast.get('model', 'unknown'),
             'behavioral_insights': forecast.get('behavioral_factors', {}).get('reasons', [])
         }
     
@@ -432,7 +676,6 @@ class ForecastService:
         trend = forecast['trend']
         behavioral_factors = forecast.get('behavioral_factors', {})
         
-        # Check for specific behavioral patterns
         if behavioral_factors.get('recovery_needed'):
             return "Consider a recovery day soon to maintain long-term performance."
         
@@ -442,66 +685,12 @@ class ForecastService:
         if behavioral_factors.get('consistency_penalty', 0) > 0.3:
             return "Focus on building a consistent daily routine to improve predictions."
         
-        # Default recommendations based on trend
         if trend == 'increasing':
             return "Keep up the excellent momentum! Your habits are strengthening."
-        elif trend == 'declining':
+        elif trend == 'decreasing':
             if change < -10:
                 return "Consider reviewing your task load or priorities to reverse the trend."
             else:
                 return "Monitor your patterns closely and consider slight adjustments."
         else:
             return "You're maintaining a steady pace - consistency is key to habit formation."
-    
-    def get_moving_average(self, days=7, history_days=30, tracker_id=None):
-        """
-        Calculate moving average (unchanged from original)
-        """
-        end_date = timezone.now().date()
-        start_date = end_date - timedelta(days=history_days - 1)
-        
-        tasks = TaskInstance.objects.filter(
-            tracker__user=self.user,
-            date__gte=start_date,
-            date__lte=end_date,
-            deleted_at__isnull=True
-        )
-        
-        if tracker_id:
-            tasks = tasks.filter(tracker__tracker__tracker_id=tracker_id)
-        
-        daily_rates = []
-        labels = []
-        current_date = start_date
-        
-        while current_date <= end_date:
-            day_tasks = tasks.filter(date=current_date)
-            total = day_tasks.count()
-            completed = day_tasks.filter(status='completed').count()
-            
-            rate = (completed / total * 100) if total > 0 else 0
-            daily_rates.append(rate)
-            labels.append(current_date.strftime('%b %d'))
-            
-            current_date += timedelta(days=1)
-        
-        if len(daily_rates) < days:
-            return {
-                'labels': labels,
-                'data': daily_rates,
-                'average': sum(daily_rates) / len(daily_rates) if daily_rates else 0
-            }
-        
-        moving_avg = []
-        for i in range(len(daily_rates)):
-            if i < days - 1:
-                window = daily_rates[:i+1]
-            else:
-                window = daily_rates[i-days+1:i+1]
-            moving_avg.append(sum(window) / len(window))
-        
-        return {
-            'labels': labels,
-            'data': [round(ma, 1) for ma in moving_avg],
-            'average': round(sum(moving_avg) / len(moving_avg), 1)
-        }

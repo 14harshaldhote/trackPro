@@ -12,6 +12,9 @@ from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from rest_framework import serializers
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 from functools import wraps
 import json
 import hashlib
@@ -277,18 +280,18 @@ def api_logout(request):
     })
 
 
-@require_http_methods(["GET"])
-@ensure_csrf_cookie
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def api_check_auth(request):
     """
-    Check authentication status
+    Check authentication status via JWT or Session
     
     GET /api/auth/status/
     
     Returns current user info if authenticated
     """
     if request.user.is_authenticated:
-        return JsonResponse({
+        return Response({
             'authenticated': True,
             'user': {
                 'email': request.user.email,
@@ -296,7 +299,7 @@ def api_check_auth(request):
             }
         })
     else:
-        return JsonResponse({
+        return Response({
             'authenticated': False
         })
 
@@ -331,131 +334,93 @@ def api_validate_email(request):
 
 
 @require_http_methods(["POST"])
-@rate_limit(max_requests=10, window_seconds=300, key_prefix='google_mobile')
+@csrf_exempt
+@rate_limit(max_requests=20, window_seconds=300, key_prefix='google_mobile')
 def api_google_auth_mobile(request):
     """
-    Authenticate with Google ID token from iOS/mobile app
+    Authenticate with Google ID token from iOS/mobile app and issue JWT.
     
-    POST /api/auth/google/mobile/
-    {"idToken": "..."}
+    POST /api/auth/google/
+    { "id_token": "<google_id_token>" }
     
-    Validates the ID token with Google, creates or retrieves the user,
-    and logs them in.
-    
-    Returns: {"success": true, "user": {"email": "...", "username": "..."}}
+    Returns:
+    {
+        "token": "<jwt_access_token>",
+        "user": { ... }
+    }
     """
     try:
         from google.oauth2 import id_token
         from google.auth.transport import requests as google_requests
         from django.conf import settings
+        from rest_framework_simplejwt.tokens import RefreshToken
         
         data = json.loads(request.body)
         token = data.get('idToken') or data.get('id_token')
         
         if not token:
-            return JsonResponse({
-                'success': False,
-                'errors': {'idToken': ['ID token is required.']}
-            }, status=400)
+            return JsonResponse({'detail': 'id_token is required.'}, status=400)
         
-        # Get the Google iOS Client ID from settings
-        google_ios_client_id = getattr(settings, 'GOOGLE_IOS_CLIENT_ID', None)
-        
-        if not google_ios_client_id:
-            # Fall back to hardcoded ID provided by user if settings missing
-            google_ios_client_id = "333674354840-mciolh2qj5iki87rn7b9qosl3q9ob5ao.apps.googleusercontent.com"
-            
-        if not google_ios_client_id:
-            # Fall back to the web client ID if iOS-specific one not set
-            google_ios_client_id = getattr(settings, 'GOOGLE_CLIENT_ID', None)
-        
-        if not google_ios_client_id:
-            return JsonResponse({
-                'success': False,
-                'errors': {'non_field_errors': ['Google authentication not configured.']}
-            }, status=500)
-        
+        # Verify the token with Google
         try:
-            # Verify the token with Google
+            # We strictly verify against the iOS Client ID because the token comes from the iOS app
+            CLIENT_ID = settings.GOOGLE_IOS_CLIENT_ID
+            
             idinfo = id_token.verify_oauth2_token(
                 token, 
                 google_requests.Request(), 
-                audience=google_ios_client_id
+                audience=CLIENT_ID
             )
             
-            # Check that the token is valid (not expired, correct issuer, etc.)
+            # Check issuer
             if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
-                raise ValueError('Invalid issuer.')
+                raise ValueError('Wrong issuer.')
             
-            # Get user info from the token
+            # Get user info
             email = idinfo.get('email')
-            email_verified = idinfo.get('email_verified', False)
-            
             if not email:
-                return JsonResponse({
-                    'success': False,
-                    'errors': {'non_field_errors': ['Could not get email from Google account.']}
-                }, status=400)
-            
-            if not email_verified:
-                return JsonResponse({
-                    'success': False,
-                    'errors': {'email': ['Please verify your Google email address first.']}
-                }, status=400)
+                raise ValueError('Email not found in token.')
+                
+            first_name = idinfo.get('given_name', '')
+            last_name = idinfo.get('family_name', '')
             
             # Get or create user
+            # We match by email
             user, created = User.objects.get_or_create(
                 email=email,
                 defaults={
-                    'username': email.split('@')[0],
-                    'first_name': idinfo.get('given_name', ''),
-                    'last_name': idinfo.get('family_name', ''),
+                    'username': email.split('@')[0], # Fallback username
+                    'first_name': first_name,
+                    'last_name': last_name,
                 }
             )
             
-            # If user exists but was created differently, ensure unique username
-            if created:
-                # Ensure unique username
-                base_username = user.username
-                counter = 1
-                while User.objects.exclude(pk=user.pk).filter(username=user.username).exists():
-                    user.username = f"{base_username}{counter}"
-                    counter += 1
+            # If created, ensure username uniqueness if collision occurred on default
+            if created and User.objects.exclude(pk=user.pk).filter(username=user.username).exists():
+                user.username = f"{user.username}{user.pk}"
                 user.save()
             
-            # Log the user in
-            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            # Generate JWT (SimpleJWT)
+            refresh = RefreshToken.for_user(user)
             
             return JsonResponse({
-                'success': True,
-                'redirect': '/',
+                'token': str(refresh.access_token),
+                'refresh': str(refresh), # Optional: send refresh token if needed
                 'user': {
+                    'id': user.id,
                     'email': user.email,
-                    'username': user.username,
+                    'name': f"{user.first_name} {user.last_name}".strip(),
+                    'username': user.username
                 }
             })
             
         except ValueError as e:
-            return JsonResponse({
-                'success': False,
-                'errors': {'idToken': [f'Invalid Google token: {str(e)}']}
-            }, status=400)
+            return JsonResponse({'detail': f'Token verification failed: {str(e)}'}, status=400)
             
-    except ImportError:
-        return JsonResponse({
-            'success': False,
-            'errors': {'non_field_errors': ['Google authentication library not installed. Run: pip install google-auth']}
-        }, status=500)
-    except json.JSONDecodeError:
-        return JsonResponse({
-            'success': False,
-            'errors': {'non_field_errors': ['Invalid JSON data.']}
-        }, status=400)
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'errors': {'non_field_errors': [str(e)]}
-        }, status=500)
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'detail': f'Internal Error: {str(e)}'}, status=500)
 
 
 # ============================================================================

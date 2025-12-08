@@ -68,6 +68,8 @@ INSTALLED_APPS = [
     
     # Local apps
     'core',
+    'rest_framework',
+    'rest_framework_simplejwt',
     # 'api',  # Commented out - directory doesn't exist
 ]
 
@@ -252,11 +254,33 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
+
+# REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication', # Keep session for admin/web
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+# Simple JWT Configuration
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=30), # Long lived for mobile convenience
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
 # Google OAuth2 Client IDs for mobile apps
 # Web client ID (used for allauth)
-GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='333674354840-u0avbnvibh2c8e9d6qs3livmdbna1g6p.apps.googleusercontent.com')
 # iOS-specific client ID (from Google Cloud Console -> iOS OAuth Client)
-GOOGLE_IOS_CLIENT_ID = config('GOOGLE_IOS_CLIENT_ID', default='')
+GOOGLE_IOS_CLIENT_ID = config('GOOGLE_IOS_CLIENT_ID', default='333674354840-mciolh2qj5iki87rn7b9qosl3q9ob5ao.apps.googleusercontent.com')
 
 # Email backend (for development - prints to console)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

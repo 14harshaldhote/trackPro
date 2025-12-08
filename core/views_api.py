@@ -316,9 +316,9 @@ def api_tracker_update(request, tracker_id):
     )
 
 
+@csrf_exempt  # Required for iOS/mobile clients
 @login_required
 @require_POST
-@handle_service_errors
 def api_template_activate(request):
     """
     Create tracker from predefined template.
@@ -328,8 +328,22 @@ def api_template_activate(request):
     
     Returns: {'tracker_id': '...', 'message': '...'}
     """
-    data = json.loads(request.body)
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError as e:
+        logger.error(f"Template activate - JSON parse error: {e}")
+        return UXResponse.error(
+            message='Invalid JSON in request body',
+            error_code='INVALID_JSON',
+            status=400
+        )
+    
     template_key = data.get('template_key')
+    
+    logger.info(f"Template activation requested: {template_key} by user {request.user.id}")
     
     # Define all template configurations matching templates.html
     TEMPLATES = {
@@ -446,23 +460,71 @@ def api_template_activate(request):
     
     template_config = TEMPLATES[template_key]
     
-    # Create tracker using TrackerService with template data
-    tracker = tracker_service.create_tracker(request.user, template_config)
+    # Create tracker manually to handle task dictionaries properly
+    import uuid
+    from django.db import transaction
+    from .models import TrackerDefinition, TaskTemplate
     
-    return UXResponse.success(
-        message=f'Created "{template_config["name"]}" tracker',
-        data={
-            'tracker_id': tracker.get('id') or tracker.get('tracker_id'),
-            'tracker_name': template_config['name'],
-            'task_count': len(template_config['tasks'])
-        },
-        feedback={
-            'type': 'success',
-            'message': f'"{template_config["name"]}" tracker created!',
-            'haptic': 'success',
-            'toast': True
-        }
-    )
+    try:
+        with transaction.atomic():
+            # Create the tracker
+            tracker = TrackerDefinition.objects.create(
+                user=request.user,
+                tracker_id=str(uuid.uuid4()),
+                name=template_config['name'],
+                description=template_config.get('description', ''),
+                time_mode=template_config.get('time_period', 'daily'),
+                status='active'
+            )
+            
+            # Create task templates from task dictionaries
+            tasks = template_config.get('tasks', [])
+            for i, task_data in enumerate(tasks):
+                if isinstance(task_data, dict):
+                    TaskTemplate.objects.create(
+                        template_id=str(uuid.uuid4()),
+                        tracker=tracker,
+                        description=task_data.get('description', ''),
+                        category=task_data.get('category', ''),
+                        weight=task_data.get('weight', len(tasks) - i),
+                        time_of_day=task_data.get('time_of_day', 'anytime'),
+                        is_recurring=True
+                    )
+                elif isinstance(task_data, str) and task_data.strip():
+                    # Fallback for string tasks
+                    TaskTemplate.objects.create(
+                        template_id=str(uuid.uuid4()),
+                        tracker=tracker,
+                        description=task_data,
+                        is_recurring=True,
+                        weight=len(tasks) - i,
+                        time_of_day='anytime'
+                    )
+        
+        return UXResponse.success(
+            message=f'Created "{template_config["name"]}" tracker',
+            data={
+                'tracker_id': str(tracker.tracker_id),
+                'tracker_name': template_config['name'],
+                'task_count': len(tasks)
+            },
+            feedback={
+                'type': 'success',
+                'message': f'"{template_config["name"]}" tracker created!',
+                'haptic': 'success',
+                'toast': True
+            }
+        )
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        logger.error(f"Template activate error: {str(e)}")
+        logger.error(f"Traceback: {error_traceback}")
+        return UXResponse.error(
+            message=f'Failed to create tracker: {str(e)}',
+            error_code='CREATE_FAILED',
+            status=500
+        )
 
 
 # ============================================================================

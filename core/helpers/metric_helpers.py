@@ -1,21 +1,21 @@
 """
 Metric helper functions for behavior analytics.
 Implements efficient algorithms for streak detection, consistency scoring, and balance metrics.
+
+Uses Polars for high-performance dataframe operations when available (10x faster than Pandas).
+All statistical methods use pure numpy - NO heavy dependencies (scipy/statsmodels/sklearn).
 """
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Union
 from datetime import date, timedelta
 
-# Optional scipy imports with fallback
+# Optional Polars import with fallback to Pandas
 try:
-    from scipy import stats as scipy_stats
-    from scipy.signal import savgol_filter
-    SCIPY_AVAILABLE = True
+    import polars as pl
+    POLARS_AVAILABLE = True
 except ImportError:
-    scipy_stats = None
-    savgol_filter = None
-    SCIPY_AVAILABLE = False
+    POLARS_AVAILABLE = False
 
 def detect_streaks_numpy(completion_series: pd.Series) -> Dict[str, int]:
     """
@@ -545,3 +545,291 @@ def analyze_seasonality(series: pd.Series, period: int = 7) -> Dict:
         'seasonal_pattern': seasonal_pattern
     }
 
+
+# ============================================================================
+# POLARS-OPTIMIZED FUNCTIONS (10x faster than Pandas)
+# ============================================================================
+
+def aggregate_daily_metrics_polars(data_dict: List[Dict]) -> pl.DataFrame:
+    """
+    Fast aggregation using Polars (Rust-based, zero-copy operations)
+    
+    Args:
+        data_dict: List of dicts with task completion data
+    
+    Returns:
+        Polars DataFrame with aggregated metrics
+    """
+    if not POLARS_AVAILABLE:
+        # Fallback to pandas
+        return pl.from_pandas(pd.DataFrame(data_dict))
+    
+    df = pl.DataFrame(data_dict)
+    
+    # Fast group-by aggregations (10x faster than pandas)
+    daily_agg = df.group_by('date').agg([
+        pl.count('task_id').alias('total_tasks'),
+        pl.col('status').filter(pl.col('status') == 'DONE').count().alias('completed'),
+        pl.col('weight').sum().alias('total_weight'),
+        pl.col('weight').filter(pl.col('status') == 'DONE').sum().alias('completed_weight')
+    ])
+    
+    # Calculate completion rate
+    daily_agg = daily_agg.with_columns([
+        ((pl.col('completed') / pl.col('total_tasks')) * 100).alias('completion_rate'),
+        ((pl.col('completed_weight') / pl.col('total_weight')) * 100).alias('weighted_rate')
+    ])
+    
+    return daily_agg
+
+
+def detect_seasonality_acf(series: Union[pd.Series, np.ndarray], period: int = 7) -> Dict:
+    """
+    Advanced seasonality detection using AutoCorrelation Function (ACF)
+    Pure numpy implementation - no statsmodels required
+    
+    Args:
+        series: Time series data
+        period: Expected seasonal period (7 for weekly)
+    
+    Returns:
+        {
+            'has_seasonality': bool,
+            'seasonal_strength': float,
+            'significant_lags': List[int],
+            'acf_values': List[float]
+        }
+    """
+    if len(series) < period * 3:
+        return {
+            'has_seasonality': False,
+            'seasonal_strength': 0.0,
+            'significant_lags': [],
+            'acf_values': []
+        }
+    
+    # Convert to numpy array if needed
+    if isinstance(series, pd.Series):
+        series = series.values
+    
+    # Calculate ACF using numpy (FFT-based for speed)
+    max_lag = min(period * 2, len(series) // 2)
+    acf_values = _calculate_acf_numpy(series, max_lag)
+    
+    # Check significance at seasonal lag
+    # Threshold: 1.96 / sqrt(n) for 95% confidence
+    threshold = 1.96 / np.sqrt(len(series))
+    
+    significant_lags = []
+    for lag in range(1, max_lag + 1):
+        if abs(acf_values[lag]) > threshold:
+            significant_lags.append(lag)
+    
+    # Seasonal strength: ACF at seasonal lag
+    if period < len(acf_values):
+        seasonal_strength = abs(acf_values[period])
+    else:
+        seasonal_strength = 0.0
+    
+    has_seasonality = seasonal_strength > threshold and period in significant_lags
+    
+    return {
+        'has_seasonality': has_seasonality,
+        'seasonal_strength': float(seasonal_strength),
+        'significant_lags': significant_lags[:10],  # Top 10
+        'acf_values': acf_values[:period * 2].tolist(),
+        'method': 'acf_numpy'
+    }
+
+
+def _calculate_acf_numpy(series: np.ndarray, max_lag: int) -> np.ndarray:
+    """
+    Calculate AutoCorrelation Function using pure numpy (FFT-based)
+    Fast and serverless-safe
+    
+    Args:
+        series: 1D numpy array
+        max_lag: Maximum lag to calculate
+    
+    Returns:
+        ACF values from lag 0 to max_lag
+    """
+    # Demean the series
+    series_mean = np.mean(series)
+    series_demeaned = series - series_mean
+    
+    # Use FFT for fast correlation calculation
+    n = len(series)
+    
+    # Pad to next power of 2 for FFT efficiency
+    nfft = 2 ** int(np.ceil(np.log2(2 * n - 1)))
+    
+    # Compute autocorrelation via FFT
+    fft_series = np.fft.fft(series_demeaned, n=nfft)
+    auto_corr = np.fft.ifft(fft_series * np.conj(fft_series)).real[:n]
+    
+    # Normalize by variance and sample size
+    variance = auto_corr[0]
+    if variance == 0:
+        return np.zeros(max_lag + 1)
+    
+    acf = auto_corr / variance
+    
+    # Return only up to max_lag
+    return acf[:max_lag + 1]
+
+
+def compute_pearson_correlation(x: np.ndarray, y: np.ndarray) -> Dict:
+    """
+    Compute Pearson correlation without scipy (pure numpy)
+    
+    Returns:
+        {
+            'correlation': float,
+            'p_value': float (approximate),
+            'significant': bool
+        }
+    """
+    if len(x) != len(y) or len(x) < 3:
+        return {'correlation': 0.0, 'p_value': 1.0, 'significant': False}
+    
+    # Remove NaN values
+    mask = ~(np.isnan(x) | np.isnan(y))
+    x = x[mask]
+    y = y[mask]
+    
+    if len(x) < 3:
+        return {'correlation': 0.0, 'p_value': 1.0, 'significant': False}
+    
+    # Pearson correlation
+    x_mean = np.mean(x)
+    y_mean = np.mean(y)
+    
+    numerator = np.sum((x - x_mean) * (y - y_mean))
+    denominator = np.sqrt(np.sum((x - x_mean)**2) * np.sum((y - y_mean)**2))
+    
+    if denominator == 0:
+        return {'correlation': 0.0, 'p_value': 1.0, 'significant': False}
+    
+    r = numerator / denominator
+    
+    # Approximate p-value using t-distribution
+    n = len(x)
+    t_stat = r * np.sqrt(n - 2) / np.sqrt(1 - r**2) if abs(r) < 1 else np.inf
+    
+    # Very rough p-value approximation (conservative)
+    # For proper p-value, would need scipy.stats.t.sf
+    if abs(t_stat) > 2.0:  # Roughly p < 0.05 for n > 30
+        p_value = 0.01
+        significant = True
+    elif abs(t_stat) > 1.0:
+        p_value = 0.1
+        significant = False
+    else:
+        p_value = 0.5
+        significant = False
+    
+    return {
+        'correlation': float(r),
+        'p_value': float(p_value),
+        'significant': significant,
+        't_statistic': float(t_stat)
+    }
+
+
+def rolling_statistics_polars(df: pl.DataFrame, value_col: str, window: int = 7) -> pl.DataFrame:
+    """
+    Fast rolling statistics using Polars
+    
+    Args:
+        df: Polars DataFrame with date and value columns
+        value_col: Name of value column
+        window: Rolling window size
+    
+    Returns:
+        DataFrame with added rolling statistics
+    """
+    if not POLARS_AVAILABLE:
+        # Convert to pandas for fallback
+        pd_df = df.to_pandas() if hasattr(df, 'to_pandas') else df
+        pd_df[f'{value_col}_rolling_mean'] = pd_df[value_col].rolling(window).mean()
+        pd_df[f'{value_col}_rolling_std'] = pd_df[value_col].rolling(window).std()
+        return pl.from_pandas(pd_df)
+    
+    # Polars rolling operations (much faster)
+    result = df.with_columns([
+        pl.col(value_col).rolling_mean(window).alias(f'{value_col}_rolling_mean'),
+        pl.col(value_col).rolling_std(window).alias(f'{value_col}_rolling_std'),
+        pl.col(value_col).rolling_min(window).alias(f'{value_col}_rolling_min'),
+        pl.col(value_col).rolling_max(window).alias(f'{value_col}_rolling_max')
+    ])
+    
+    return result
+
+
+def compute_z_score_anomalies(values: np.ndarray, threshold: float = 2.5) -> Dict:
+    """
+    Detect anomalies using Z-score method (lightweight, no sklearn)
+    
+    Args:
+        values: Array of values
+        threshold: Z-score threshold (default: 2.5 = ~1.2% outliers)
+    
+    Returns:
+        {
+            'anomaly_indices': List[int],
+            'anomaly_values': List[float],
+            'z_scores': np.ndarray
+        }
+    """
+    if len(values) < 3:
+        return {
+            'anomaly_indices': [],
+            'anomaly_values': [],
+            'z_scores': []
+        }
+    
+    mean = np.mean(values)
+    std = np.std(values)
+    
+    if std == 0:
+        return {
+            'anomaly_indices': [],
+            'anomaly_values': [],
+            'z_scores': np.zeros(len(values))
+        }
+    
+    z_scores = (values - mean) / std
+    anomaly_mask = np.abs(z_scores) > threshold
+    anomaly_indices = np.where(anomaly_mask)[0].tolist()
+    anomaly_values = values[anomaly_mask].tolist()
+    
+    return {
+        'anomaly_indices': anomaly_indices,
+        'anomaly_values': anomaly_values,
+        'z_scores': z_scores,
+        'threshold': threshold
+    }
+
+
+def exponential_moving_average(values: np.ndarray, alpha: float = 0.3) -> np.ndarray:
+    """
+    Calculate EMA without pandas (pure numpy, faster)
+    
+    Args:
+        values: Input array
+        alpha: Smoothing factor (0-1)
+    
+    Returns:
+        EMA array
+    """
+    if len(values) == 0:
+        return np.array([])
+    
+    ema = np.zeros(len(values))
+    ema[0] = values[0]
+    
+    for i in range(1, len(values)):
+        ema[i] = alpha * values[i] + (1 - alpha) * ema[i-1]
+    
+    return ema

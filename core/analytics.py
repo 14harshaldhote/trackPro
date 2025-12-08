@@ -733,36 +733,18 @@ def analyze_trends(tracker_id: str, window: int = 14, smooth_method: str = 'savg
     }
 
 # ====================================================================
-# ADVANCED VISUALIZATIONS
+# ADVANCED VISUALIZATIONS (Disabled for serverless deployment)
 # ====================================================================
 
 def generate_correlation_heatmap(tracker_id: str):
-    """Generates correlation heatmap."""
+    """Generates correlation heatmap.
+    
+    NOTE: Visualization disabled for Vercel/serverless deployment.
+    Returns correlation data as dict instead of image.
+    """
     corr_data = compute_correlations(tracker_id)
-    corr_matrix = corr_data.get('correlation_matrix', {})
-    
-    if not corr_matrix:
-        return None
-    
-    # Convert to DataFrame for seaborn
-    metrics = list(corr_matrix.keys())
-    matrix_values = []
-    for m1 in metrics:
-        row = [corr_matrix[m1].get(m2, 0) for m2 in metrics]
-        matrix_values.append(row)
-    
-    df = pd.DataFrame(matrix_values, index=metrics, columns=metrics)
-    
-    # Plot
-    sns.set_theme()
-    fig, ax = plt.subplots(figsize=(8, 6))
-    
-    sns.heatmap(df, annot=True, cmap='coolwarm', center=0, vmin=-1, vmax=1, 
-                square=True, linewidths=1, cbar_kws={"shrink": 0.8}, ax=ax)
-    
-    ax.set_title('Metric Correlations', fontsize=14)
-    
-    return get_plot_as_base64(fig)
+    # Return data instead of image for frontend to render
+    return corr_data
 
 def simple_forecast(tracker_id: str, metric: str = 'completion_rate', days: int = 7) -> Dict:
     """
@@ -838,31 +820,40 @@ def simple_forecast(tracker_id: str, metric: str = 'completion_rate', days: int 
         # Use today as fallback
         last_date = pd.Timestamp.now().normalize()
     
-    forecast_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=days)
+    try:
+        forecast_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=days)
+    except Exception:
+        return {
+            'metric_name': 'forecast',
+            'forecast_dates': [],
+            'forecast_values': [],
+            'method': 'none',
+            'error': 'Error creating forecast dates'
+        }
     
-    # Plot
-    sns.set_theme()
-    fig, ax = plt.subplots(figsize=(12, 5))
-    
-    # Historical
-    ax.plot(historical_dates, historical_values, marker='o', label='Historical', color='#2196F3', linewidth=2)
-    
-    # Forecast
-    ax.plot(forecast_dates, forecast_values, marker='s', label='Forecast', color='#FF9800', linewidth=2, linestyle='--')
-    
-    # Confidence interval
-    ax.fill_between(forecast_dates, conf_lower, conf_upper, alpha=0.3, color='#FF9800', label='95% Confidence')
-    
-    ax.set_title(f'{metric.replace("_", " ").title()} Forecast ({days} days)', fontsize=14)
-    ax.set_ylabel('Value')
-    ax.set_xlabel('Date')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    return get_plot_as_base64(fig)
+    # Return data for frontend Chart.js rendering instead of matplotlib image
+    return {
+        'metric_name': 'forecast',
+        'metric': metric,
+        'historical': {
+            'dates': [str(d) for d in historical_dates],
+            'values': [float(v) for v in historical_values]
+        },
+        'forecast': {
+            'dates': [str(d) for d in forecast_dates],
+            'values': [float(v) for v in forecast_values],
+            'confidence_lower': [float(v) for v in conf_lower],
+            'confidence_upper': [float(v) for v in conf_upper]
+        },
+        'method': 'arima_or_exponential'
+    }
 
 def generate_forecast_chart(tracker_id: str, metric: str = 'completion_rate', days: int = 7):
-    """Generates forecast chart with confidence intervals."""
+    """Generates forecast chart data.
+    
+    NOTE: Visualization disabled for Vercel/serverless deployment.
+    Returns data for frontend Chart.js rendering instead of matplotlib image.
+    """
     ts_data = analyze_time_series(tracker_id, metric=metric, forecast_days=days)
     
     # Validate we have forecast data
@@ -880,7 +871,6 @@ def generate_forecast_chart(tracker_id: str, metric: str = 'completion_rate', da
         df['date'] = pd.to_datetime(df['date'])
         df = df.sort_values('date')
         
-        # Validate we have data
         if len(df) == 0:
             return None
         
@@ -889,7 +879,6 @@ def generate_forecast_chart(tracker_id: str, metric: str = 'completion_rate', da
     else:
         return None
     
-    # Validate historical dates
     if len(historical_dates) == 0:
         return None
     
@@ -898,45 +887,40 @@ def generate_forecast_chart(tracker_id: str, metric: str = 'completion_rate', da
     conf_lower = forecast_result.get('confidence_lower', [])
     conf_upper = forecast_result.get('confidence_upper', [])
     
-    # Validate forecast data
-    if not forecast_values or len(forecast_values) == 0:
+    if not forecast_values:
         return None
     
-    # Create forecast dates - validate last_date is not NaT
     last_date = historical_dates[-1]
     if pd.isna(last_date):
-        # Use today as fallback
         last_date = pd.Timestamp.now().normalize()
     
     try:
         forecast_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=days)
-    except Exception as e:
-        logger.error(f"Error creating forecast dates: {e}")
+    except Exception:
         return None
     
-    # Plot
-    sns.set_theme()
-    fig, ax = plt.subplots(figsize=(12, 5))
-    
-    # Historical
-    ax.plot(historical_dates, historical_values, marker='o', label='Historical', color='#2196F3', linewidth=2)
-    
-    # Forecast
-    ax.plot(forecast_dates, forecast_values, marker='s', label='Forecast', color='#FF9800', linewidth=2, linestyle='--')
-    
-    # Confidence interval
-    ax.fill_between(forecast_dates, conf_lower, conf_upper, alpha=0.3, color='#FF9800', label='95% Confidence')
-    
-    ax.set_title(f'{metric.replace("_", " ").title()} Forecast ({days} days)', fontsize=14)
-    ax.set_ylabel('Value')
-    ax.set_xlabel('Date')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    return get_plot_as_base64(fig)
+    # Return data for frontend Chart.js rendering instead of matplotlib image
+    return {
+        'chart_type': 'forecast',
+        'metric': metric,
+        'historical': {
+            'labels': [pd.Timestamp(d).strftime('%b %d') for d in historical_dates],
+            'data': [float(v) for v in historical_values]
+        },
+        'forecast': {
+            'labels': [d.strftime('%b %d') for d in forecast_dates],
+            'data': [float(v) for v in forecast_values],
+            'confidence_lower': [float(v) for v in conf_lower],
+            'confidence_upper': [float(v) for v in conf_upper]
+        }
+    }
 
 def generate_progress_chart_with_trend(tracker_id: str):
-    """Generates progress chart with trend line."""
+    """Generates progress chart data with trend line.
+    
+    NOTE: Visualization disabled for Vercel/serverless deployment.
+    Returns data for frontend Chart.js rendering instead of matplotlib image.
+    """
     completion_data = compute_completion_rate(tracker_id)
     daily_rates = completion_data.get('daily_rates', [])
     
@@ -953,18 +937,16 @@ def generate_progress_chart_with_trend(tracker_id: str):
     
     trend_line = trend_info['slope'] * x_vals + trend_info['intercept']
     
-    # Plot
-    sns.set_theme()
-    fig, ax = plt.subplots(figsize=(12, 5))
-    
-    ax.scatter(df['date'], df['rate'], alpha=0.6, s=50, color='#4CAF50', label='Actual')
-    ax.plot(df['date'], trend_line, color='#F44336', linewidth=2, linestyle='--', label=f'Trend (R²={trend_info["r_squared"]:.2f})')
-    
-    ax.set_title('Progress with Trend Line', fontsize=14)
-    ax.set_ylabel('Completion Rate %')
-    ax.set_xlabel('Date')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-    
-    return get_plot_as_base64(fig)
+    # Return data for frontend Chart.js rendering
+    return {
+        'chart_type': 'progress_with_trend',
+        'labels': [d.strftime('%b %d') for d in df['date']],
+        'actual': [float(r) for r in df['rate'].values],
+        'trend': [float(t) for t in trend_line],
+        'trend_info': {
+            'slope': trend_info['slope'],
+            'r_squared': trend_info['r_squared'],
+            'direction': 'improving' if trend_info['slope'] > 0 else 'declining' if trend_info['slope'] < 0 else 'stable'
+        }
+    }
 
