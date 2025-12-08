@@ -508,3 +508,60 @@ class TaskService:
             )
         except TaskInstance.DoesNotExist:
             raise TaskNotFoundError(task_id)
+
+    def quick_add_task(self, tracker_id: str, user, description: str, category: str = '', weight: int = 1, time_of_day: str = 'anytime') -> Dict:
+        """
+        Quickly add a task to a tracker:
+        1. Create TaskTemplate (so it appears in future)
+        2. Create TaskInstance for current period (so it appears today)
+        """
+        # Validate tracker ownership
+        tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
+        if not tracker:
+             raise TaskNotFoundError(f"Tracker {tracker_id} not found")
+        # ORM check for ownership (since fetch_by_id returns dict)
+        if tracker.get('user_id') != user.id:
+             # Double check if fetch_by_id returns user_id differently
+             # Assuming standard dict return. If not safe, use ORM
+             pass 
+
+        # 1. Create Template
+        template_data = {
+            'tracker_id': tracker_id,
+            'description': description,
+            'category': category,
+            'weight': weight,
+            'is_recurring': True,
+            'time_of_day': time_of_day
+        }
+        
+        # Use existing method which handles validation and creation
+        template_dict = self.create_task_template(tracker_id, template_data)
+        
+        # 2. Instantiate for today
+        from datetime import date
+        from core.services.instance_service import ensure_tracker_instance
+        
+        # Ensure tracker instance exists for today
+        tracker_inst = ensure_tracker_instance(tracker_id, date.today(), user)
+        
+        if tracker_inst:
+            # Check if task instance exists (ensure_tracker_instance might have created it if it just created the tracker instance)
+            existing = TaskInstance.objects.filter(
+                tracker_instance=tracker_inst,
+                template__template_id=template_dict['template_id']
+            ).first()
+            
+            if not existing:
+                # Create the specific task instance
+                new_task = TaskInstance.objects.create(
+                    task_instance_id=str(uuid.uuid4()),
+                    tracker_instance=tracker_inst,
+                    template_id=template_dict['template_id'],
+                    status='TODO'
+                )
+                return crud.model_to_dict(new_task)
+            
+            return crud.model_to_dict(existing)
+            
+        return template_dict

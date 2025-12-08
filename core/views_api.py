@@ -500,6 +500,10 @@ def api_template_activate(request):
                         weight=len(tasks) - i,
                         time_of_day='anytime'
                     )
+            
+            # Instantiate for today immediately to generate tasks
+            from core.services.instance_service import ensure_tracker_instance
+            ensure_tracker_instance(str(tracker.tracker_id), timezone.now().date(), request.user)
         
         return UXResponse.success(
             message=f'Created "{template_config["name"]}" tracker',
