@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 from enum import Enum
 from dataclasses import dataclass
-import numpy as np
+import statistics
 
 from core import analytics
 from core.helpers import nlp_helpers, metric_helpers
@@ -220,8 +220,8 @@ class InsightsEngine:
         if not weekend_rates or not weekday_rates:
             return
         
-        weekday_avg = np.mean(weekday_rates)
-        weekend_avg = np.mean(weekend_rates)
+        weekday_avg = statistics.mean(weekday_rates)
+        weekend_avg = statistics.mean(weekend_rates)
         difference = weekday_avg - weekend_avg
         
         if difference > 20:  # 20% drop on weekends
@@ -355,7 +355,7 @@ class InsightsEngine:
             return
         
         # Check if low sleep correlates with low completion
-        avg_sleep = np.mean([s['hours'] for s in sleep_data])
+        avg_sleep = statistics.mean([s['hours'] for s in sleep_data])
         low_sleep_days = [s['date'] for s in sleep_data if s['hours'] < 6]
         
         if len(low_sleep_days) > 2:
@@ -429,7 +429,7 @@ class InsightsEngine:
         
         if len(daily_rates) >= 5:
             recent_rates = [d['rate'] for d in daily_rates[-5:]]
-            recent_avg = np.mean(recent_rates)
+            recent_avg = statistics.mean(recent_rates)
             
             # High completion + high effort suggests need for recovery
             if recent_avg > 85 and completed_tasks > 20:

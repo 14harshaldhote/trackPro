@@ -8,14 +8,19 @@ Only core metrics and analytics functions are available.
 """
 import io
 import base64
-import pandas as pd
-import numpy as np
+import statistics
+import math
 from datetime import datetime, date, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
+from collections import Counter
 from core.repositories import base_repository as crud
 from core.helpers import nlp_helpers as nlp_utils
 from core.helpers import metric_helpers
 from core.helpers.cache_helpers import cache_result, CACHE_TIMEOUTS
+
+# Dependencies removed: pandas, numpy, matplotlib, seaborn
+# Serverless-friendly pure Python implementation
+_matplotlib_available = False
 
 # Matplotlib/Seaborn disabled for serverless deployment
 # Visualization functions will return None
@@ -54,15 +59,16 @@ def compute_completion_rate(tracker_id: str, start_date: Optional[date] = None, 
             'computed_at': datetime.now()
         }
     
-    # Build DataFrame - tasks are already prefetched
+    # Build structured data (previously Dataframe)
     data = []
+    total_completed = 0
+    total_scheduled = 0
+
     for inst in instances:
         inst_date = inst.period_start or inst.tracking_date
         if isinstance(inst_date, str):
             inst_date = date.fromisoformat(inst_date)
         
-        # Tasks are nested in the instance dict from prefetch
-        # With ORM objects and prefetch_related, utilize .all() which hits cache
         tasks = inst.tasks.all()
         if not tasks:
             continue
@@ -71,6 +77,10 @@ def compute_completion_rate(tracker_id: str, start_date: Optional[date] = None, 
         completed = sum(1 for t in tasks if t.status == 'DONE')
         rate = (completed / total) * 100 if total > 0 else 0.0
         
+        # Accumulate totals
+        total_scheduled += total
+        total_completed += completed
+
         data.append({
             'date': inst_date,
             'total': total,
@@ -78,21 +88,16 @@ def compute_completion_rate(tracker_id: str, start_date: Optional[date] = None, 
             'rate': rate
         })
     
-    df = pd.DataFrame(data)
-    
-    if df.empty:
-        overall_rate = 0.0
-    else:
-        overall_rate = (df['completed'].sum() / df['total'].sum()) * 100 if df['total'].sum() > 0 else 0.0
+    overall_rate = (total_completed / total_scheduled) * 100 if total_scheduled > 0 else 0.0
     
     return {
         'metric_name': 'completion_rate',
         'value': float(overall_rate),
-        'daily_rates': df.to_dict('records') if not df.empty else [],
+        'daily_rates': data, # Already list of dicts
         'raw_inputs': {
             'total_instances': len(data),
-            'total_tasks': int(df['total'].sum()) if not df.empty else 0,
-            'completed_tasks': int(df['completed'].sum()) if not df.empty else 0
+            'total_tasks': total_scheduled,
+            'completed_tasks': total_completed
         },
         'formula': 'completion_rate = (completed_tasks / scheduled_tasks) * 100',
         'computed_at': datetime.now()
@@ -144,20 +149,22 @@ def detect_streaks(tracker_id: str, task_template_id: Optional[str] = None) -> D
             'computed_at': datetime.now()
         }
     
-    # Convert to pandas Series
-    completion_series = pd.Series(completion_data).sort_index()
+    # Convert to simple list of booleans ordered by date
+    # Sort by date
+    sorted_items = sorted(completion_data.items())
+    completion_list = [status for _, status in sorted_items]
     
-    # Use metric_helpers for streak detection
-    streak_data = metric_helpers.detect_streaks_numpy(completion_series)
+    # Use metric_helpers for streak detection (pure python now)
+    streak_data = metric_helpers.detect_streaks(completion_list)
     
     return {
         'metric_name': 'streaks',
         'value': {
-            'current_streak': streak_data['current_streak'],
-            'longest_streak': streak_data['longest_streak']
+            'current_streak': streak_data['current'],
+            'longest_streak': streak_data['best']
         },
-        'raw_inputs': {'total_days': streak_data['total_days']},
-        'formula': 'Run-length encoding of consecutive completion days using NumPy diff + cumsum',
+        'raw_inputs': {'total_days': len(completion_list)},
+        'formula': 'Run-length encoding of consecutive completion days',
         'computed_at': datetime.now()
     }
 
@@ -201,16 +208,35 @@ def compute_consistency_score(tracker_id: str, window_days: int = 7) -> Dict:
             'computed_at': datetime.now()
         }
     
-    completion_series = pd.Series(completion_data).sort_index()
-    rolling_scores = metric_helpers.compute_rolling_consistency(completion_series, window_days)
+    # Sort by date
+    sorted_dates = sorted(completion_data.keys())
+    # Convert bools to 1.0/0.0
+    values = [100.0 if completion_data[d] else 0.0 for d in sorted_dates]
     
-    # Current consistency is the most recent rolling score
-    current_score = float(rolling_scores.iloc[-1]) if not rolling_scores.empty else 0.0
+    # Calculate rolling average manually
+    rolling_scores = []
+    if not values:
+        rolling_scores = []
+    else:
+        # Simple moving average
+        current_window = []
+        for i, val in enumerate(values):
+            current_window.append(val)
+            if len(current_window) > window_days:
+                current_window.pop(0)
+            
+            avg_score = sum(current_window) / len(current_window)
+            rolling_scores.append({
+                'date': str(sorted_dates[i]),
+                'score': avg_score
+            })
+            
+    current_score = rolling_scores[-1]['score'] if rolling_scores else 0.0
     
     return {
         'metric_name': 'consistency_score',
         'value': current_score,
-        'rolling_scores': [{'date': str(d), 'score': float(s)} for d, s in rolling_scores.items()],
+        'rolling_scores': rolling_scores,
         'raw_inputs': {'window_days': window_days, 'total_days': len(completion_data)},
         'formula': f'{window_days}-day rolling window mean of completion rate * 100',
         'computed_at': datetime.now()
@@ -248,7 +274,43 @@ def compute_balance_score(tracker_id: str) -> Dict:
             cat = template_map.get(str(t.template_id), 'Uncategorized')
             category_counts[cat] = category_counts.get(cat, 0) + 1
     
-    balance_data = metric_helpers.compute_category_balance(category_counts)
+    # Calculate entropy manually
+    total_count = sum(category_counts.values())
+    entropy = 0.0
+    normalized_distribution = {}
+    
+    if total_count > 0:
+        for count in category_counts.values():
+            p = count / total_count
+            if p > 0:
+                entropy -= p * math.log2(p)
+                
+        # Calculate max possible entropy (log2 of number of categories)
+        num_categories = len(category_counts)
+        max_entropy = math.log2(num_categories) if num_categories > 1 else 1.0
+        
+        # Normalize to 0-100
+        balance_score = (entropy / max_entropy) * 100 if max_entropy > 0 else 100.0 # Single category is technically perfectly balanced with itself? Or 0? Usually 0 diversity. 
+        # Actually for "balance" usually means diversity. Let's stick to entropy.
+        # If only 1 category exists, entropy is 0.
+        if num_categories <= 1:
+            balance_score = 0.0 if num_categories == 1 else 0.0
+        else:
+            balance_score = (entropy / max_entropy) * 100
+            
+        for cat, count in category_counts.items():
+            normalized_distribution[cat] = (count / total_count) * 100
+    else:
+        balance_score = 0.0
+        entropy = 0.0
+        max_entropy = 0.0
+        
+    balance_data = {
+        'balance_score': balance_score,
+        'entropy': entropy,
+        'max_entropy': max_entropy,
+        'normalized_distribution': normalized_distribution
+    }
     
     return {
         'metric_name': 'balance_score',
@@ -359,7 +421,7 @@ def analyze_notes_sentiment(tracker_id: str, start_date: Optional[date] = None, 
             'neg': sentiment['neg']
         })
     
-    avg_mood = np.mean([s['compound'] for s in daily_sentiments]) if daily_sentiments else 0.0
+    avg_mood = statistics.mean([s['compound'] for s in daily_sentiments]) if daily_sentiments else 0.0
     
     return {
         'metric_name': 'sentiment_analysis',
@@ -434,20 +496,26 @@ def compute_mood_trends(tracker_id: str, window_days: int = 7) -> Dict:
             'computed_at': datetime.now()
         }
     
-    # Convert to DataFrame
-    df = pd.DataFrame(daily_mood)
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values('date').set_index('date')
+    # Manual rolling mean
+    rolling_data = []
     
-    # Rolling mean
-    rolling_mean = df['compound'].rolling(window=window_days, min_periods=1).mean()
+    # Sort by date
+    daily_mood_sorted = sorted(daily_mood, key=lambda x: x['date'])
     
-    rolling_data = [
-        {'date': str(d.date()), 'mood': float(m)}
-        for d, m in rolling_mean.items()
-    ]
+    compounds = [x['compound'] for x in daily_mood_sorted]
     
-    current_trend = float(rolling_mean.iloc[-1]) if not rolling_mean.empty else 0.0
+    for i in range(len(compounds)):
+        # Determine window start
+        start_idx = max(0, i - window_days + 1)
+        window = compounds[start_idx : i+1]
+        
+        avg_val = sum(window) / len(window)
+        rolling_data.append({
+            'date': daily_mood_sorted[i]['date'],
+            'mood': float(avg_val)
+        })
+    
+    current_trend = rolling_data[-1]['mood'] if rolling_data else 0.0
     
     return {
         'metric_name': 'mood_trends',
@@ -516,7 +584,7 @@ def compute_tracker_stats(tracker_id):
 
 def compute_correlations(tracker_id: str, metrics: Optional[List[str]] = None) -> Dict:
     """
-    Computes correlation matrix between multiple metrics.
+    Computes correlation matrix between multiple metrics (pure Python).
     
     Args:
         tracker_id: Tracker ID
@@ -526,10 +594,9 @@ def compute_correlations(tracker_id: str, metrics: Optional[List[str]] = None) -
         {
             'metric_name': 'correlations',
             'correlation_matrix': dict,
-            'p_values': dict,
-            'significant': dict,
             'raw_inputs': {...},
-            'formula': str
+            'formula': str,
+            'computed_at': datetime
         }
     """
     if metrics is None:
@@ -542,15 +609,22 @@ def compute_correlations(tracker_id: str, metrics: Optional[List[str]] = None) -
     if 'completion_rate' in metrics:
         completion_data = compute_completion_rate(tracker_id)
         daily_rates = completion_data.get('daily_rates', [])
+        # Create map date_str -> rate
         if daily_rates:
-            data_dict['completion_rate'] = np.array([r['rate'] for r in daily_rates])
+            for r in daily_rates:
+                d_str = str(r['date'])
+                if d_str not in data_dict: data_dict[d_str] = {}
+                data_dict[d_str]['completion_rate'] = r['rate']
     
     # Mood (sentiment)
     if 'mood' in metrics:
         sentiment_data = analyze_notes_sentiment(tracker_id)
         daily_mood = sentiment_data.get('daily_mood', [])
         if daily_mood:
-            data_dict['mood'] = np.array([m['compound'] for m in daily_mood])
+            for m in daily_mood:
+                d_str = str(m['date'])
+                if d_str not in data_dict: data_dict[d_str] = {}
+                data_dict[d_str]['mood'] = m['compound']
     
     # Effort
     if 'effort' in metrics:
@@ -560,35 +634,50 @@ def compute_correlations(tracker_id: str, metrics: Optional[List[str]] = None) -
         # Fix: templates is a QuerySet of objects, not dicts
         template_map = {str(t.template_id): getattr(t, 'weight', 1) for t in templates}
         
-        daily_effort = []
         for inst in instances:
             tasks = crud.get_task_instances_for_tracker_instance(inst.instance_id)
             day_effort = sum(template_map.get(str(t.template_id), 1) for t in tasks if t.status == 'DONE')
-            daily_effort.append(day_effort)
-        
-        if daily_effort:
-            data_dict['effort'] = np.array(daily_effort)
+            
+            d_str = str(inst.period_start or inst.tracking_date)
+            if d_str not in data_dict: data_dict[d_str] = {}
+            data_dict[d_str]['effort'] = day_effort
+
+    # Prepare aligned lists
+    aligned_data = {m: [] for m in metrics}
     
-    if len(data_dict) < 2:
-        return {
-            'metric_name': 'correlations',
-            'correlation_matrix': {},
-            'p_values': {},
-            'significant': {},
-            'raw_inputs': {'metrics': metrics, 'data_available': list(data_dict.keys())},
-            'formula': 'Pearson correlation coefficient: r = cov(X,Y) / (σ_X * σ_Y)',
-            'computed_at': datetime.now()
-        }
+    # Only include dates where we have data for at least 2 metrics?
+    # Or just pairwise? Correlation matrix pairwise is best.
     
-    corr_result = metric_helpers.compute_correlation_matrix(data_dict, method='pearson')
+    # Strategy: For each pair of metrics, extract common dates
+    correlation_matrix = {}
     
+    for i, m1 in enumerate(metrics):
+        correlation_matrix[m1] = {}
+        for m2 in metrics:
+            if m1 == m2:
+                correlation_matrix[m1][m2] = 1.0
+                continue
+            
+            vals1 = []
+            vals2 = []
+            
+            for d_str, day_data in data_dict.items():
+                if m1 in day_data and m2 in day_data:
+                    vals1.append(day_data[m1])
+                    vals2.append(day_data[m2])
+            
+            if len(vals1) < 2:
+                correlation_matrix[m1][m2] = 0.0
+            else:
+                correlation_matrix[m1][m2] = metric_helpers.calculate_correlation(vals1, vals2)
+
     return {
         'metric_name': 'correlations',
-        'correlation_matrix': corr_result['correlation_matrix'],
-        'p_values': corr_result['p_values'],
-        'significant': corr_result['significant'],
-        'raw_inputs': {'metrics': list(data_dict.keys()), 'sample_sizes': {k: len(v) for k, v in data_dict.items()}},
-        'formula': 'Pearson correlation coefficient: r = cov(X,Y) / (σ_X * σ_Y)',
+        'correlation_matrix': correlation_matrix,
+        'p_values': {}, # Not supported in lightweight mode
+        'significant': {}, # Not supported in lightweight mode
+        'raw_inputs': {'metrics': metrics, 'data_points': len(data_dict)},
+        'formula': 'Pearson correlation coefficient (aligned by date)',
         'computed_at': datetime.now()
     }
 
@@ -610,60 +699,45 @@ def analyze_time_series(tracker_id: str, metric: str = 'completion_rate', foreca
             'seasonality': dict
         }
     """
-    # Get time series data
+    # Lightweight Time Series Analysis
+    
+    # 1. Fetch Data
+    series = []
     if metric == 'completion_rate':
-        completion_data = compute_completion_rate(tracker_id)
-        daily_rates = completion_data.get('daily_rates', [])
-        if not daily_rates:
-            return _empty_timeseries_result(metric)
-        
-        df = pd.DataFrame(daily_rates)
-        df['date'] = pd.to_datetime(df['date'])
-        df = df.set_index('date').sort_index()
-        series = df['rate']
+        c_data = compute_completion_rate(tracker_id)
+        series = [r['rate'] for r in c_data.get('daily_rates', [])]
     
-    elif metric == 'mood':
-        sentiment_data = analyze_notes_sentiment(tracker_id)
-        daily_mood = sentiment_data.get('daily_mood', [])
-        if not daily_mood:
-            return _empty_timeseries_result(metric)
-        
-        df = pd.DataFrame(daily_mood)
-        df['date'] = pd.to_datetime(df['date'])
-        df = df.set_index('date').sort_index()
-        series = df['compound']
+    if not series:
+         return _empty_timeseries_result(metric)
+         
+    # 2. Compute Trend (Linear Regression)
+    # x values are just indices 0..n-1
+    x_vals = list(range(len(series)))
+    trend_result = metric_helpers.compute_trend_line_pure_python(x_vals, series)
     
-    else:
-        return _empty_timeseries_result(metric)
-    
-    # Smooth series for trend
-    smoothed = metric_helpers.smooth_series(series, method='savgol', window=7)
-    
-    # Detect trend
-    x_vals = np.arange(len(series))
-    trend_info = metric_helpers.compute_trend_line(x_vals, series.values)
-    
-    # Detect change points
-    change_points = metric_helpers.detect_change_points(series, threshold=0.3)
-    
-    # Forecast
-    forecast_result = metric_helpers.forecast_arima(series, steps=forecast_days)
-    
-    # Seasonality analysis
-    seasonality = metric_helpers.analyze_seasonality(series, period=7)
+    # 3. Forecast (Simple EMA projection)
+    # Use standard EMA with alpha=0.3
+    forecast_values = metric_helpers.exponential_moving_average(series, alpha=0.3)
+    # Simple projection
+    last_val = forecast_values[-1] if forecast_values else 0
+    forecast_projection = [last_val] * forecast_days 
     
     return {
         'metric_name': 'time_series_analysis',
         'metric': metric,
         'trend': {
-            'slope': trend_info['slope'],
-            'direction': 'improving' if trend_info['slope'] > 0 else 'declining',
-            'r_squared': trend_info['r_squared']
+            'slope': trend_result['slope'],
+            'direction': 'improving' if trend_result['direction'] > 0 else 'declining',
+            'r_squared': 0.0 # Not computed in simplified version
         },
-        'forecast': forecast_result,
-        'change_points': change_points,
-        'seasonality': seasonality,
-        'raw_inputs': {'data_points': len(series), 'date_range': [str(series.index[0]), str(series.index[-1])]},
+        'forecast': {
+            'forecast': forecast_projection,
+            'confidence_lower': [],
+            'confidence_upper': []
+        },
+        'change_points': [],
+        'seasonality': {'has_seasonality': False},
+        'raw_inputs': {'data_points': len(series)},
         'computed_at': datetime.now()
     }
 
@@ -692,6 +766,7 @@ def analyze_trends(tracker_id: str, window: int = 14, smooth_method: str = 'savg
             'improving_periods': int
         }
     """
+    # Lightweight Trend Analysis
     completion_data = compute_completion_rate(tracker_id)
     daily_rates = completion_data.get('daily_rates', [])
     
@@ -702,33 +777,34 @@ def analyze_trends(tracker_id: str, window: int = 14, smooth_method: str = 'savg
             'trend_direction': 'stable',
             'improving_periods': 0
         }
+        
+    rates = [r['rate'] for r in daily_rates]
+    # metric_helpers.exponential_moving_average takes 'alpha', not 'span' in the lightweight version
+    # calculate_ema was renamed/removed, using exponential_moving_average
+    # Standard alpha for span=14 is 2/(14+1) ~= 0.133
+    alpha = 2 / (window + 1)
+    smoothed = metric_helpers.exponential_moving_average(rates, alpha=alpha)
     
-    df = pd.DataFrame(daily_rates)
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.set_index('date').sort_index()
+    improving_periods = sum(1 for i in range(1, len(smoothed)) if smoothed[i] > smoothed[i-1])
     
-    # Smooth
-    smoothed = metric_helpers.smooth_series(df['rate'], method=smooth_method, window=window)
+    start_v = smoothed[0] if smoothed else 0
+    end_v = smoothed[-1] if smoothed else 0
     
-    # Count improving periods
-    improving = sum(1 for i in range(1, len(smoothed)) if smoothed.iloc[i] > smoothed.iloc[i-1])
+    if end_v > start_v: direction = 'improving'
+    elif end_v < start_v: direction = 'declining'
+    else: direction = 'stable'
     
-    # Overall direction
-    if smoothed.iloc[-1] > smoothed.iloc[0]:
-        direction = 'improving'
-    elif smoothed.iloc[-1] < smoothed.iloc[0]:
-        direction = 'declining'
-    else:
-        direction = 'stable'
-    
-    smoothed_data = [{'date': str(d), 'value': float(v)} for d, v in smoothed.items()]
+    smoothed_data = [
+        {'date': daily_rates[i]['date'], 'value': v}
+        for i, v in enumerate(smoothed)
+    ]
     
     return {
         'metric_name': 'trend_analysis',
         'smoothed_data': smoothed_data,
         'trend_direction': direction,
-        'improving_periods': improving,
-        'total_periods': len(smoothed) - 1,
+        'improving_periods': improving_periods,
+        'total_periods': len(smoothed),
         'computed_at': datetime.now()
     }
 
@@ -784,12 +860,11 @@ def simple_forecast(tracker_id: str, metric: str = 'completion_rate', days: int 
                 'error': 'No historical data'
             }
         
-        df = pd.DataFrame(daily_rates)
-        df['date'] = pd.to_datetime(df['date'])
-        df = df.sort_values('date')
+        # Sort by date
+        sorted_rates = sorted(daily_rates, key=lambda x: x['date'])
         
-        historical_values = df['rate'].values
-        historical_dates = df['date'].values
+        historical_values = [r['rate'] for r in sorted_rates]
+        historical_dates = [r['date'] for r in sorted_rates]
     else:
         return {
             'metric_name': 'forecast',
@@ -815,13 +890,17 @@ def simple_forecast(tracker_id: str, metric: str = 'completion_rate', days: int 
     conf_upper = forecast_result.get('confidence_upper', [])
     
     # Create forecast dates - validate last_date is not NaT
-    last_date = historical_dates[-1]
-    if pd.isna(last_date):
-        # Use today as fallback
-        last_date = pd.Timestamp.now().normalize()
+    # last_date is already a date object or string from above
+    if isinstance(last_date, str):
+        last_date = date.fromisoformat(last_date)
+    elif isinstance(last_date, datetime):
+        last_date = last_date.date()
+    
+    if last_date is None:
+        last_date = date.today()
     
     try:
-        forecast_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=days)
+        forecast_dates = [last_date + timedelta(days=i+1) for i in range(days)]
     except Exception:
         return {
             'metric_name': 'forecast',
@@ -867,15 +946,14 @@ def generate_forecast_chart(tracker_id: str, metric: str = 'completion_rate', da
         if not daily_rates:
             return None
         
-        df = pd.DataFrame(daily_rates)
-        df['date'] = pd.to_datetime(df['date'])
-        df = df.sort_values('date')
+        # Sort by date
+        sorted_rates = sorted(daily_rates, key=lambda x: x['date'])
         
-        if len(df) == 0:
+        if len(sorted_rates) == 0:
             return None
-        
-        historical_values = df['rate'].values
-        historical_dates = df['date'].values
+            
+        historical_values = [r['rate'] for r in sorted_rates]
+        historical_dates = [r['date'] for r in sorted_rates]
     else:
         return None
     
@@ -891,11 +969,14 @@ def generate_forecast_chart(tracker_id: str, metric: str = 'completion_rate', da
         return None
     
     last_date = historical_dates[-1]
-    if pd.isna(last_date):
-        last_date = pd.Timestamp.now().normalize()
+    if isinstance(last_date, str):
+        last_date = date.fromisoformat(last_date)
+    
+    if last_date is None:
+        last_date = date.today()
     
     try:
-        forecast_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=days)
+        forecast_dates = [last_date + timedelta(days=i+1) for i in range(days)]
     except Exception:
         return None
     
@@ -904,7 +985,7 @@ def generate_forecast_chart(tracker_id: str, metric: str = 'completion_rate', da
         'chart_type': 'forecast',
         'metric': metric,
         'historical': {
-            'labels': [pd.Timestamp(d).strftime('%b %d') for d in historical_dates],
+            'labels': [d.strftime('%b %d') if isinstance(d, (date, datetime)) else str(d) for d in historical_dates],
             'data': [float(v) for v in historical_values]
         },
         'forecast': {
@@ -927,21 +1008,26 @@ def generate_progress_chart_with_trend(tracker_id: str):
     if not daily_rates:
         return None
     
-    df = pd.DataFrame(daily_rates)
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values('date')
+    # Sort by date
+    sorted_rates = sorted(daily_rates, key=lambda x: x['date'])
+    
+    if not sorted_rates:
+        return None
+        
+    dates = [r['date'] for r in sorted_rates]
+    rates = [r['rate'] for r in sorted_rates]
     
     # Compute trend line
-    x_vals = np.arange(len(df))
-    trend_info = metric_helpers.compute_trend_line(x_vals, df['rate'].values)
+    x_vals = list(range(len(rates)))
+    trend_info = metric_helpers.compute_trend_line_pure_python(x_vals, rates)
     
-    trend_line = trend_info['slope'] * x_vals + trend_info['intercept']
+    trend_line = [trend_info['slope'] * x + trend_info['intercept'] for x in x_vals]
     
     # Return data for frontend Chart.js rendering
     return {
         'chart_type': 'progress_with_trend',
-        'labels': [d.strftime('%b %d') for d in df['date']],
-        'actual': [float(r) for r in df['rate'].values],
+        'labels': [d.strftime('%b %d') if isinstance(d, (date, datetime)) else str(d) for d in dates],
+        'actual': [float(r) for r in rates],
         'trend': [float(t) for t in trend_line],
         'trend_info': {
             'slope': trend_info['slope'],

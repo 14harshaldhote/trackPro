@@ -10,15 +10,15 @@ dj-database-url
 psycopg2-binary
 
 # Data Processing (lightweight & serverless-safe)
-pandas
-polars>=0.20.0  # Rust-based, faster & lighter than pandas
-numpy
+# pandas
+# polars>=0.20.0  # Rust-based, faster & lighter than pandas
+# numpy
 openpyxl
 xlsxwriter
 tablib
 
 # Analytics & Visualization (lightweight, serverless-safe)
-altair>=5.0.0  # Declarative viz (JSON specs, no heavy rendering)
+# altair>=5.0.0  # Declarative viz (JSON specs, no heavy rendering)
 
 # API & Serialization
 marshmallow

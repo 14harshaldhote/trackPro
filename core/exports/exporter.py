@@ -9,8 +9,8 @@ import csv
 from io import StringIO
 from datetime import datetime, date
 from typing import Dict, List, Optional, Iterator, Generator
-import pandas as pd
-import numpy as np
+from django.http import HttpResponse, StreamingHttpResponse
+# Removed pandas/numpy for serverless environment
 
 
 # ============================================================================
@@ -236,38 +236,44 @@ def export_data(tracker_id: str, format: str = 'csv') -> str:
         format: 'csv', 'json', 'xlsx', 'yaml'
     
     Returns:
-        Export data as string (or file path for xlsx)
+        HttpResponse containing the exported data.
     """
-    import tablib
-    from core.repositories import base_repository as crud
     from core import analytics
+    import json # For JSON export
+    import yaml # For YAML export (if still desired)
     
     # Fetch completion data
     completion_data = analytics.compute_completion_rate(tracker_id)
     daily_rates = completion_data.get('daily_rates', [])
     
-    # Create tablib Dataset
-    dataset = tablib.Dataset()
-    dataset.headers = ['Date', 'Total Tasks', 'Completed', 'Completion Rate']
-    
+    # Prepare data for export functions
+    # Transform daily_rates into a list of dicts with consistent keys
+    export_list_of_dicts = []
     for row in daily_rates:
-        dataset.append([
-            str(row['date']),
-            row['total'],
-            row['completed'],
-            row['rate']
-        ])
+        export_list_of_dicts.append({
+            'Date': str(row['date']),
+            'Total Tasks': row['total'],
+            'Completed': row['completed'],
+            'Completion Rate': row['rate']
+        })
     
     # Export in requested format
     if format == 'csv':
-        return dataset.export('csv')
-    elif format == 'json':
-        return dataset.export('json')
+        return export_to_csv(export_list_of_dicts, filename=f"tracker_{tracker_id}_daily_rates")
     elif format == 'xlsx':
-        # For xlsx, return the bytes
-        return dataset.export('xlsx')
+        return export_to_excel(export_list_of_dicts, filename=f"tracker_{tracker_id}_daily_rates")
+    elif format == 'json':
+        # For JSON, return as string in HttpResponse
+        json_output = json.dumps(export_list_of_dicts, indent=4)
+        response = HttpResponse(json_output, content_type='application/json')
+        response['Content-Disposition'] = f'attachment; filename="tracker_{tracker_id}_daily_rates.json"'
+        return response
     elif format == 'yaml':
-        return dataset.export('yaml')
+        # For YAML, return as string in HttpResponse
+        yaml_output = yaml.dump(export_list_of_dicts, sort_keys=False)
+        response = HttpResponse(yaml_output, content_type='application/x-yaml')
+        response['Content-Disposition'] = f'attachment; filename="tracker_{tracker_id}_daily_rates.yaml"'
+        return response
     else:
         raise ValueError(f"Unsupported format: {format}")
 
