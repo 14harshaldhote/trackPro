@@ -16,6 +16,19 @@ app_name = 'api_v1'
 
 urlpatterns = [
     # =========================================================================
+    # DASHBOARD ENDPOINTS - Main app data
+    # =========================================================================
+    path('dashboard/', views_api.api_dashboard, name='dashboard'),
+    path('dashboard/trackers/', views_api.api_dashboard_trackers, name='dashboard_trackers'),
+    path('dashboard/today/', views_api.api_dashboard_today, name='dashboard_today'),
+    path('dashboard/week/', views_api.api_dashboard_week, name='dashboard_week'),
+    path('dashboard/goals/', views_api.api_dashboard_goals, name='dashboard_goals'),
+    path('dashboard/streaks/', views_api.api_dashboard_streaks, name='dashboard_streaks'),
+    path('dashboard/activity/', views_api.api_dashboard_activity, name='dashboard_activity'),
+    path('trackers/', views_api.api_trackers_list, name='trackers_list'),
+    path('tracker/<str:tracker_id>/', views_api.api_tracker_detail, name='tracker_detail'),
+    
+    # =========================================================================
     # TASK ENDPOINTS
     # =========================================================================
     path('task/<str:task_id>/toggle/', views_api.api_task_toggle, name='task_toggle'),
@@ -81,7 +94,6 @@ urlpatterns = [
     path('analytics/data/', views_api.api_analytics_data, name='analytics_data'),
     path('analytics/forecast/', views_api.api_analytics_forecast, name='analytics_forecast'),
     path('export/month/', views_api.api_export_month, name='export_month'),
-    path('undo/', views_api.api_undo, name='undo'),
     
     # =========================================================================
     # UX OPTIMIZATION
@@ -90,6 +102,15 @@ urlpatterns = [
     path('tasks/infinite/', views_api.api_tasks_infinite, name='tasks_infinite'),
     path('suggestions/', views_api.api_smart_suggestions, name='suggestions'),
     path('sync/', views_api.api_sync, name='sync'),
+    
+    # =========================================================================
+    # POINTS & GOALS - Task Points and Tracker Goal Management
+    # =========================================================================
+    path('tracker/<str:tracker_id>/progress/', views_api.api_tracker_progress, name='tracker_progress'),
+    path('tracker/<str:tracker_id>/goal/', views_api.api_tracker_goal, name='tracker_goal'),
+    path('tracker/<str:tracker_id>/points-breakdown/', views_api.api_task_points_breakdown, name='tracker_points_breakdown'),
+    path('task/<str:template_id>/toggle-goal/', views_api.api_toggle_task_goal, name='task_toggle_goal'),
+    path('task/<str:template_id>/points/', views_api.api_update_task_points, name='task_update_points'),
     
     # =========================================================================
     # SYSTEM

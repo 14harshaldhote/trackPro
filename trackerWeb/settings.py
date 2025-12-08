@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'django.contrib.sites',  # Required by allauth
     
     # Third-party
+    'corsheaders',  # CORS support for mobile apps
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
@@ -77,6 +78,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'core.utils.logging_utils.RequestIDMiddleware',  # Request ID for structured logging
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Add whitenoise for static files
+    'corsheaders.middleware.CorsMiddleware',  # CORS - Must be before CommonMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -309,3 +311,39 @@ FEATURE_FLAGS = {
     'api_v2': {'enabled': False, 'rollout_percent': 0},
     'streaming_export': {'enabled': True, 'rollout_percent': 100},
 }
+
+# =============================================================================
+# CORS CONFIGURATION (for mobile apps and external API clients)
+# =============================================================================
+# Allow all origins in development; restrict in production
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000,http://127.0.0.1:3000', cast=Csv())
+CORS_ALLOW_CREDENTIALS = True
+
+# For mobile apps that don't send Origin header
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=True, cast=bool)
+
+# Allow these headers
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# Allow these methods including OPTIONS for preflight
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Preflight cache time (24 hours)
+CORS_PREFLIGHT_MAX_AGE = 86400

@@ -41,6 +41,12 @@ class TrackerDefinition(SoftDeleteModel):
         ('archived', 'Archived'),
     ]
     
+    GOAL_PERIOD_CHOICES = [
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('custom', 'Custom'),
+    ]
+    
     tracker_id = models.CharField(max_length=36, primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='trackers', null=True)
     name = models.CharField(max_length=200)
@@ -49,6 +55,22 @@ class TrackerDefinition(SoftDeleteModel):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Goal Configuration - points-based goal tracking
+    target_points = models.IntegerField(
+        default=0,
+        help_text="Target points for the goal (0 = no goal set)"
+    )
+    goal_period = models.CharField(
+        max_length=20,
+        choices=GOAL_PERIOD_CHOICES,
+        default='daily',
+        help_text="Period for goal reset (daily/weekly/custom)"
+    )
+    goal_start_day = models.IntegerField(
+        default=0,
+        help_text="Start day for weekly goals (0=Monday, 6=Sunday)"
+    )
     
     # Audit history - tracks all changes with user attribution
     history = HistoricalRecords()
@@ -121,9 +143,19 @@ class TaskTemplate(SoftDeleteModel):
     description = models.CharField(max_length=500)
     is_recurring = models.BooleanField(default=True)
     category = models.CharField(max_length=100, blank=True, default='')
-    weight = models.IntegerField(default=1)
+    weight = models.IntegerField(default=1, help_text="Task priority/ordering weight (1-10)")
     time_of_day = models.CharField(max_length=20, choices=TIME_OF_DAY_CHOICES, default='anytime')
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Points and Goal Integration
+    points = models.IntegerField(
+        default=1,
+        help_text="Points awarded when task is completed (0 or more)"
+    )
+    include_in_goal = models.BooleanField(
+        default=True,
+        help_text="Whether this task's points count towards the tracker goal"
+    )
     
     # Audit history
     history = HistoricalRecords()

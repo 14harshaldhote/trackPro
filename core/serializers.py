@@ -17,6 +17,12 @@ class TrackerCreateSerializer(serializers.Serializer):
         ('monthly', 'Monthly'),
     ]
     
+    GOAL_PERIOD_CHOICES = [
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('custom', 'Custom'),
+    ]
+    
     name = serializers.CharField(
         max_length=200,
         required=True,
@@ -35,6 +41,29 @@ class TrackerCreateSerializer(serializers.Serializer):
         help_text="Tracking frequency"
     )
     
+    # Goal Configuration
+    target_points = serializers.IntegerField(
+        min_value=0,
+        default=0,
+        required=False,
+        help_text="Target points for the goal (0 = no goal set)"
+    )
+    
+    goal_period = serializers.ChoiceField(
+        choices=GOAL_PERIOD_CHOICES,
+        default='daily',
+        required=False,
+        help_text="Period for goal reset (daily/weekly/custom)"
+    )
+    
+    goal_start_day = serializers.IntegerField(
+        min_value=0,
+        max_value=6,
+        default=0,
+        required=False,
+        help_text="Start day for weekly goals (0=Monday, 6=Sunday)"
+    )
+    
     def validate_name(self, value):
         """Ensure name is not empty and has minimum length"""
         if not value or len(value.strip()) < 3:
@@ -42,6 +71,55 @@ class TrackerCreateSerializer(serializers.Serializer):
                 "Name must be at least 3 characters long"
             )
         return value.strip()
+
+
+class TrackerGoalSerializer(serializers.Serializer):
+    """Validate tracker goal update data"""
+    
+    GOAL_PERIOD_CHOICES = [
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('custom', 'Custom'),
+    ]
+    
+    target_points = serializers.IntegerField(
+        min_value=0,
+        required=False,
+        help_text="Target points for the goal (0 = no goal set)"
+    )
+    
+    goal_period = serializers.ChoiceField(
+        choices=GOAL_PERIOD_CHOICES,
+        required=False,
+        help_text="Period for goal reset (daily/weekly/custom)"
+    )
+    
+    goal_start_day = serializers.IntegerField(
+        min_value=0,
+        max_value=6,
+        required=False,
+        help_text="Start day for weekly goals (0=Monday, 6=Sunday)"
+    )
+
+
+class TaskToggleGoalSerializer(serializers.Serializer):
+    """Validate task goal toggle request"""
+    
+    include = serializers.BooleanField(
+        required=True,
+        help_text="Whether to include task points in goal calculation"
+    )
+
+
+class TaskPointsUpdateSerializer(serializers.Serializer):
+    """Validate task points update request"""
+    
+    points = serializers.IntegerField(
+        min_value=0,
+        max_value=1000,
+        required=True,
+        help_text="Points awarded when task is completed"
+    )
 
 
 class TaskTemplateSerializer(serializers.Serializer):
@@ -64,7 +142,21 @@ class TaskTemplateSerializer(serializers.Serializer):
         min_value=1,
         max_value=10,
         default=1,
-        help_text="Task difficulty/importance (1-10)"
+        help_text="Task priority/ordering weight (1-10)"
+    )
+    
+    points = serializers.IntegerField(
+        min_value=0,
+        max_value=1000,
+        default=1,
+        required=False,
+        help_text="Points awarded when task is completed"
+    )
+    
+    include_in_goal = serializers.BooleanField(
+        default=True,
+        required=False,
+        help_text="Whether this task's points count towards the tracker goal"
     )
     
     is_recurring = serializers.BooleanField(
@@ -85,6 +177,14 @@ class TaskTemplateSerializer(serializers.Serializer):
         if value < 1 or value > 10:
             raise serializers.ValidationError(
                 "Weight must be between 1 and 10"
+            )
+        return value
+    
+    def validate_points(self, value):
+        """Ensure points is non-negative"""
+        if value < 0:
+            raise serializers.ValidationError(
+                "Points must be 0 or greater"
             )
         return value
 

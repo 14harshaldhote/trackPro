@@ -499,10 +499,27 @@ def api_template_activate(request):
         },
     }
     
-    if not template_key or template_key not in TEMPLATES:
+    # Validate template_key is provided
+    if not template_key:
         return UXResponse.error(
-            message='Template not found',
+            message='template_key is required',
+            error_code='MISSING_TEMPLATE_KEY',
+            data={
+                'available_templates': list(TEMPLATES.keys()),
+                'usage': 'POST /api/v1/templates/activate/ with body {"template_key": "morning"}'
+            },
+            status=400
+        )
+    
+    # Validate template exists
+    if template_key not in TEMPLATES:
+        return UXResponse.error(
+            message=f'Template "{template_key}" not found',
             error_code='INVALID_TEMPLATE',
+            data={
+                'available_templates': list(TEMPLATES.keys()),
+                'requested': template_key
+            },
             status=404
         )
     
@@ -1014,9 +1031,19 @@ def api_heatmap_data(request):
     
     Returns: Grid of completion levels (0-4) for GitHub-style heatmap
     """
+    from django.core.cache import cache
+    
     try:
         tracker_id = request.GET.get('tracker_id')
         weeks = int(request.GET.get('weeks', 12))
+        
+        # Create cache key based on user, tracker, and weeks
+        cache_key = f"heatmap:{request.user.id}:{tracker_id or 'all'}:{weeks}:{date.today().isoformat()}"
+        
+        # Try to get cached data
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return JsonResponse(cached_data)
         
         today = date.today()
         
@@ -1028,7 +1055,35 @@ def api_heatmap_data(request):
         start_date = today - timedelta(days=(weeks * 7) + days_since_sunday)
         
         # Import TaskInstance for task-based completion
-        from .models import TaskInstance, TrackerInstance
+        from .models import TaskInstance
+        
+        # Fetch all task instances in the date range at once (optimized query)
+        base_query = TaskInstance.objects.filter(
+            tracker_instance__tracker__user=request.user,
+            tracker_instance__period_start__gte=start_date,
+            tracker_instance__period_end__lte=today
+        ).select_related('tracker_instance')
+        
+        if tracker_id:
+            base_query = base_query.filter(tracker_instance__tracker__tracker_id=tracker_id)
+        
+        # Aggregate by date for performance
+        from django.db.models import Count, Q
+        from django.db.models.functions import TruncDate
+        
+        # Get daily aggregates
+        daily_stats = base_query.annotate(
+            tracking_day=TruncDate('tracker_instance__period_start')
+        ).values('tracking_day').annotate(
+            total=Count('task_instance_id'),
+            done=Count('task_instance_id', filter=Q(status='DONE'))
+        ).order_by('tracking_day')
+        
+        # Convert to dict for fast lookup
+        stats_by_date = {
+            item['tracking_day']: {'total': item['total'], 'done': item['done']}
+            for item in daily_stats
+        }
         
         current_date = start_date
         for week in range(weeks + 1):
@@ -1037,23 +1092,9 @@ def api_heatmap_data(request):
                 if current_date > today:
                     week_data.append({'date': None, 'level': 0, 'count': 0})
                 else:
-                    # Get task completion for this day using TaskInstance
-                    base_filter = {
-                        'tracker_instance__tracker__user': request.user,
-                        'tracker_instance__period_start__lte': current_date,
-                        'tracker_instance__period_end__gte': current_date
-                    }
-                    
-                    if tracker_id:
-                        base_filter['tracker_instance__tracker__tracker_id'] = tracker_id
-                    
-                    done = TaskInstance.objects.filter(
-                        status='DONE',
-                        **base_filter
-                    ).count()
-                    
-                    total = TaskInstance.objects.filter(**base_filter).count()
-                    
+                    stats = stats_by_date.get(current_date, {'total': 0, 'done': 0})
+                    done = stats['done']
+                    total = stats['total']
                     rate = (done / total * 100) if total else 0
                     
                     # Determine level (0-4) for GitHub-style heatmap
@@ -1082,11 +1123,16 @@ def api_heatmap_data(request):
             
             heatmap_data.append(week_data)
         
-        return JsonResponse({
+        response_data = {
             'success': True,
             'heatmap': heatmap_data,
             'weeks': weeks
-        })
+        }
+        
+        # Cache for 5 minutes
+        cache.set(cache_key, response_data, 300)
+        
+        return JsonResponse(response_data)
         
     except Exception as e:
         return JsonResponse({
@@ -1336,20 +1382,78 @@ def api_preferences(request):
 @require_auth
 @require_http_methods(['GET', 'POST'])
 def api_notifications(request):
-    """Notifications API endpoint"""
+    """
+    Notifications API endpoint with pagination
+    
+    GET params:
+        page: Page number (default: 1)
+        per_page: Items per page (default: 20, max: 100)
+        unread_only: Filter to unread only (default: false)
+    """
     from .models import Notification
+    from django.core.paginator import Paginator, EmptyPage
     
     if request.method == 'GET':
-        notifications = Notification.objects.filter(user=request.user).values(
-            'notification_id', 'type', 'title', 'message', 'link', 'is_read', 'created_at'
-        )[:50]  # Limit to last 50
+        # Get pagination params
+        page = int(request.GET.get('page', 1))
+        per_page = min(int(request.GET.get('per_page', 20)), 100)
+        unread_only = request.GET.get('unread_only', 'false').lower() == 'true'
         
+        # Build query
+        query = Notification.objects.filter(user=request.user).order_by('-created_at')
+        
+        if unread_only:
+            query = query.filter(is_read=False)
+        
+        # Get counts before pagination
+        total_count = query.count()
         unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+        
+        # Paginate
+        paginator = Paginator(query, per_page)
+        
+        try:
+            page_obj = paginator.get_page(page)
+        except EmptyPage:
+            return JsonResponse({
+                'success': True,
+                'notifications': [],
+                'unread_count': unread_count,
+                'pagination': {
+                    'current_page': page,
+                    'total_pages': paginator.num_pages,
+                    'total_count': total_count,
+                    'has_next': False,
+                    'has_previous': False,
+                    'per_page': per_page
+                }
+            })
+        
+        # Serialize notifications
+        notifications_data = [{
+            'notification_id': n.notification_id,
+            'type': n.type,
+            'title': n.title,
+            'message': n.message,
+            'link': n.link,
+            'is_read': n.is_read,
+            'created_at': n.created_at.isoformat() if n.created_at else None
+        } for n in page_obj]
         
         return JsonResponse({
             'success': True,
-            'notifications': list(notifications),
-            'unread_count': unread_count
+            'notifications': notifications_data,
+            'unread_count': unread_count,
+            'pagination': {
+                'current_page': page,
+                'total_pages': paginator.num_pages,
+                'total_count': total_count,
+                'has_next': page_obj.has_next(),
+                'has_previous': page_obj.has_previous(),
+                'next_page': page + 1 if page_obj.has_next() else None,
+                'previous_page': page - 1 if page_obj.has_previous() else None,
+                'per_page': per_page
+            }
         })
     
     elif request.method == 'POST':
@@ -1372,6 +1476,7 @@ def api_notifications(request):
                 
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
 
 
 # ============================================================================
@@ -2489,7 +2594,28 @@ def api_analytics_forecast(request):
         )
         
         if not forecast['success']:
-            return JsonResponse(forecast, status=400)
+            # Return user-friendly response for new users with insufficient data
+            return JsonResponse({
+                'success': True,  # Still success, but with empty forecast
+                'forecast': {
+                    'predictions': [],
+                    'dates': [],
+                    'labels': [],
+                    'confidence': 0,
+                    'trend': 'insufficient_data'
+                },
+                'summary': {
+                    'message': 'Not enough data for forecasting yet',
+                    'recommendation': 'Complete more tasks over the next few days to unlock predictions!',
+                    'predicted_change': 0
+                },
+                'reason': forecast.get('error', 'Insufficient historical data'),
+                'suggestions': [
+                    'Complete at least 7 days of task tracking',
+                    'Add more tasks to your trackers',
+                    'Stay consistent with daily task completion'
+                ]
+            })
         
         # Get summary
         summary = service.get_forecast_summary(days_ahead=days)
@@ -2647,3 +2773,692 @@ def api_feature_flag(request, flag_name):
         'enabled': enabled,
         'flag': flag_name
     })
+
+
+# =============================================================================
+# POINTS & GOALS API - Task Points and Tracker Goal Management
+# =============================================================================
+
+@require_auth
+@require_GET
+def api_tracker_progress(request, tracker_id):
+    """
+    Get current progress for a tracker's point-based goal.
+    
+    GET /api/v1/tracker/{tracker_id}/progress/
+    
+    Returns:
+        {
+            'success': true,
+            'current_points': 35,
+            'target_points': 50,
+            'progress_percentage': 70.0,
+            'goal_met': false,
+            'period': 'daily',
+            'period_start': '2025-12-08',
+            'period_end': '2025-12-08',
+            'task_breakdown': {...}
+        }
+    """
+    from core.services.points_service import PointsCalculationService
+    
+    try:
+        service = PointsCalculationService(tracker_id, request.user)
+        progress = service.calculate_current_points()
+        
+        return JsonResponse({
+            'success': True,
+            **progress
+        })
+    except TrackerDefinition.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Tracker not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt  # For iOS clients
+@require_auth
+@require_POST
+def api_toggle_task_goal(request, template_id):
+    """
+    Toggle whether a task's points count towards the tracker goal.
+    
+    POST /api/v1/task/{template_id}/toggle-goal/
+    Body: {"include": true/false}
+    
+    Returns:
+        {
+            'success': true,
+            'template_id': 'uuid',
+            'include_in_goal': true,
+            'tracker_progress': {...}  // Updated progress
+        }
+    """
+    from core.services.points_service import toggle_task_goal_inclusion
+    
+    try:
+        data = json.loads(request.body)
+        include = data.get('include', True)
+        
+        result = toggle_task_goal_inclusion(template_id, request.user, include)
+        
+        return UXResponse.success(
+            message=f"Task {'included in' if include else 'excluded from'} goal",
+            data=result,
+            feedback={
+                'type': 'success',
+                'message': 'Goal settings updated',
+                'haptic': 'light',
+                'toast': True
+            }
+        )
+    except ValueError as e:
+        return UXResponse.error(str(e), error_code='NOT_FOUND', status=404)
+    except json.JSONDecodeError:
+        return UXResponse.error('Invalid JSON', error_code='INVALID_JSON', status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_auth
+@require_POST
+def api_update_task_points(request, template_id):
+    """
+    Update the points value for a task.
+    
+    POST /api/v1/task/{template_id}/points/
+    Body: {"points": 10}
+    
+    Returns:
+        {
+            'success': true,
+            'template_id': 'uuid',
+            'points': 10,
+            'tracker_progress': {...}
+        }
+    """
+    from core.services.points_service import update_task_points
+    
+    try:
+        data = json.loads(request.body)
+        points = int(data.get('points', 1))
+        
+        if points < 0:
+            return UXResponse.error('Points must be 0 or greater', error_code='INVALID_POINTS', status=400)
+        
+        result = update_task_points(template_id, request.user, points)
+        
+        return UXResponse.success(
+            message=f"Task points updated to {points}",
+            data=result,
+            feedback={
+                'type': 'success',
+                'haptic': 'light',
+                'toast': True
+            }
+        )
+    except ValueError as e:
+        return UXResponse.error(str(e), error_code='NOT_FOUND', status=404)
+    except json.JSONDecodeError:
+        return UXResponse.error('Invalid JSON', error_code='INVALID_JSON', status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_auth
+@require_http_methods(['GET', 'PUT'])
+def api_tracker_goal(request, tracker_id):
+    """
+    Get or set the goal configuration for a tracker.
+    
+    GET /api/v1/tracker/{tracker_id}/goal/
+    PUT /api/v1/tracker/{tracker_id}/goal/
+    
+    PUT Body: {
+        "target_points": 50,
+        "goal_period": "daily",  // 'daily', 'weekly', 'custom'
+        "goal_start_day": 0      // 0=Monday, 6=Sunday (for weekly)
+    }
+    
+    Returns:
+        {
+            'success': true,
+            'tracker_id': 'uuid',
+            'target_points': 50,
+            'goal_period': 'daily',
+            'progress': {...}
+        }
+    """
+    from core.services.points_service import set_tracker_goal, PointsCalculationService
+    
+    try:
+        tracker = TrackerDefinition.objects.get(tracker_id=tracker_id, user=request.user)
+    except TrackerDefinition.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Tracker not found'
+        }, status=404)
+    
+    if request.method == 'GET':
+        # Get current goal settings and progress
+        service = PointsCalculationService(tracker_id, request.user)
+        progress = service.calculate_current_points()
+        
+        return JsonResponse({
+            'success': True,
+            'tracker_id': tracker_id,
+            'tracker_name': tracker.name,
+            'target_points': tracker.target_points,
+            'goal_period': tracker.goal_period,
+            'goal_start_day': tracker.goal_start_day,
+            'progress': progress
+        })
+    
+    else:  # PUT
+        try:
+            data = json.loads(request.body)
+            
+            target_points = data.get('target_points')
+            goal_period = data.get('goal_period')
+            goal_start_day = data.get('goal_start_day')
+            
+            # Update fields if provided
+            if target_points is not None:
+                if int(target_points) < 0:
+                    return UXResponse.error('Target points must be 0 or greater', status=400)
+                tracker.target_points = int(target_points)
+            
+            if goal_period and goal_period in ['daily', 'weekly', 'custom']:
+                tracker.goal_period = goal_period
+            
+            if goal_start_day is not None:
+                if not 0 <= int(goal_start_day) <= 6:
+                    return UXResponse.error('Goal start day must be 0-6', status=400)
+                tracker.goal_start_day = int(goal_start_day)
+            
+            tracker.save()
+            
+            # Calculate new progress
+            service = PointsCalculationService(tracker_id, request.user)
+            progress = service.calculate_current_points()
+            
+            return UXResponse.success(
+                message='Goal settings updated',
+                data={
+                    'tracker_id': tracker_id,
+                    'target_points': tracker.target_points,
+                    'goal_period': tracker.goal_period,
+                    'goal_start_day': tracker.goal_start_day,
+                    'progress': progress
+                },
+                feedback={
+                    'type': 'success',
+                    'message': 'Goal updated!',
+                    'haptic': 'success',
+                    'toast': True
+                }
+            )
+        except json.JSONDecodeError:
+            return UXResponse.error('Invalid JSON', error_code='INVALID_JSON', status=400)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+
+
+@require_auth
+@require_GET
+def api_task_points_breakdown(request, tracker_id):
+    """
+    Get detailed breakdown of each task's points contribution.
+    
+    GET /api/v1/tracker/{tracker_id}/points-breakdown/
+    
+    Returns:
+        {
+            'success': true,
+            'tracker_id': 'uuid',
+            'tasks': [
+                {
+                    'task_id': 'uuid',
+                    'description': 'Exercise 30 min',
+                    'points_possible': 10,
+                    'points_earned': 10,
+                    'include_in_goal': true,
+                    'status': 'DONE',
+                    'is_completed': true
+                },
+                ...
+            ],
+            'summary': {
+                'total_possible': 50,
+                'total_earned': 35,
+                'tasks_included': 5,
+                'tasks_excluded': 2
+            }
+        }
+    """
+    from core.services.points_service import PointsCalculationService
+    
+    try:
+        service = PointsCalculationService(tracker_id, request.user)
+        breakdown = service.get_task_points_breakdown()
+        
+        # Calculate summary
+        total_possible = sum(t['points_possible'] for t in breakdown if t['include_in_goal'])
+        total_earned = sum(t['points_earned'] for t in breakdown)
+        tasks_included = sum(1 for t in breakdown if t['include_in_goal'])
+        tasks_excluded = sum(1 for t in breakdown if not t['include_in_goal'])
+        
+        return JsonResponse({
+            'success': True,
+            'tracker_id': tracker_id,
+            'tasks': breakdown,
+            'summary': {
+                'total_possible': total_possible,
+                'total_earned': total_earned,
+                'tasks_included': tasks_included,
+                'tasks_excluded': tasks_excluded
+            }
+        })
+    except TrackerDefinition.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Tracker not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+# =============================================================================
+# DASHBOARD API - Main Dashboard Data Endpoints
+# =============================================================================
+
+@require_auth
+@require_GET
+def api_dashboard(request):
+    """
+    Get complete dashboard data in one call.
+    
+    GET /api/v1/dashboard/
+    
+    Query params:
+        date (optional): Target date in YYYY-MM-DD format
+    
+    Returns comprehensive dashboard data including:
+    - Greeting message
+    - All trackers with tasks for today
+    - Today's stats (completion rate, points)
+    - Active goals progress
+    - Current streaks
+    - Recent activity
+    - Unread notifications count
+    - Quick action suggestions
+    """
+    from core.services.dashboard_service import DashboardService
+    from datetime import datetime
+    
+    try:
+        # Parse optional date parameter
+        date_str = request.GET.get('date')
+        target_date = None
+        if date_str:
+            try:
+                target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid date format. Use YYYY-MM-DD'
+                }, status=400)
+        
+        service = DashboardService(request.user, target_date)
+        dashboard_data = service.get_full_dashboard()
+        
+        return JsonResponse({
+            'success': True,
+            **dashboard_data
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_auth
+@require_GET
+def api_dashboard_trackers(request):
+    """
+    Get all trackers with their tasks for today (or specified date).
+    
+    GET /api/v1/dashboard/trackers/
+    
+    Query params:
+        date (optional): Target date in YYYY-MM-DD format
+    
+    Returns list of tracker summaries with:
+    - Tracker info (id, name, description)
+    - Task list with status
+    - Completion percentage
+    - Points progress
+    """
+    from core.services.dashboard_service import DashboardService
+    from datetime import datetime
+    
+    try:
+        date_str = request.GET.get('date')
+        target_date = None
+        if date_str:
+            try:
+                target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid date format. Use YYYY-MM-DD'
+                }, status=400)
+        
+        service = DashboardService(request.user, target_date)
+        trackers = service.get_trackers_summary()
+        
+        return JsonResponse({
+            'success': True,
+            'date': service.target_date.isoformat(),
+            'trackers': trackers,
+            'count': len(trackers)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_auth
+@require_GET
+def api_dashboard_today(request):
+    """
+    Get today's aggregated stats only.
+    
+    GET /api/v1/dashboard/today/
+    
+    Returns:
+    - Total tasks
+    - Completed/In Progress/Todo/Missed counts
+    - Completion rate
+    - Points earned vs total possible
+    """
+    from core.services.dashboard_service import DashboardService
+    
+    try:
+        service = DashboardService(request.user)
+        stats = service.get_today_stats()
+        
+        return JsonResponse({
+            'success': True,
+            **stats
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_auth
+@require_GET
+def api_dashboard_week(request):
+    """
+    Get week overview with day-by-day breakdown.
+    
+    GET /api/v1/dashboard/week/
+    
+    Returns:
+    - Week start/end dates
+    - Day-by-day stats
+    - Week totals
+    """
+    from core.services.dashboard_service import DashboardService
+    
+    try:
+        service = DashboardService(request.user)
+        week_data = service.get_week_overview()
+        
+        return JsonResponse({
+            'success': True,
+            **week_data
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_auth
+@require_GET
+def api_dashboard_goals(request):
+    """
+    Get active goals summary for dashboard.
+    
+    GET /api/v1/dashboard/goals/
+    
+    Returns list of active goals with progress info.
+    """
+    from core.services.dashboard_service import DashboardService
+    
+    try:
+        service = DashboardService(request.user)
+        goals = service.get_goals_progress()
+        
+        return JsonResponse({
+            'success': True,
+            'goals': goals,
+            'count': len(goals)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_auth
+@require_GET
+def api_dashboard_streaks(request):
+    """
+    Get streak information.
+    
+    GET /api/v1/dashboard/streaks/
+    
+    Returns:
+    - Current streak count
+    - Longest streak (30 day window)
+    - Streak threshold percentage
+    - Days meeting threshold in last 30
+    """
+    from core.services.dashboard_service import DashboardService
+    
+    try:
+        service = DashboardService(request.user)
+        streaks = service.get_streaks()
+        
+        return JsonResponse({
+            'success': True,
+            **streaks
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_auth
+@require_GET
+def api_dashboard_activity(request):
+    """
+    Get recent activity feed.
+    
+    GET /api/v1/dashboard/activity/
+    
+    Query params:
+        limit (optional): Number of items (default 10, max 50)
+    
+    Returns list of recent task completions.
+    """
+    from core.services.dashboard_service import DashboardService
+    
+    try:
+        limit = int(request.GET.get('limit', 10))
+        limit = min(max(1, limit), 50)  # Clamp between 1 and 50
+        
+        service = DashboardService(request.user)
+        activity = service.get_recent_activity(limit)
+        
+        return JsonResponse({
+            'success': True,
+            'activity': activity,
+            'count': len(activity)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_auth
+@require_GET  
+def api_trackers_list(request):
+    """
+    Get list of all user's trackers (summary only, no tasks).
+    
+    GET /api/v1/trackers/
+    
+    Query params:
+        status (optional): Filter by status ('active', 'paused', 'archived')
+        include_deleted (optional): Include soft-deleted trackers
+    
+    Returns list of tracker metadata.
+    """
+    try:
+        status_filter = request.GET.get('status', 'active')
+        include_deleted = request.GET.get('include_deleted', 'false').lower() == 'true'
+        
+        query = TrackerDefinition.objects.filter(user=request.user)
+        
+        if not include_deleted:
+            query = query.filter(deleted_at__isnull=True)
+        
+        if status_filter and status_filter != 'all':
+            query = query.filter(status=status_filter)
+        
+        trackers = query.order_by('-created_at')
+        
+        tracker_list = []
+        for tracker in trackers:
+            # Quick stats without loading all tasks
+            template_count = tracker.templates.filter(deleted_at__isnull=True).count()
+            
+            tracker_list.append({
+                'tracker_id': str(tracker.tracker_id),
+                'name': tracker.name,
+                'description': tracker.description,
+                'time_mode': tracker.time_mode,
+                'status': tracker.status,
+                'target_points': getattr(tracker, 'target_points', 0),
+                'goal_period': getattr(tracker, 'goal_period', 'daily'),
+                'template_count': template_count,
+                'created_at': tracker.created_at.isoformat(),
+                'updated_at': tracker.updated_at.isoformat(),
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'trackers': tracker_list,
+            'count': len(tracker_list)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_auth
+@require_GET
+def api_tracker_detail(request, tracker_id):
+    """
+    Get detailed information about a specific tracker.
+    
+    GET /api/v1/tracker/{tracker_id}/
+    
+    Returns full tracker info including templates (not instances).
+    """
+    try:
+        tracker = TrackerDefinition.objects.get(
+            tracker_id=tracker_id,
+            user=request.user,
+            deleted_at__isnull=True
+        )
+        
+        # Get templates
+        templates = tracker.templates.filter(deleted_at__isnull=True).order_by('-weight')
+        
+        template_list = [{
+            'template_id': str(t.template_id),
+            'description': t.description,
+            'category': t.category,
+            'weight': t.weight,
+            'points': getattr(t, 'points', 1),
+            'include_in_goal': getattr(t, 'include_in_goal', True),
+            'is_recurring': t.is_recurring,
+            'time_of_day': t.time_of_day,
+        } for t in templates]
+        
+        return JsonResponse({
+            'success': True,
+            'tracker': {
+                'tracker_id': str(tracker.tracker_id),
+                'name': tracker.name,
+                'description': tracker.description,
+                'time_mode': tracker.time_mode,
+                'status': tracker.status,
+                'target_points': getattr(tracker, 'target_points', 0),
+                'goal_period': getattr(tracker, 'goal_period', 'daily'),
+                'goal_start_day': getattr(tracker, 'goal_start_day', 0),
+                'created_at': tracker.created_at.isoformat(),
+                'updated_at': tracker.updated_at.isoformat(),
+            },
+            'templates': template_list,
+            'template_count': len(template_list)
+        })
+    except TrackerDefinition.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Tracker not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+

@@ -1,9 +1,43 @@
 from django.urls import path, include
+from django.shortcuts import redirect
+from django.http import JsonResponse
 from . import views_auth
 from . import views_api
 from . import urls_api_v1
 
+
+def root_redirect(request):
+    """
+    Handle root URL based on client type and auth status.
+    
+    - API clients (Accept: application/json): Return JSON with API info
+    - Browser clients (authenticated): Redirect to /login/ (no web dashboard yet)
+    - Browser clients (unauthenticated): Redirect to login page
+    """
+    # Check if this is an API request
+    accept = request.META.get('HTTP_ACCEPT', '')
+    if 'application/json' in accept:
+        return JsonResponse({
+            'success': True,
+            'message': 'Tracker Pro API',
+            'version': '1.0',
+            'endpoints': {
+                'api_v1': '/api/v1/',
+                'health': '/api/v1/health/',
+                'auth': '/api/v1/auth/',
+                'docs': '/docs/'  # Future: API documentation
+            },
+            'authenticated': request.user.is_authenticated
+        })
+    
+    # Browser redirect
+    return redirect('/login/')
+
+
 urlpatterns = [
+    # Root URL redirect
+    path('', root_redirect, name='root'),
+    
     # =========================================================================
     # API ENDPOINTS
     # =========================================================================

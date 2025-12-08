@@ -112,7 +112,7 @@ class SignupSerializer(serializers.Serializer):
 
 @require_http_methods(["POST"])
 @csrf_exempt  # Mobile apps don't send CSRF tokens
-@rate_limit(max_requests=5, window_seconds=300, key_prefix='login')  # 5 attempts per 5 minutes
+@rate_limit(max_requests=10, window_seconds=300, key_prefix='login')  # 10 attempts per 5 minutes
 def api_login(request):
     """
     Login via AJAX
@@ -162,7 +162,7 @@ def api_login(request):
             
             return JsonResponse({
                 'success': True,
-                'redirect': '/',
+                'redirect': '/',  # Root URL handles redirect based on auth status
                 'user': {
                     'email': user.email,
                     'username': user.username,
@@ -304,6 +304,7 @@ def api_check_auth(request):
 
 
 @require_http_methods(["POST"])
+@csrf_exempt  # Mobile apps don't send CSRF tokens
 @rate_limit(max_requests=10, window_seconds=60, key_prefix='validate_email')  # 10 per minute
 def api_validate_email(request):
     """
@@ -504,13 +505,17 @@ def api_apple_auth_mobile(request):
                 if last_name and not user.last_name: user.last_name = last_name
                 user.save()
             
-            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            # Generate JWT tokens (same as Google auth)
+            from rest_framework_simplejwt.tokens import RefreshToken
+            refresh = RefreshToken.for_user(user)
             
             return JsonResponse({
-                'success': True,
-                'redirect': '/',
+                'token': str(refresh.access_token),
+                'refresh': str(refresh),
                 'user': {
+                    'id': user.id,
                     'email': user.email,
+                    'name': f"{user.first_name} {user.last_name}".strip() or user.username,
                     'username': user.username,
                 }
             })
