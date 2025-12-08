@@ -7,11 +7,12 @@ from datetime import date, datetime, timedelta
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods, require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.decorators import login_required
+# from django.contrib.auth.decorators import login_required  <-- Replaced with custom decorator
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils import timezone
+from functools import wraps
 
 from .models import TrackerDefinition, TrackerInstance, TaskInstance, DayNote, TaskTemplate
 from .services import instance_service as services
@@ -23,6 +24,53 @@ from .utils.constants import HAPTIC_FEEDBACK, UI_COLORS
 from .utils.error_handlers import handle_service_errors
 from .helpers.cache_helpers import check_etag
 
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+
+def require_auth(view_func):
+    """
+    Decorator to ensure user is logged in for API endpoints.
+    Supports both Session (Browser) and JWT (Mobile) authentication.
+    Returns 401 JSON instead of redirecting to login page.
+    """
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        # 1. Check existing Session Auth (Django Middleware)
+        if request.user.is_authenticated:
+            return view_func(request, *args, **kwargs)
+        
+        # 2. Check JWT Auth (Mobile)
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            try:
+                # Manually authenticate using SimpleJWT
+                jwt_auth = JWTAuthentication()
+                # authenticate() returns (user, token) or None
+                auth_result = jwt_auth.authenticate(request)
+                if auth_result:
+                    request.user, _ = auth_result
+                    return view_func(request, *args, **kwargs)
+            except (InvalidToken, TokenError) as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': {
+                        'message': f'Invalid token: {str(e)}',
+                        'code': 'INVALID_TOKEN',
+                        'retry': False
+                    }
+                }, status=401)
+        
+        # 3. No valid auth found
+        return JsonResponse({
+            'success': False,
+            'error': {
+                'message': 'Authentication required',
+                'code': 'UNAUTHORIZED',
+                'retry': True
+            }
+        }, status=401)
+    return _wrapped_view
+
 # Initialize Services
 task_service = TaskService()
 tracker_service = TrackerService()
@@ -33,7 +81,7 @@ search_service = SearchService()
 # TASK ENDPOINTS
 # ============================================================================
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_task_toggle(request, task_id):
@@ -112,7 +160,7 @@ def api_task_toggle(request, task_id):
     )
 
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_task_delete(request, task_id):
@@ -136,7 +184,7 @@ def api_task_delete(request, task_id):
     )
 
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_task_status(request, task_id):
@@ -176,7 +224,7 @@ def api_task_status(request, task_id):
     )
 
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_tasks_bulk(request):
@@ -216,7 +264,7 @@ def api_tasks_bulk(request):
         return UXResponse.error('Unknown action', error_code='INVALID_ACTION')
 
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_task_add(request, tracker_id):
@@ -237,7 +285,7 @@ def api_task_add(request, tracker_id):
     )
 
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_task_edit(request, task_id):
@@ -251,7 +299,7 @@ def api_task_edit(request, task_id):
     )
 
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_tracker_reorder(request, tracker_id):
@@ -272,7 +320,7 @@ def api_tracker_reorder(request, tracker_id):
 # TRACKER ENDPOINTS
 # ============================================================================
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_tracker_create(request):
@@ -289,7 +337,7 @@ def api_tracker_create(request):
     )
 
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_tracker_delete(request, tracker_id):
@@ -302,7 +350,7 @@ def api_tracker_delete(request, tracker_id):
     )
 
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_tracker_update(request, tracker_id):
@@ -317,7 +365,7 @@ def api_tracker_update(request, tracker_id):
 
 
 @csrf_exempt  # Required for iOS/mobile clients
-@login_required
+@require_auth
 @require_POST
 def api_template_activate(request):
     """
@@ -565,7 +613,7 @@ def api_search(request):
 # DAY NOTE ENDPOINT
 # ============================================================================
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_day_note(request, date_str):
@@ -591,7 +639,7 @@ def api_day_note(request, date_str):
 # UNDO ENDPOINT
 # ============================================================================
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_undo(request):
@@ -651,7 +699,7 @@ def api_undo(request):
 # EXPORT ENDPOINT
 # ============================================================================
 
-@login_required
+@require_auth
 @require_GET
 @handle_service_errors
 def api_export(request, tracker_id):
@@ -719,7 +767,7 @@ def api_export(request, tracker_id):
 # SHARE ENDPOINT
 # ============================================================================
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_share_tracker(request, tracker_id):
@@ -752,7 +800,7 @@ def api_share_tracker(request, tracker_id):
 # FORM VALIDATION ENDPOINT
 # ============================================================================
 
-@login_required
+@require_auth
 @require_POST
 @handle_service_errors
 def api_validate_field(request):
@@ -790,7 +838,7 @@ def api_validate_field(request):
 # INSIGHTS API ENDPOINT
 # ============================================================================
 
-@login_required
+@require_auth
 @require_GET
 @handle_service_errors
 def api_insights(request, tracker_id=None):
@@ -843,7 +891,7 @@ def api_insights(request, tracker_id=None):
 # CHART DATA API ENDPOINT
 # ============================================================================
 
-@login_required
+@require_auth
 @require_GET
 @handle_service_errors
 def api_chart_data(request):
@@ -956,7 +1004,7 @@ def api_chart_data(request):
 # HEATMAP DATA API ENDPOINT
 # ============================================================================
 
-@login_required
+@require_auth
 @require_GET
 def api_heatmap_data(request):
     """
@@ -1051,7 +1099,7 @@ def api_heatmap_data(request):
 # BULK STATUS UPDATE (Moved from views.py)
 # ============================================================================
 
-@login_required
+@require_auth
 @require_POST
 def api_bulk_status_update(request):
     """
@@ -1089,7 +1137,7 @@ def api_bulk_status_update(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
-@login_required
+@require_auth
 @require_POST
 def api_mark_overdue_missed(request, tracker_id):
     """
@@ -1113,7 +1161,7 @@ def api_mark_overdue_missed(request, tracker_id):
 # GOALS API
 # ============================================================================
 
-@login_required
+@require_auth
 @require_http_methods(['GET', 'POST'])
 def api_goals(request):
     """
@@ -1233,7 +1281,7 @@ def api_goals(request):
 # USER PREFERENCES API
 # ============================================================================
 
-@login_required
+@require_auth
 @require_http_methods(['GET', 'PUT'])
 def api_preferences(request):
     """User preferences API endpoint"""
@@ -1285,7 +1333,7 @@ def api_preferences(request):
 # NOTIFICATIONS API
 # ============================================================================
 
-@login_required
+@require_auth
 @require_http_methods(['GET', 'POST'])
 def api_notifications(request):
     """Notifications API endpoint"""
@@ -1330,7 +1378,7 @@ def api_notifications(request):
 # PREFETCH API - For SPA navigation (Phase 3)
 # ============================================================================
 
-@login_required
+@require_auth
 @require_GET
 @check_etag
 def api_prefetch(request):
@@ -1404,7 +1452,7 @@ def api_prefetch(request):
 # INFINITE SCROLL API - For task lists (Phase 3)
 # ============================================================================
 
-@login_required
+@require_auth
 @require_GET
 @check_etag
 def api_tasks_infinite(request):
@@ -1492,7 +1540,7 @@ def api_tasks_infinite(request):
 # SMART SUGGESTIONS API (Phase 5)
 # ============================================================================
 
-@login_required
+@require_auth
 @require_GET
 def api_smart_suggestions(request):
     """
@@ -1600,7 +1648,7 @@ def api_smart_suggestions(request):
 # SYNC ENDPOINT (Offline-First Support)
 # ============================================================================
 
-@login_required
+@require_auth
 @require_POST
 def api_sync(request):
     """
@@ -1712,7 +1760,7 @@ def api_health(request):
 # USER PROFILE \u0026 SETTINGS ENDPOINTS (for both Web and iOS)
 # ============================================================================
 
-@login_required
+@require_auth
 @require_http_methods(['GET', 'PUT'])
 def api_user_profile(request):
     """
@@ -1809,7 +1857,7 @@ def api_user_profile(request):
             }, status=500)
 
 
-@login_required
+@require_auth
 @require_http_methods(['POST', 'DELETE'])
 def api_user_avatar(request):
     """
@@ -1931,7 +1979,7 @@ def api_user_avatar(request):
             }, status=500)
 
 
-@login_required
+@require_auth
 @require_POST
 def api_data_export(request):
     """
@@ -2050,7 +2098,7 @@ def api_data_export(request):
         }, status=500)
 
 
-@login_required
+@require_auth
 @require_POST
 def api_data_import(request):
     """
@@ -2133,7 +2181,7 @@ def api_data_import(request):
         }, status=500)
 
 
-@login_required
+@require_auth
 @require_POST
 def api_data_clear(request):
     """
@@ -2190,7 +2238,7 @@ def api_data_clear(request):
         }, status=500)
 
 
-@login_required
+@require_auth
 @require_http_methods(['DELETE'])
 def api_user_delete(request):
     """
@@ -2250,7 +2298,7 @@ def api_user_delete(request):
 # ANALYTICS & EXPORT APIs
 # =============================================================================
 
-@login_required
+@require_auth
 @require_http_methods(['GET'])
 def api_analytics_data(request):
     """
@@ -2310,7 +2358,7 @@ def api_analytics_data(request):
         }, status=500)
 
 
-@login_required
+@require_auth
 @require_http_methods(['POST'])
 def api_export_month(request):
     """
@@ -2380,7 +2428,7 @@ def api_export_month(request):
         }, status=500)
 
 
-@login_required
+@require_auth
 @require_http_methods(['GET'])
 def api_analytics_forecast(request):
     """
@@ -2463,7 +2511,7 @@ def api_analytics_forecast(request):
 # UNDO SYSTEM
 # =============================================================================
 
-@login_required
+@require_auth
 @require_POST
 def api_undo(request):
     """
@@ -2577,7 +2625,7 @@ def api_undo(request):
 # FEATURE FLAGS
 # =============================================================================
 
-@login_required
+@require_auth
 @require_GET
 def api_feature_flag(request, flag_name):
     """

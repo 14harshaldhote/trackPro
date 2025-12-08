@@ -256,7 +256,6 @@ def api_signup(request):
 
 
 @require_http_methods(["GET", "POST"])
-@login_required
 def api_logout(request):
     """
     Logout via AJAX or Standard Request
