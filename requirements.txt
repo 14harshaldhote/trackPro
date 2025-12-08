@@ -47,3 +47,4 @@ whitenoise
 certifi
 urllib3
 pillow
+pytz
