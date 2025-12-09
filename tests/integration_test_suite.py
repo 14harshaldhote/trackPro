@@ -58,6 +58,12 @@ class IntegrationTestSuite:
     def log(self, msg: str):
         if VERBOSE:
             print(msg)
+    
+    def safe_get(self, data: Any, key: str, default: Any = None) -> Any:
+        """Safely get a key from dict, handling non-dict responses"""
+        if isinstance(data, dict):
+            return data.get(key, default)
+        return default
             
     def add_result(self, name: str, status: TestStatus, code: int, 
                    message: str, duration: float, phase: str):
@@ -123,13 +129,13 @@ class IntegrationTestSuite:
         
         # 1.1 Health Check
         code, data, dur = self.request("GET", "/health/", auth=False)
-        status = TestStatus.PASSED if code == 200 and data.get("status") == "healthy" else TestStatus.FAILED
-        self.add_result("Health check returns healthy", status, code, str(data), dur, phase)
+        status = TestStatus.PASSED if code == 200 and self.safe_get(data, "status") == "healthy" else TestStatus.FAILED
+        self.add_result("Health check returns healthy", status, code, str(data)[:100], dur, phase)
         
         # 1.2 Auth Status (Unauthenticated)
         code, data, dur = self.request("GET", "/auth/status/", auth=False)
-        status = TestStatus.PASSED if code == 200 and data.get("authenticated") == False else TestStatus.FAILED
-        self.add_result("Auth status shows unauthenticated", status, code, str(data), dur, phase)
+        status = TestStatus.PASSED if code == 200 and self.safe_get(data, "authenticated") == False else TestStatus.FAILED
+        self.add_result("Auth status shows unauthenticated", status, code, str(data)[:100], dur, phase)
         
         # 1.3 Email Validation - Available
         code, data, dur = self.request("POST", "/auth/validate-email/", 
@@ -178,10 +184,10 @@ class IntegrationTestSuite:
         self.add_result("Login with valid credentials", status, code, str(data), dur, phase)
         
         # Store token if available
-        if data.get("token"):
+        if isinstance(data, dict) and data.get("token"):
             self.auth_token = data["token"]
             self.log(f"    → Token acquired for authenticated tests")
-        elif data.get("success"):
+        elif isinstance(data, dict) and data.get("success"):
             # Session-based, get token separately
             self.log(f"    → Session acquired (no JWT token)")
             
@@ -233,13 +239,14 @@ class IntegrationTestSuite:
             "description": "Integration test tracker",
             "time_mode": "daily"
         })
-        status = TestStatus.PASSED if code in [200, 201] and data.get("success") else TestStatus.FAILED
-        self.add_result("Create tracker", status, code, str(data), dur, phase)
+        status = TestStatus.PASSED if code in [200, 201] and self.safe_get(data, "success") else TestStatus.FAILED
+        self.add_result("Create tracker", status, code, str(data)[:100], dur, phase)
         
-        if "tracker_id" in data:
-            self.test_tracker_id = data["tracker_id"]
-        elif data.get("data", {}).get("tracker_id"):
-            self.test_tracker_id = data["data"]["tracker_id"]
+        if isinstance(data, dict):
+            if "tracker_id" in data:
+                self.test_tracker_id = data["tracker_id"]
+            elif self.safe_get(data, "data", {}).get("tracker_id"):
+                self.test_tracker_id = data["data"]["tracker_id"]
             
         # 2.3 Create Tracker - Missing name
         code, data, dur = self.request("POST", "/tracker/create/", {"time_mode": "daily"})
@@ -277,7 +284,7 @@ class IntegrationTestSuite:
         self.add_result("Activate morning template", status, code, str(data), dur, phase)
         
         # Store template tracker ID for task tests
-        if data.get("data", {}).get("tracker_id"):
+        if isinstance(data, dict) and self.safe_get(data, "data", {}).get("tracker_id"):
             template_tracker_id = data["data"]["tracker_id"]
             self.test_tracker_id = self.test_tracker_id or template_tracker_id
             
@@ -334,10 +341,11 @@ class IntegrationTestSuite:
                 "name": "Task Test Tracker",
                 "time_mode": "daily"
             })
-            if data.get("tracker_id"):
-                self.test_tracker_id = data["tracker_id"]
-            elif data.get("data", {}).get("tracker_id"):
-                self.test_tracker_id = data["data"]["tracker_id"]
+            if isinstance(data, dict):
+                if self.safe_get(data, "tracker_id"):
+                    self.test_tracker_id = data["tracker_id"]
+                elif self.safe_get(data, "data", {}).get("tracker_id"):
+                    self.test_tracker_id = data["data"]["tracker_id"]
         
         # 3.1 Add Task to Tracker
         code, data, dur = self.request("POST", f"/tracker/{self.test_tracker_id}/task/add/", {
@@ -668,7 +676,7 @@ class IntegrationTestSuite:
         # 6.9 Sync
         code, data, dur = self.request("GET", "/sync/")
         status = TestStatus.PASSED if code == 200 else TestStatus.FAILED
-        self.add_result("Sync data", status, code, str(data.get("success")), dur, phase)
+        self.add_result("Sync data", status, code, str(self.safe_get(data, "success")), dur, phase)
         
         # 6.10 Validate Field
         code, data, dur = self.request("POST", "/validate/", {
@@ -703,7 +711,7 @@ class IntegrationTestSuite:
             "email": self.test_user_email,
             "password": self.test_user_password
         }, auth=False)
-        if data.get("token"):
+        if isinstance(data, dict) and self.safe_get(data, "token"):
             self.auth_token = data["token"]
             
     # =========================================================================
@@ -764,7 +772,7 @@ class IntegrationTestSuite:
             "name": f"Workflow Test {uuid.uuid4().hex[:6]}",
             "time_mode": "daily"
         })
-        new_tracker_id = data.get("tracker_id") or data.get("data", {}).get("tracker_id")
+        new_tracker_id = self.safe_get(data, "tracker_id") or self.safe_get(data, "data", {}).get("tracker_id") if isinstance(data, dict) else None
         self.add_result("Workflow: Create tracker",
                        TestStatus.PASSED if code in [200, 201] else TestStatus.FAILED,
                        code, f"ID: {new_tracker_id}", dur, phase)

@@ -1,251 +1,218 @@
 """
-Goal Progress Service
+Goal Service
 
-Provides goal progress calculation, tracking, and recommendations.
-Integrates with the behavioral engine for intelligent progress insights.
+Manage goal progress calculations, status updates, and insights.
 """
 from datetime import date, timedelta
-from typing import Dict, List, Optional
-from django.db.models import Sum, Count, Avg, Q
+from django.db import transaction
+from django.db.models import Sum, Count, Q, F
+from core.models import Goal, GoalTaskMapping, TaskInstance, Notification
 
-from core.models import Goal, TrackerDefinition, TaskInstance
-
-
-class GoalProgressService:
-    """
-    Service for calculating and tracking goal progress.
+class GoalService:
+    """Manage goal progress calculations and updates."""
     
-    Provides:
-    - Progress calculation based on linked trackers
-    - Projection/forecasting
-    - Recommendations for at-risk goals
-    """
-    
-    def __init__(self, user):
+    @staticmethod
+    def update_goal_progress(goal: Goal) -> dict:
         """
-        Initialize service with user isolation.
-        
-        Args:
-            user: Django User object
-        """
-        self.user = user
-    
-    def calculate_goal_progress(self, goal_id: str) -> Dict:
-        """
-        Calculate current progress for a specific goal.
-        
-        Args:
-            goal_id: Goal UUID
+        Recalculate and update goal progress.
         
         Returns:
-            {
-                'progress': float (0-100),
-                'current_value': float,
-                'target_value': float,
-                'on_track': bool,
-                'days_left': int,
-                'projected_completion': date or None
-            }
+            Dict with progress details
         """
-        try:
-            goal = Goal.objects.get(goal_id=goal_id, user=self.user)
-        except Goal.DoesNotExist:
-            return {}
+        # Filter out deleted templates
+        mappings = goal.task_mappings.filter(
+            template__deleted_at__isnull=True
+        ).select_related('template')
         
-        today = date.today()
+        if not mappings.exists():
+            # If no mappings, check if it's a simple manual goal or has no tasks
+            # For now return 0 progress if no mappings and no manual override logic
+            return {'progress': 0, 'current_value': 0, 'target_value': goal.target_value}
         
-        # Calculate progress based on goal type
-        if goal.goal_type == 'habit' and goal.tracker:
-            # For habit goals, calculate from linked tracker
-            progress = self._calculate_habit_progress(goal)
-        elif goal.goal_type == 'milestone':
-            # For milestone goals, use current_value vs target_value
-            progress = (goal.current_value / goal.target_value * 100) if goal.target_value else 0
+        total_weight = 0
+        weighted_completion = 0
+        total_completions = 0
+        
+        for mapping in mappings:
+            template = mapping.template
+            weight = mapping.contribution_weight
+            
+            # Get instance counts
+            # Note: We might want to filter by date range if goal has start/end date
+            # Current plan doesn't specify strict date filtering for all goals yet, 
+            # but usually goals apply to tasks created after goal start.
+            # For simplicity matching the plan:
+            instances = template.instances.filter(deleted_at__isnull=True)
+            if goal.target_date:
+                 instances = instances.filter(completed_at__lte=goal.target_date) # Cap at target date?
+            # Or usually within goal window. Let's stick to plan's simple count for now or add basic date filter
+            
+            total = instances.count()
+            done = instances.filter(status='DONE').count()
+            
+            total_completions += done
+            
+            if total > 0:
+                completion_rate = done / total
+                weighted_completion += completion_rate * weight
+                total_weight += weight
+        
+        # Calculate progress percentage
+        if total_weight > 0:
+            progress = (weighted_completion / total_weight) * 100
         else:
-            progress = goal.progress
+            progress = 0
         
-        # Calculate days remaining
-        days_left = (goal.target_date - today).days if goal.target_date else None
-        
-        # Determine if on track
-        on_track = True
-        behind_by = 0
-        if goal.target_date and days_left and days_left > 0:
-            expected_progress = self._get_expected_progress(goal)
-            on_track = progress >= (expected_progress * 0.9)  # 10% buffer
-            if not on_track:
-                behind_by = int(expected_progress - progress)
-        
-        # Project completion date
-        projected_completion = self._project_completion(goal, progress)
+        # Update goal
+        with transaction.atomic():
+            goal.progress = progress
+            goal.current_value = total_completions
+            
+            # Check if goal achieved
+            if goal.target_value and goal.current_value >= goal.target_value:
+                if goal.status != 'achieved':
+                    goal.status = 'achieved'
+                    GoalService._send_achievement_notification(goal)
+            
+            goal.save(update_fields=['progress', 'current_value', 'status', 'updated_at'])
         
         return {
-            'progress': round(progress, 1),
+            'progress': progress,
             'current_value': goal.current_value,
             'target_value': goal.target_value,
-            'on_track': on_track,
-            'behind_by': f"{behind_by}%" if behind_by > 0 else '',
-            'days_left': days_left,
-            'projected_completion': projected_completion,
-            'tracker_name': goal.tracker.name if goal.tracker else 'No tracker'
+            'status': goal.status
         }
     
-    def _calculate_habit_progress(self, goal: Goal) -> float:
-        """Calculate progress for habit-based goals."""
-        if not goal.tracker:
-            return 0
-        
-        # Get completion rate from linked tracker
-        completed = TaskInstance.objects.filter(
-            tracker_instance__tracker=goal.tracker,
-            status='DONE'
-        ).count()
-        
-        total = TaskInstance.objects.filter(
-            tracker_instance__tracker=goal.tracker
-        ).count()
-        
-        return (completed / total * 100) if total else 0
+    @staticmethod
+    def _send_achievement_notification(goal: Goal):
+        """Send notification when goal is achieved."""
+        # Check if notification service is available/imported or create directly
+        # Plan says create directly here
+        Notification.objects.create(
+            user=goal.user,
+            type='achievement',
+            title='🎉 Goal Achieved!',
+            message=f'Congratulations! You completed "{goal.title}"',
+            link=f'/goals/{str(goal.goal_id)}'
+        )
     
-    def _get_expected_progress(self, goal: Goal) -> float:
-        """Calculate expected progress based on time elapsed."""
-        if not goal.target_date:
-            return 0
+    @staticmethod
+    def get_goal_insights(goal: Goal) -> dict:
+        """Get detailed insights for a goal."""
+        mappings = goal.task_mappings.select_related('template')
         
-        today = date.today()
-        total_days = (goal.target_date - goal.created_at.date()).days
-        elapsed_days = (today - goal.created_at.date()).days
+        task_breakdowns = []
+        for mapping in mappings:
+            template = mapping.template
+            instances = template.instances.filter(deleted_at__isnull=True)
+            
+            total = instances.count()
+            done = instances.filter(status='DONE').count()
+            missed = instances.filter(status='MISSED').count()
+            
+            task_breakdowns.append({
+                'template_id': str(template.template_id),
+                'description': template.description,
+                'weight': mapping.contribution_weight,
+                'total': total,
+                'done': done,
+                'missed': missed,
+                'completion_rate': (done / total * 100) if total > 0 else 0
+            })
         
-        if total_days <= 0:
-            return 100
+        # Calculate days remaining
+        days_remaining = None
+        if goal.target_date:
+            days_remaining = (goal.target_date - date.today()).days
         
-        return (elapsed_days / total_days) * 100
+        # Forecast completion
+        avg_daily_progress = GoalService._calculate_velocity(goal)
+        
+        return {
+            'goal_id': str(goal.goal_id),
+            'title': goal.title,
+            'progress': goal.progress,
+            'current_value': goal.current_value,
+            'target_value': goal.target_value,
+            'days_remaining': days_remaining,
+            'avg_daily_progress': avg_daily_progress,
+            'on_track': GoalService._is_on_track(goal, avg_daily_progress, days_remaining),
+            'task_breakdowns': task_breakdowns
+        }
     
-    def _project_completion(self, goal: Goal, current_progress: float) -> Optional[date]:
-        """Project when goal will be completed based on current rate."""
-        if current_progress >= 100:
-            return date.today()
-        
-        if current_progress <= 0:
-            return None
-        
-        today = date.today()
-        days_elapsed = (today - goal.created_at.date()).days
-        
-        if days_elapsed <= 0:
-            return None
-        
-        # Daily progress rate
-        daily_rate = current_progress / days_elapsed
-        remaining_progress = 100 - current_progress
-        
-        if daily_rate <= 0:
-            return None
-        
-        days_needed = int(remaining_progress / daily_rate)
-        return today + timedelta(days=days_needed)
+    @staticmethod
+    def _calculate_velocity(goal: Goal) -> float:
+        """Calculate average daily progress rate."""
+        days_elapsed = (date.today() - goal.created_at.date()).days or 1
+        return goal.current_value / days_elapsed
     
-    def get_all_goals_progress(self) -> List[Dict]:
+    @staticmethod
+    def _is_on_track(goal: Goal, velocity: float, days_remaining: int | None) -> bool:
+        """Determine if goal is on track for completion."""
+        if not goal.target_value or not days_remaining or days_remaining <= 0:
+            return goal.status == 'achieved'
+        
+        projected_value = goal.current_value + (velocity * days_remaining)
+        return projected_value >= goal.target_value
+
+    @staticmethod
+    def update_target(goal: Goal, new_target: float) -> dict:
         """
-        Get progress for all user goals.
-        
-        Returns:
-            List of goal progress dicts
+        Update goal target with history preservation.
         """
-        goals = Goal.objects.filter(user=self.user).select_related('tracker')
+        old_target = goal.target_value
+        was_achieved = goal.status == 'achieved'
         
-        results = []
-        for goal in goals:
-            progress_data = self.calculate_goal_progress(goal.goal_id)
-            progress_data['goal_id'] = goal.goal_id
-            progress_data['title'] = goal.title
-            progress_data['icon'] = goal.icon
-            progress_data['status'] = goal.status
-            progress_data['unit'] = goal.unit or 'tasks'
-            progress_data['completed_at'] = goal.updated_at if goal.status == 'achieved' else None
-            results.append(progress_data)
+        goal.target_value = new_target
         
-        return results
-    
-    def get_at_risk_goals(self) -> List[Dict]:
-        """
-        Get goals that are behind schedule.
-        
-        Returns:
-            List of at-risk goals with recommendations
-        """
-        all_progress = self.get_all_goals_progress()
-        
-        at_risk = []
-        for goal in all_progress:
-            if goal.get('status') == 'active' and not goal.get('on_track', True):
-                goal['recommendation'] = self._get_recommendation(goal)
-                at_risk.append(goal)
-        
-        return at_risk
-    
-    def _get_recommendation(self, goal_data: Dict) -> str:
-        """Generate recommendation for at-risk goal."""
-        days_left = goal_data.get('days_left')
-        progress = goal_data.get('progress', 0)
-        
-        if days_left and days_left < 7:
-            return "This goal needs immediate attention. Consider focusing on it daily."
-        elif progress < 25:
-            return "You're in the early stages. Try setting smaller daily milestones."
-        elif progress < 50:
-            return "You're making progress but falling behind. Increase your daily effort."
-        else:
-            return "You're more than halfway there! Push a bit harder to finish on time."
-    
-    def update_goal_progress(self, goal_id: str, new_value: float = None) -> Dict:
-        """
-        Update a goal's progress.
-        
-        Args:
-            goal_id: Goal UUID
-            new_value: New current_value (optional, will recalculate if not provided)
-        
-        Returns:
-            Updated progress data
-        """
-        try:
-            goal = Goal.objects.get(goal_id=goal_id, user=self.user)
-        except Goal.DoesNotExist:
-            return {'error': 'Goal not found'}
-        
-        if new_value is not None:
-            goal.current_value = new_value
-        
-        # Recalculate progress
-        if goal.target_value:
-            goal.progress = min(100, (goal.current_value / goal.target_value) * 100)
-        
-        # Check if goal is achieved
-        if goal.progress >= 100 and goal.status == 'active':
+        # Recalculate status
+        if goal.current_value >= new_target:
             goal.status = 'achieved'
+        elif was_achieved:
+            # Was achieved, now not - reopen
+            goal.status = 'active'
+            # Could add notification here: "Goal target increased!"
         
         goal.save()
+        GoalService.update_goal_progress(goal)
         
-        return self.calculate_goal_progress(goal_id)
+        return {
+            'old_target': old_target,
+            'new_target': new_target,
+            'status_changed': was_achieved and goal.status != 'achieved'
+        }
 
-
-# Convenience functions
-
-def calculate_user_goal_progress(user) -> Dict:
-    """Get summary of all user's goal progress."""
-    service = GoalProgressService(user)
-    
-    all_progress = service.get_all_goals_progress()
-    at_risk = service.get_at_risk_goals()
-    
-    active_goals = [g for g in all_progress if g.get('status') == 'active']
-    avg_progress = sum(g.get('progress', 0) for g in active_goals) / len(active_goals) if active_goals else 0
-    
-    return {
-        'total_goals': len(all_progress),
-        'active_goals': len(active_goals),
-        'avg_progress': round(avg_progress, 1),
-        'at_risk_count': len(at_risk),
-        'at_risk_goals': at_risk
-    }
+    @staticmethod
+    def get_count_based_progress(
+        goal: Goal,
+        start_date: date = None,
+        end_date: date = None
+    ) -> dict:
+        """
+        Calculate progress for frequency-based goals.
+        """
+        # Get all task mappings for this goal
+        template_ids = goal.task_mappings.values_list('template_id', flat=True)
+        
+        # Build query for completed tasks
+        query = TaskInstance.objects.filter(
+            template_id__in=template_ids,
+            status='DONE',
+            deleted_at__isnull=True
+        )
+        
+        # Apply date filters if provided
+        if start_date:
+            query = query.filter(completed_at__date__gte=start_date)
+        if end_date:
+            query = query.filter(completed_at__date__lte=end_date)
+        
+        current_count = query.count()
+        target = goal.target_value or 1
+        
+        return {
+            'current_count': current_count,
+            'target': target,
+            'progress_percent': min(100, (current_count / target) * 100),
+            'remaining': max(0, target - current_count)
+        }

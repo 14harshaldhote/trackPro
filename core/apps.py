@@ -7,6 +7,13 @@ class CoreConfig(AppConfig):
     name = "core"
 
     def ready(self):
+        # Import signals to register them
+        # This enables automatic goal updates when tasks change
+        try:
+            from core.signals import task_signals  # noqa - imports register the signals
+        except ImportError:
+            pass  # Signals not yet created
+        
         # Prevent scheduler from starting twice (reloader)
         if 'runserver' in sys.argv:
             from core.integrations import scheduler

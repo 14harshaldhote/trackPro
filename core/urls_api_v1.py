@@ -128,4 +128,82 @@ urlpatterns = [
     path('auth/validate-email/', views_auth.api_validate_email, name='auth_validate_email'),
     path('auth/google/', views_auth.api_google_auth_mobile, name='auth_google_mobile'),
     path('auth/apple/mobile/', views_auth.api_apple_auth_mobile, name='auth_apple_mobile'),
+    
+    # =========================================================================
+    # V1.0 ENHANCED TRACKER OPERATIONS
+    # =========================================================================
+    path('tracker/<str:tracker_id>/clone/', views_api.api_tracker_clone, name='tracker_clone'),
+    path('tracker/<str:tracker_id>/restore/', views_api.api_tracker_restore, name='tracker_restore'),
+    path('tracker/<str:tracker_id>/change-mode/', views_api.api_tracker_change_mode, name='tracker_change_mode'),
+    path('tracker/<str:tracker_id>/week/', views_api.api_week_aggregation, name='tracker_week'),
+    path('tracker/<str:tracker_id>/instances/generate/', views_api.api_generate_instances, name='tracker_generate_instances'),
+    path('tracker/<str:tracker_id>/dependency-graph/', views_api.api_dependency_graph, name='tracker_dependency_graph'),
+    
+    # =========================================================================
+    # V1.5 TAGS
+    # =========================================================================
+    path('tags/', views_api.api_tags, name='tags'),
+    path('tags/<str:tag_id>/', views_api.api_tag_detail, name='tag_detail'),
+    path('tags/analytics/', views_api.api_tag_analytics, name='tag_analytics'),
+    path('template/<str:template_id>/tag/<str:tag_id>/', views_api.api_tag_template, name='tag_template'),
+    path('tasks/by-tag/', views_api.api_tasks_by_tag, name='tasks_by_tag'),
+    
+    # =========================================================================
+    # V1.5 ENTITY RELATIONS / DEPENDENCIES
+    # =========================================================================
+    path('template/<str:template_id>/dependencies/', views_api.api_task_dependencies, name='task_dependencies'),
+    path('template/<str:template_id>/dependencies/<str:target_id>/remove/', views_api.api_remove_dependency, name='remove_dependency'),
+    path('task/<str:task_id>/blocked/', views_api.api_task_blocked_status, name='task_blocked'),
+    
+    # =========================================================================
+    # V1.5 ENHANCED SEARCH
+    # =========================================================================
+    path('search/suggestions/', views_api.api_search_suggestions, name='search_suggestions'),
+    path('search/history/', views_api.api_search_history, name='search_history'),
+    path('search/history/clear/', views_api.api_clear_search_history, name='search_history_clear'),
+    
+    # =========================================================================
+    # V1.5 MULTI-TRACKER ANALYTICS
+    # =========================================================================
+    path('analytics/compare/', views_api.api_compare_trackers, name='analytics_compare'),
+    
+    # =========================================================================
+    # V1 SHARE LINKS
+    # =========================================================================
+    path('shares/', views_api.api_share_links, name='shares_list'),
+    path('tracker/<str:tracker_id>/share/create/', views_api.api_share_links, name='share_create'),
+    path('share/<str:token>/deactivate/', views_api.api_share_deactivate, name='share_deactivate'),
+    
+    # =========================================================================
+    # V2.0 KNOWLEDGE GRAPH
+    # =========================================================================
+    path('v2/knowledge-graph/', views_api.api_knowledge_graph, name='knowledge_graph'),
+    path('v2/graph/<str:entity_type>/<str:entity_id>/', views_api.api_entity_connections, name='entity_connections'),
+    path('v2/graph/path/', views_api.api_find_path, name='find_path'),
+    
+    # =========================================================================
+    # V2.0 HABIT INTELLIGENCE
+    # =========================================================================
+    path('v2/insights/habits/', views_api.api_habit_insights, name='habit_insights'),
+    path('v2/insights/day-analysis/', views_api.api_day_of_week_analysis, name='day_analysis'),
+    path('v2/insights/difficulty/', views_api.api_task_difficulty_analysis, name='task_difficulty'),
+    path('v2/insights/schedule/', views_api.api_schedule_suggestions, name='schedule_suggestions'),
+    
+    # =========================================================================
+    # V2.0 ACTIVITY REPLAY
+    # =========================================================================
+    path('v2/timeline/', views_api.api_activity_timeline, name='activity_timeline'),
+    path('v2/snapshot/<str:date_str>/', views_api.api_day_snapshot, name='day_snapshot'),
+    path('v2/compare/', views_api.api_compare_periods, name='compare_periods'),
+    path('v2/compare/weekly/', views_api.api_weekly_comparison, name='weekly_comparison'),
+    path('v2/history/<str:entity_type>/<str:entity_id>/', views_api.api_entity_history, name='entity_history'),
+    
+    # =========================================================================
+    # V2.0 COLLABORATION
+    # =========================================================================
+    path('v2/shared/<str:token>/', views_api.api_shared_tracker_view, name='shared_tracker'),
+    path('v2/shared/<str:token>/instances/', views_api.api_shared_tracker_instances, name='shared_instances'),
+    path('v2/shared/<str:token>/task/<str:task_id>/', views_api.api_shared_task_update, name='shared_task_update'),
+    path('v2/shared/<str:token>/instance/<str:instance_id>/note/', views_api.api_shared_note_add, name='shared_note_add'),
+    path('v2/tracker/<str:tracker_id>/invite/', views_api.api_create_collaboration_invite, name='collaboration_invite'),
 ]

@@ -224,6 +224,14 @@ class TaskInstance(SoftDeleteModel):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    first_completed_at = models.DateTimeField(null=True, blank=True)
+    last_status_change = models.DateTimeField(auto_now=True, null=True, blank=True)
+    
+    # Snapshot fields (copied from template at creation)
+    snapshot_description = models.CharField(max_length=500, blank=True)
+    snapshot_points = models.IntegerField(default=0)
+    snapshot_weight = models.IntegerField(default=1)
+
     # Audit history - critical for tracking task status changes
     history = HistoricalRecords()
     
@@ -248,11 +256,36 @@ class TaskInstance(SoftDeleteModel):
     def __str__(self):
         return f"{self.template.description} - {self.status}"
     
+    def save(self, *args, **kwargs):
+        if not self.pk:  # New instance
+            if self.template:
+                self.snapshot_description = self.template.description
+                self.snapshot_points = self.template.points
+                self.snapshot_weight = self.template.weight
+        super().save(*args, **kwargs)
+
+    def set_status(self, new_status: str):
+        """Properly handle status changes."""
+        old_status = self.status
+        self.status = new_status
+        
+        if new_status == 'DONE':
+            now = timezone.now()
+            if self.first_completed_at is None:
+                self.first_completed_at = now
+            self.completed_at = now
+        elif old_status == 'DONE':
+            # Was done, now not - keep completed_at for history if desired, 
+            # currently we might want to clear it or keep it. 
+            # The edge case plan says: last completion timestamp updates each time.
+            # first_completed_at never changes.
+            pass
+        
+        self.save()
+    
     def mark_done(self):
         """Helper method to mark task as done"""
-        self.status = 'DONE'
-        self.completed_at = timezone.now()
-        self.save()
+        self.set_status('DONE')
 
 
 class DayNote(SoftDeleteModel):

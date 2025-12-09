@@ -14,11 +14,15 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from functools import wraps
 
-from .models import TrackerDefinition, TrackerInstance, TaskInstance, DayNote, TaskTemplate
+from .models import TrackerDefinition, TrackerInstance, TaskInstance, DayNote, TaskTemplate, Goal, UserPreferences, Notification, GoalTaskMapping
 from .services import instance_service as services
 from .services.task_service import TaskService
 from .services.tracker_service import TrackerService
 from .services.search_service import SearchService
+from .services.goal_service import GoalService
+from .services.streak_service import StreakService
+from .services.notification_service import NotificationService
+from .services.analytics_service import AnalyticsService
 from .utils.response_helpers import UXResponse
 from .utils.constants import HAPTIC_FEEDBACK, UI_COLORS
 from .utils.error_handlers import handle_service_errors
@@ -32,6 +36,9 @@ def require_auth(view_func):
     Decorator to ensure user is logged in for API endpoints.
     Supports both Session (Browser) and JWT (Mobile) authentication.
     Returns 401 JSON instead of redirecting to login page.
+    
+    Note: This decorator also exempts the view from CSRF checks since 
+    mobile/API clients use JWT tokens instead of CSRF tokens.
     """
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
@@ -69,7 +76,9 @@ def require_auth(view_func):
                 'retry': True
             }
         }, status=401)
-    return _wrapped_view
+    
+    # Apply csrf_exempt to allow API clients without CSRF tokens
+    return csrf_exempt(_wrapped_view)
 
 # Initialize Services
 task_service = TaskService()
@@ -501,27 +510,28 @@ def api_template_activate(request):
     
     # Validate template_key is provided
     if not template_key:
-        return UXResponse.error(
-            message='template_key is required',
-            error_code='MISSING_TEMPLATE_KEY',
-            data={
-                'available_templates': list(TEMPLATES.keys()),
-                'usage': 'POST /api/v1/templates/activate/ with body {"template_key": "morning"}'
+        available = ', '.join(TEMPLATES.keys())
+        return JsonResponse({
+            'success': False,
+            'error': {
+                'message': 'template_key is required',
+                'code': 'MISSING_TEMPLATE_KEY'
             },
-            status=400
-        )
+            'available_templates': list(TEMPLATES.keys()),
+            'usage': 'POST /api/v1/templates/activate/ with body {"template_key": "morning"}'
+        }, status=400)
     
     # Validate template exists
     if template_key not in TEMPLATES:
-        return UXResponse.error(
-            message=f'Template "{template_key}" not found',
-            error_code='INVALID_TEMPLATE',
-            data={
-                'available_templates': list(TEMPLATES.keys()),
-                'requested': template_key
+        return JsonResponse({
+            'success': False,
+            'error': {
+                'message': f'Template "{template_key}" not found',
+                'code': 'INVALID_TEMPLATE'
             },
-            status=404
-        )
+            'available_templates': list(TEMPLATES.keys()),
+            'requested': template_key
+        }, status=404)
     
     template_config = TEMPLATES[template_key]
     
@@ -634,20 +644,62 @@ def api_search(request):
 @require_POST
 @handle_service_errors
 def api_day_note(request, date_str):
-    """Save day note"""
+    """Save day note for a specific date"""
+    from datetime import datetime
+    
+    # Validate date format
+    try:
+        note_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({
+            'success': False,
+            'error': {
+                'message': f'Invalid date format. Use YYYY-MM-DD',
+                'code': 'INVALID_DATE'
+            }
+        }, status=400)
+    
     data = json.loads(request.body)
     note_text = data.get('note', '')
+    tracker_id = data.get('tracker_id')
     
-    note_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    
-    note, created = DayNote.objects.update_or_create(
-        user=request.user,
-        date=note_date,
-        defaults={'content': note_text}
-    )
+    # If tracker_id provided, save for that tracker
+    if tracker_id:
+        tracker = get_object_or_404(
+            TrackerDefinition,
+            tracker_id=tracker_id,
+            user=request.user
+        )
+        note, created = DayNote.objects.update_or_create(
+            tracker=tracker,
+            date=note_date,
+            defaults={'content': note_text}
+        )
+    else:
+        # Get user's first/default tracker for general notes
+        tracker = TrackerDefinition.objects.filter(
+            user=request.user, 
+            status='active'
+        ).first()
+        
+        if not tracker:
+            return JsonResponse({
+                'success': False,
+                'error': {
+                    'message': 'No tracker found. Create a tracker first or provide tracker_id.',
+                    'code': 'NO_TRACKER'
+                }
+            }, status=400)
+        
+        note, created = DayNote.objects.update_or_create(
+            tracker=tracker,
+            date=note_date,
+            defaults={'content': note_text}
+        )
     
     return UXResponse.success(
         message='Note saved',
+        data={'note_id': str(note.note_id), 'created': created},
         feedback={'type': 'success', 'haptic': 'light', 'toast': True}
     )
 
@@ -793,7 +845,7 @@ def api_share_tracker(request, tracker_id):
     
     tracker = get_object_or_404(
         TrackerDefinition,
-        id=tracker_id,
+        tracker_id=tracker_id,
         user=request.user
     )
     
@@ -3462,3 +3514,1411 @@ def api_tracker_detail(request, tracker_id):
             'error': str(e)
         }, status=500)
 
+
+# ============================================================================
+# GOAL ENDPOINTS
+# ============================================================================
+
+@require_auth
+@require_http_methods(["GET", "POST"])
+@handle_service_errors
+def api_goals(request):
+    """
+    List or create goals.
+    
+    GET: List all user goals with progress
+    POST: Create new goal
+    """
+    if request.method == "POST":
+        data = json.loads(request.body)
+        
+        # Basic manual creation for now - could use GoalService for complex logic if needed
+        # But GoalService handles progress updates. Creation is usually CRUD.
+        import uuid
+        from django.db import transaction
+        
+        with transaction.atomic():
+            goal = Goal.objects.create(
+                user=request.user,
+                goal_id=str(uuid.uuid4()),
+                title=data.get('title'),
+                description=data.get('description', ''),
+                target_value=data.get('target_value', 0),
+                current_value=0,
+                unit=data.get('unit', 'tasks'),
+                target_date=data.get('target_date'), # Expect YYYY-MM-DD
+                status='active',
+                goal_type=data.get('goal_type', 'achievement')
+            )
+            
+            # Link templates if provided
+            tracker_id = data.get('tracker_id')
+            if tracker_id:
+                # Link goal to this tracker and all its tasks
+                tracker = get_object_or_404(TrackerDefinition, tracker_id=tracker_id, user=request.user)
+                goal.tracker = tracker
+                goal.save()
+                
+                # Auto-map templates
+                for tmpl in tracker.templates.filter(deleted_at__isnull=True):
+                    GoalTaskMapping.objects.create(
+                        goal=goal,
+                        template=tmpl,
+                        contribution_weight=1.0 # Default
+                    )
+        
+        return UXResponse.success("Goal created", {'goal_id': str(goal.goal_id)})
+    
+    else:
+        # GET - List goals using GoalService logic if simpler or manual
+        goals = Goal.objects.filter(user=request.user, deleted_at__isnull=True).select_related('tracker')
+        
+        results = []
+        for goal in goals:
+            # Check for up-to-date calculation on read or cache?
+            # GoalService.update_goal_progress(goal) # Optional: Real-time update
+            
+            progress_data = GoalService.get_goal_insights(goal) # Rich data
+            results.append(progress_data)
+        
+        return JsonResponse({'success': True, 'goals': results})
+
+
+# ============================================================================
+# NOTIFICATION ENDPOINTS
+# ============================================================================
+
+@require_auth
+@require_http_methods(["GET", "POST"])
+@handle_service_errors
+def api_notifications(request):
+    """
+    GET: List notifications
+    POST: Mark all read
+    """
+    if request.method == "POST":
+        NotificationService.mark_all_read(request.user.id)
+        return UXResponse.success("Notifications marked read")
+    
+    notifications = Notification.objects.filter(
+        user=request.user
+    ).order_by('-created_at')[:50]
+    
+    data = [{
+        'id': n.id,
+        'title': n.title,
+        'message': n.message,
+        'type': n.type,
+        'is_read': n.is_read,
+        'created_at': n.created_at.isoformat(),
+        'link': n.link
+    } for n in notifications]
+    
+    return JsonResponse({'success': True, 'notifications': data})
+
+
+# ============================================================================
+# ANALYTICS ENDPOINTS
+# ============================================================================
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_analytics_data(request):
+    """Get comprehensive analytics data for dashboard using AnalyticsService."""
+    days = int(request.GET.get('days', 30))
+    tracker_id = request.GET.get('tracker_id')
+    
+    start_date = date.today() - timedelta(days=days-1)
+    
+    data = {
+        'summary': AnalyticsService.get_weekly_summary(request.user.id), # Default to week for summary
+        'heatmap': AnalyticsService.get_heatmap_data(request.user.id),
+        'best_days': AnalyticsService.get_best_days(request.user.id),
+        'most_missed': AnalyticsService.get_most_missed_tasks(request.user.id),
+    }
+    
+    if tracker_id:
+        data['tracker_specific'] = AnalyticsService.get_tracker_analytics(tracker_id, days)
+    
+    return JsonResponse({'success': True, 'analytics': data})
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_chart_data(request):
+    """Get data formatted for charts."""
+    # Simplified wrapper
+    return api_analytics_data(request)
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_heatmap_data(request):
+    """Get heatmap data."""
+    data = AnalyticsService.get_heatmap_data(request.user.id)
+    return JsonResponse({'success': True, 'heatmap': data})
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_insights(request, tracker_id=None):
+    """Get insights."""
+    best_days = AnalyticsService.get_best_days(request.user.id)
+    missed = AnalyticsService.get_most_missed_tasks(request.user.id)
+    
+    insights = []
+    if best_days['best_day']:
+        insights.append({
+            'type': 'positive',
+            'title': 'Peak Productivity',
+            'message': f"You are most productive on {best_days['best_day']}s."
+        })
+    
+    if missed:
+        top_miss = missed[0]
+        insights.append({
+            'type': 'improvement',
+            'title': 'Challenge Area',
+            'message': f"'{top_miss['description']}' is missed often ({int(top_miss['miss_rate'])}%). Try rescheduling it?"
+        })
+        
+    return JsonResponse({'success': True, 'insights': insights})
+
+
+# ============================================================================
+# STREAK ENDPOINTS
+# ============================================================================
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_dashboard_streaks(request):
+    """Get streaks for all active trackers."""
+    streaks = StreakService.get_all_user_streaks(request.user.id)
+    return JsonResponse({'success': True, 'streaks': streaks})
+
+
+# ============================================================================
+# PREFERENCES ENDPOINTS
+# ============================================================================
+
+@require_auth
+@require_http_methods(["GET", "POST"])
+@handle_service_errors
+def api_preferences(request):
+    """
+    GET: Get all user preferences
+    POST: Update preferences
+    """
+    user = request.user
+    
+    # Ensure prefs exist
+    prefs, created = UserPreferences.objects.get_or_create(user=user)
+    
+    if request.method == "POST":
+        data = json.loads(request.body)
+        
+        # Update fields
+        if 'theme' in data: prefs.theme = data['theme']
+        if 'default_view' in data: prefs.default_view = data['default_view']
+        
+        # Notifications
+        if 'daily_reminder_enabled' in data: prefs.daily_reminder_enabled = data['daily_reminder_enabled']
+        if 'daily_reminder_time' in data: 
+            # Parse time "HH:MM"
+            t_str = data['daily_reminder_time']
+            if t_str:
+                try:
+                    h, m = map(int, t_str.split(':'))
+                    prefs.daily_reminder_time = time(h, m)
+                except:
+                    pass
+        
+        if 'streak_threshold' in data: prefs.streak_threshold = data['streak_threshold']
+        
+        prefs.save()
+        return UXResponse.success("Preferences updated")
+    
+    else:
+        return JsonResponse({
+            'success': True,
+            'preferences': {
+                'theme': prefs.theme,
+                'default_view': prefs.default_view,
+                'daily_reminder_enabled': prefs.daily_reminder_enabled,
+                'daily_reminder_time': prefs.daily_reminder_time.strftime('%H:%M') if prefs.daily_reminder_time else '08:00',
+                'streak_threshold': prefs.streak_threshold,
+            }
+        })
+
+# ============================================================================
+# MISSING DASHBOARD ENDPOINTS
+# ============================================================================
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_dashboard_activity(request):
+    """Get recent activity feed."""
+    # Return last 20 tasks completed or modified
+    recent_tasks = TaskInstance.objects.filter(
+        tracker_instance__tracker__user=request.user,
+        deleted_at__isnull=True
+    ).order_by('-updated_at')[:10]
+    
+    activity = []
+    for task in recent_tasks:
+        activity.append({
+            'type': 'task',
+            'status': task.status,
+            'description': task.template.description,
+            'tracker': task.tracker_instance.tracker.name,
+            'timestamp': task.updated_at.isoformat()
+        })
+    
+    return JsonResponse({'success': True, 'activity': activity})
+
+
+# =============================================================================
+# V1.0 ENHANCED TRACKER ENDPOINTS
+# =============================================================================
+
+@require_auth
+@require_POST
+@handle_service_errors
+def api_tracker_clone(request, tracker_id):
+    """
+    Clone/duplicate a tracker with all its templates.
+    
+    POST /api/v1/tracker/{tracker_id}/clone/
+    
+    Body:
+        {"name": "Optional new name for clone"}
+    
+    Returns:
+        Clone details with new tracker ID
+    """
+    try:
+        data = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        data = {}
+    
+    new_name = data.get('name')
+    
+    service = TrackerService()
+    result = service.clone_tracker(tracker_id, request.user, new_name)
+    
+    return UXResponse.success(
+        message=f"Tracker cloned: {result['clone_name']}",
+        data=result,
+        feedback={
+            'type': 'success',
+            'haptic': 'success',
+            'toast': True
+        }
+    )
+
+
+@require_auth
+@require_POST
+@handle_service_errors
+def api_tracker_restore(request, tracker_id):
+    """
+    Restore a soft-deleted tracker.
+    
+    POST /api/v1/tracker/{tracker_id}/restore/
+    
+    Returns:
+        Restored tracker info, including if it was renamed due to conflict
+    """
+    service = TrackerService()
+    result = service.restore_tracker(tracker_id, request.user)
+    
+    if 'error' in result:
+        return JsonResponse({'success': False, 'error': result['error']}, status=400)
+    
+    message = "Tracker restored"
+    if result.get('renamed'):
+        message = f"Tracker restored as '{result['new_name']}' due to name conflict"
+    
+    return UXResponse.success(
+        message=message,
+        data=result,
+        feedback={
+            'type': 'success',
+            'haptic': 'success',
+            'toast': True
+        }
+    )
+
+
+@require_auth
+@require_POST
+@handle_service_errors
+def api_tracker_change_mode(request, tracker_id):
+    """
+    Change tracker's time mode (daily/weekly/monthly).
+    
+    POST /api/v1/tracker/{tracker_id}/change-mode/
+    
+    Body:
+        {"time_mode": "weekly"}
+    
+    Note: Existing future instances will be marked as 'legacy'
+    """
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    new_mode = data.get('time_mode')
+    if new_mode not in ['daily', 'weekly', 'monthly']:
+        return JsonResponse({
+            'success': False, 
+            'error': 'time_mode must be daily, weekly, or monthly'
+        }, status=400)
+    
+    try:
+        tracker = TrackerDefinition.objects.get(
+            tracker_id=tracker_id, 
+            user=request.user,
+            deleted_at__isnull=True
+        )
+    except TrackerDefinition.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Tracker not found'}, status=404)
+    
+    service = TrackerService()
+    result = service.change_time_mode(tracker, new_mode)
+    
+    return UXResponse.success(
+        message=f"Time mode changed from {result['old_mode']} to {result['new_mode']}",
+        data=result,
+        feedback={
+            'type': 'info',
+            'haptic': 'success',
+            'toast': True
+        }
+    )
+
+
+# =============================================================================
+# V1.5 TAG ENDPOINTS
+# =============================================================================
+
+@require_auth
+@require_http_methods(["GET", "POST"])
+@handle_service_errors
+def api_tags(request):
+    """
+    List or create tags.
+    
+    GET /api/v1/tags/
+        Returns all user's tags with usage counts
+        
+    POST /api/v1/tags/
+        Body: {"name": "Health", "color": "#22C55E", "icon": "🏃"}
+    """
+    from core.services.tag_service import TagService
+    
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+        
+        name = data.get('name', '').strip()
+        if not name:
+            return JsonResponse({'success': False, 'error': 'Tag name is required'}, status=400)
+        
+        tag = TagService.create_tag(
+            user_id=request.user.id,
+            name=name,
+            color=data.get('color'),
+            icon=data.get('icon')
+        )
+        
+        return UXResponse.success(
+            message=f"Tag '{name}' created",
+            data={
+                'tag_id': str(tag.tag_id),
+                'name': tag.name,
+                'color': tag.color,
+                'icon': tag.icon
+            }
+        )
+    
+    else:  # GET
+        tags = TagService.get_user_tags(request.user.id)
+        return JsonResponse({'success': True, 'tags': tags, 'count': len(tags)})
+
+
+@require_auth
+@require_http_methods(["PUT", "DELETE"])
+@handle_service_errors
+def api_tag_detail(request, tag_id):
+    """
+    Update or delete a tag.
+    
+    PUT /api/v1/tags/{tag_id}/
+        Body: {"name": "New Name", "color": "#new", "icon": "🏋️"}
+        
+    DELETE /api/v1/tags/{tag_id}/
+    """
+    from core.services.tag_service import TagService
+    
+    if request.method == "DELETE":
+        success = TagService.delete_tag(tag_id, request.user.id)
+        if success:
+            return UXResponse.success("Tag deleted")
+        return JsonResponse({'success': False, 'error': 'Tag not found'}, status=404)
+    
+    else:  # PUT
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+        
+        result = TagService.update_tag(
+            tag_id=tag_id,
+            user_id=request.user.id,
+            name=data.get('name'),
+            color=data.get('color'),
+            icon=data.get('icon')
+        )
+        
+        if result:
+            return UXResponse.success("Tag updated", data=result)
+        return JsonResponse({'success': False, 'error': 'Tag not found'}, status=404)
+
+
+@require_auth
+@require_POST
+@handle_service_errors
+def api_tag_template(request, template_id, tag_id):
+    """
+    Add or remove a tag from a template.
+    
+    POST /api/v1/template/{template_id}/tag/{tag_id}/
+        Body: {"action": "add"} or {"action": "remove"}
+    """
+    from core.services.tag_service import TagService
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        data = {'action': 'add'}
+    
+    action = data.get('action', 'add')
+    
+    if action == 'remove':
+        success = TagService.remove_tag_from_template(template_id, tag_id, request.user.id)
+    else:
+        success = TagService.add_tag_to_template(template_id, tag_id, request.user.id)
+    
+    if success:
+        return UXResponse.success(f"Tag {'removed' if action == 'remove' else 'added'}")
+    return JsonResponse({'success': False, 'error': 'Template or tag not found'}, status=404)
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_tasks_by_tag(request):
+    """
+    Get today's tasks filtered by tags.
+    
+    GET /api/v1/tasks/by-tag/
+    
+    Query params:
+        tags: Comma-separated tag IDs
+        
+    Returns tasks grouped by tag with completion stats
+    """
+    from core.services.tag_service import TagService
+    
+    tag_ids_param = request.GET.get('tags', '')
+    tag_ids = [t.strip() for t in tag_ids_param.split(',') if t.strip()] if tag_ids_param else None
+    
+    result = TagService.get_today_tasks_by_tag(request.user.id, tag_ids)
+    
+    return JsonResponse({'success': True, **result})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_tag_analytics(request):
+    """
+    Get completion analytics grouped by tag.
+    
+    GET /api/v1/tags/analytics/
+    
+    Query params:
+        days: Number of days (default 30)
+        
+    Returns tag-wise completion rates
+    """
+    from core.services.tag_service import TagService
+    
+    days = int(request.GET.get('days', 30))
+    analytics = TagService.get_tag_analytics(request.user.id, days)
+    
+    return JsonResponse({'success': True, 'analytics': analytics})
+
+
+# =============================================================================
+# V1.5 ENTITY RELATIONS / TASK DEPENDENCIES
+# =============================================================================
+
+@require_auth
+@require_http_methods(["GET", "POST"])
+@handle_service_errors
+def api_task_dependencies(request, template_id):
+    """
+    Get or create task dependencies.
+    
+    GET /api/v1/template/{template_id}/dependencies/
+        Returns what this task depends on
+        
+    POST /api/v1/template/{template_id}/dependencies/
+        Body: {"depends_on": "other_template_id"}
+    """
+    from core.services.entity_relation_service import EntityRelationService
+    
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+        
+        depends_on = data.get('depends_on')
+        if not depends_on:
+            return JsonResponse({
+                'success': False, 
+                'error': 'depends_on template ID is required'
+            }, status=400)
+        
+        relation = EntityRelationService.create_relation(
+            source_type='template',
+            source_id=template_id,
+            target_type='template',
+            target_id=depends_on,
+            relation_type=EntityRelationService.DEPENDS_ON,
+            user_id=request.user.id
+        )
+        
+        if relation is None:
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not create dependency (possible circular reference)'
+            }, status=400)
+        
+        return UXResponse.success("Dependency created")
+    
+    else:  # GET
+        dependencies = EntityRelationService.get_dependencies('template', template_id)
+        dependents = EntityRelationService.get_dependents('template', template_id)
+        
+        return JsonResponse({
+            'success': True,
+            'template_id': template_id,
+            'depends_on': dependencies,
+            'depended_by': dependents
+        })
+
+
+@require_auth
+@require_POST
+@handle_service_errors
+def api_remove_dependency(request, template_id, target_id):
+    """
+    Remove a dependency relationship.
+    
+    POST /api/v1/template/{template_id}/dependencies/{target_id}/remove/
+    """
+    from core.services.entity_relation_service import EntityRelationService
+    
+    success = EntityRelationService.remove_relation(
+        source_type='template',
+        source_id=template_id,
+        target_type='template',
+        target_id=target_id,
+        relation_type=EntityRelationService.DEPENDS_ON
+    )
+    
+    if success:
+        return UXResponse.success("Dependency removed")
+    return JsonResponse({'success': False, 'error': 'Dependency not found'}, status=404)
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_task_blocked_status(request, task_id):
+    """
+    Check if a task is blocked by incomplete dependencies.
+    
+    GET /api/v1/task/{task_id}/blocked/
+    
+    Returns blocking info and list of blockers
+    """
+    from core.services.entity_relation_service import EntityRelationService
+    
+    result = EntityRelationService.check_task_blocked(task_id)
+    return JsonResponse({'success': True, **result})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_dependency_graph(request, tracker_id):
+    """
+    Get the dependency graph for a tracker's tasks.
+    
+    GET /api/v1/tracker/{tracker_id}/dependency-graph/
+    
+    Returns nodes and edges for visualization
+    """
+    from core.services.entity_relation_service import EntityRelationService
+    
+    graph = EntityRelationService.get_task_dependency_graph(tracker_id)
+    return JsonResponse({'success': True, **graph})
+
+
+# =============================================================================
+# V1.5 ENHANCED SEARCH ENDPOINTS
+# =============================================================================
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_search_suggestions(request):
+    """
+    Get search suggestions based on partial query.
+    
+    GET /api/v1/search/suggestions/
+    
+    Query params:
+        q: Partial search query
+        limit: Max suggestions (default 5)
+    """
+    query = request.GET.get('q', '')
+    limit = int(request.GET.get('limit', 5))
+    
+    suggestions = SearchService.get_search_suggestions(request.user, query, limit)
+    
+    return JsonResponse({'success': True, 'suggestions': suggestions})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_search_history(request):
+    """
+    Get user's search history.
+    
+    GET /api/v1/search/history/
+    
+    Query params:
+        limit: Max results (default 10)
+        type: 'recent' or 'popular' (default 'recent')
+    """
+    limit = int(request.GET.get('limit', 10))
+    search_type = request.GET.get('type', 'recent')
+    
+    if search_type == 'popular':
+        results = SearchService.get_popular_searches(request.user, limit=limit)
+    else:
+        results = SearchService.get_recent_searches(request.user, limit)
+    
+    return JsonResponse({'success': True, 'searches': results})
+
+
+@require_auth
+@require_POST
+@handle_service_errors
+def api_clear_search_history(request):
+    """
+    Clear user's search history.
+    
+    POST /api/v1/search/history/clear/
+    
+    Body:
+        {"older_than_days": 30}  // Optional, clear only old entries
+    """
+    try:
+        data = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        data = {}
+    
+    older_than_days = data.get('older_than_days')
+    
+    count = SearchService.clear_search_history(request.user, older_than_days)
+    
+    return UXResponse.success(f"Deleted {count} search history entries")
+
+
+# =============================================================================
+# V1.5 MULTI-TRACKER ANALYTICS
+# =============================================================================
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_compare_trackers(request):
+    """
+    Compare analytics across multiple trackers.
+    
+    GET /api/v1/analytics/compare/
+    
+    Query params:
+        trackers: Comma-separated tracker IDs
+        days: Number of days (default 30)
+    """
+    tracker_ids_param = request.GET.get('trackers', '')
+    tracker_ids = [t.strip() for t in tracker_ids_param.split(',') if t.strip()]
+    days = int(request.GET.get('days', 30))
+    
+    if not tracker_ids:
+        return JsonResponse({
+            'success': False, 
+            'error': 'At least one tracker ID required'
+        }, status=400)
+    
+    comparison = []
+    for tracker_id in tracker_ids[:5]:  # Limit to 5 trackers
+        try:
+            analytics = AnalyticsService.get_tracker_analytics(tracker_id, days)
+            comparison.append(analytics)
+        except Exception as e:
+            comparison.append({
+                'tracker_id': tracker_id,
+                'error': str(e)
+            })
+    
+    return JsonResponse({
+        'success': True,
+        'comparison': comparison,
+        'days': days
+    })
+
+
+# =============================================================================
+# V1 SHARE LINK ENDPOINTS
+# =============================================================================
+
+@require_auth
+@require_http_methods(["GET", "POST"])
+@handle_service_errors
+def api_share_links(request, tracker_id=None):
+    """
+    Manage share links.
+    
+    GET /api/v1/shares/
+        List all user's share links
+        
+    POST /api/v1/tracker/{tracker_id}/share/
+        Create new share link
+        Body: {"expires_in_days": 7, "max_uses": 10, "password": "optional"}
+    """
+    from core.services.share_service import ShareService
+    
+    if request.method == "POST" and tracker_id:
+        try:
+            tracker = TrackerDefinition.objects.get(
+                tracker_id=tracker_id,
+                user=request.user,
+                deleted_at__isnull=True
+            )
+        except TrackerDefinition.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Tracker not found'}, status=404)
+        
+        try:
+            data = json.loads(request.body) if request.body else {}
+        except json.JSONDecodeError:
+            data = {}
+        
+        share = ShareService.create_share_link(
+            tracker=tracker,
+            user_id=request.user.id,
+            permission_level=data.get('permission', 'view'),
+            expires_in_days=data.get('expires_in_days'),
+            max_uses=data.get('max_uses'),
+            password=data.get('password')
+        )
+        
+        # Build share URL
+        share_url = f"/share/{share.token}/"
+        
+        return UXResponse.success(
+            message="Share link created",
+            data={
+                'token': str(share.token),
+                'url': share_url,
+                'expires_at': share.expires_at.isoformat() if share.expires_at else None,
+                'max_uses': share.max_uses,
+                'has_password': share.password_hash is not None
+            }
+        )
+    
+    else:  # GET - List all shares
+        shares = ShareService.get_user_shares(request.user.id)
+        
+        share_list = [{
+            'token': str(s.token),
+            'tracker_id': str(s.tracker_id),
+            'tracker_name': s.tracker.name,
+            'use_count': s.use_count,
+            'max_uses': s.max_uses,
+            'is_active': s.is_active,
+            'expires_at': s.expires_at.isoformat() if s.expires_at else None,
+            'created_at': s.created_at.isoformat()
+        } for s in shares]
+        
+        return JsonResponse({'success': True, 'shares': share_list})
+
+
+@require_auth
+@require_POST
+@handle_service_errors
+def api_share_deactivate(request, token):
+    """
+    Deactivate a share link.
+    
+    POST /api/v1/share/{token}/deactivate/
+    """
+    from core.services.share_service import ShareService
+    
+    success, message = ShareService.deactivate_link(token, request.user.id)
+    
+    if success:
+        return UXResponse.success(message)
+    return JsonResponse({'success': False, 'error': message}, status=404)
+
+
+# =============================================================================
+# V1.5 INSTANCE GENERATION ENDPOINTS
+# =============================================================================
+
+@require_auth
+@require_POST
+@handle_service_errors
+def api_generate_instances(request, tracker_id):
+    """
+    Generate instances for a date range.
+    
+    POST /api/v1/tracker/{tracker_id}/instances/generate/
+    
+    Body:
+        {
+            "start_date": "2025-12-01",
+            "end_date": "2025-12-31",
+            "fill_missing": true
+        }
+    """
+    from core.services.instance_service import InstanceService
+    
+    try:
+        tracker = TrackerDefinition.objects.get(
+            tracker_id=tracker_id,
+            user=request.user,
+            deleted_at__isnull=True
+        )
+    except TrackerDefinition.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Tracker not found'}, status=404)
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+    end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+    
+    if end_date < start_date:
+        return JsonResponse({
+            'success': False, 
+            'error': 'end_date must be after start_date'
+        }, status=400)
+    
+    if (end_date - start_date).days > 365:
+        return JsonResponse({
+            'success': False, 
+            'error': 'Maximum range is 365 days'
+        }, status=400)
+    
+    instances = InstanceService.fill_missing_instances(
+        tracker=tracker,
+        start_date=start_date,
+        end_date=end_date,
+        mark_missed=data.get('mark_missed', False)
+    )
+    
+    return UXResponse.success(
+        message=f"Generated {len(instances)} instances",
+        data={
+            'tracker_id': tracker_id,
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'instances_created': len(instances)
+        }
+    )
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_week_aggregation(request, tracker_id):
+    """
+    Get weekly aggregation of daily instances.
+    
+    GET /api/v1/tracker/{tracker_id}/week/
+    
+    Query params:
+        week_start: Start date (default: current week)
+    """
+    week_start_str = request.GET.get('week_start')
+    
+    if week_start_str:
+        week_start = datetime.strptime(week_start_str, '%Y-%m-%d').date()
+    else:
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+    
+    result = TrackerService.get_week_aggregation(tracker_id, week_start)
+    
+    return JsonResponse({'success': True, **result})
+
+
+# =============================================================================
+# V2.0 KNOWLEDGE GRAPH ENDPOINTS
+# =============================================================================
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_knowledge_graph(request):
+    """
+    Get the complete knowledge graph for visualization.
+    
+    GET /api/v2/knowledge-graph/
+    
+    Query params:
+        include_notes: Include DayNotes in graph (default false)
+    """
+    from core.services.knowledge_graph_service import KnowledgeGraphService
+    
+    include_notes = request.GET.get('include_notes', 'false').lower() == 'true'
+    
+    graph = KnowledgeGraphService.get_full_graph(request.user.id, include_notes)
+    
+    return JsonResponse({'success': True, **graph})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_entity_connections(request, entity_type, entity_id):
+    """
+    Get connections for a specific entity.
+    
+    GET /api/v2/graph/{entity_type}/{entity_id}/
+    
+    Query params:
+        depth: How many levels to explore (default 2)
+    """
+    from core.services.knowledge_graph_service import KnowledgeGraphService
+    
+    depth = int(request.GET.get('depth', 2))
+    
+    graph = KnowledgeGraphService.get_entity_connections(entity_type, entity_id, depth)
+    
+    return JsonResponse({'success': True, **graph})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_find_path(request):
+    """
+    Find path between two entities in the knowledge graph.
+    
+    GET /api/v2/graph/path/
+    
+    Query params:
+        source_type, source_id: Starting entity
+        target_type, target_id: Ending entity
+    """
+    from core.services.knowledge_graph_service import KnowledgeGraphService
+    
+    source_type = request.GET.get('source_type')
+    source_id = request.GET.get('source_id')
+    target_type = request.GET.get('target_type')
+    target_id = request.GET.get('target_id')
+    
+    if not all([source_type, source_id, target_type, target_id]):
+        return JsonResponse({
+            'success': False, 
+            'error': 'All parameters required: source_type, source_id, target_type, target_id'
+        }, status=400)
+    
+    path = KnowledgeGraphService.find_path(source_type, source_id, target_type, target_id)
+    
+    return JsonResponse({
+        'success': True,
+        'path_found': path is not None,
+        'path': path
+    })
+
+
+# =============================================================================
+# V2.0 HABIT INTELLIGENCE ENDPOINTS
+# =============================================================================
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_habit_insights(request):
+    """
+    Get comprehensive habit intelligence insights.
+    
+    GET /api/v2/insights/habits/
+    
+    Returns pattern analysis, suggestions, and correlations
+    """
+    from core.services.habit_intelligence_service import HabitIntelligenceService
+    
+    insights = HabitIntelligenceService.generate_all_insights(request.user.id)
+    
+    return JsonResponse({'success': True, **insights})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_day_of_week_analysis(request):
+    """
+    Get day-of-week performance analysis.
+    
+    GET /api/v2/insights/day-analysis/
+    
+    Query params:
+        days: Number of days to analyze (default 90)
+    """
+    from core.services.habit_intelligence_service import HabitIntelligenceService
+    
+    days = int(request.GET.get('days', 90))
+    
+    analysis = HabitIntelligenceService.analyze_day_of_week_patterns(request.user.id, days)
+    
+    return JsonResponse({'success': True, **analysis})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_task_difficulty_analysis(request):
+    """
+    Get task difficulty rankings.
+    
+    GET /api/v2/insights/difficulty/
+    
+    Returns tasks ranked by how often they're missed
+    """
+    from core.services.habit_intelligence_service import HabitIntelligenceService
+    
+    analysis = HabitIntelligenceService.analyze_task_difficulty(request.user.id)
+    
+    return JsonResponse({'success': True, 'tasks': analysis})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_schedule_suggestions(request):
+    """
+    Get optimal schedule suggestions.
+    
+    GET /api/v2/insights/schedule/
+    
+    Returns suggestions for improving task scheduling
+    """
+    from core.services.habit_intelligence_service import HabitIntelligenceService
+    
+    suggestions = HabitIntelligenceService.get_optimal_schedule_suggestions(request.user.id)
+    
+    return JsonResponse({'success': True, 'suggestions': suggestions})
+
+
+# =============================================================================
+# V2.0 ACTIVITY REPLAY ENDPOINTS
+# =============================================================================
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_activity_timeline(request):
+    """
+    Get activity timeline for replay.
+    
+    GET /api/v2/timeline/
+    
+    Query params:
+        start_date: YYYY-MM-DD
+        end_date: YYYY-MM-DD
+        limit: Max events (default 50)
+    """
+    from core.services.activity_replay_service import ActivityReplayService
+    
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    limit = int(request.GET.get('limit', 50))
+    
+    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
+    end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
+    
+    events = ActivityReplayService.get_activity_timeline(
+        request.user.id, start_date, end_date, limit
+    )
+    
+    return JsonResponse({'success': True, 'events': events})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_day_snapshot(request, date_str):
+    """
+    Get complete snapshot of a specific day.
+    
+    GET /api/v2/snapshot/{date}/
+    
+    Returns all tracker/task states for that date
+    """
+    from core.services.activity_replay_service import ActivityReplayService
+    
+    target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    
+    snapshot = ActivityReplayService.get_day_snapshot(request.user.id, target_date)
+    
+    return JsonResponse({'success': True, **snapshot})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_compare_periods(request):
+    """
+    Compare performance between two periods.
+    
+    GET /api/v2/compare/
+    
+    Query params:
+        p1_start, p1_end: First period
+        p2_start, p2_end: Second period
+    """
+    from core.services.activity_replay_service import ActivityReplayService
+    
+    p1_start = datetime.strptime(request.GET.get('p1_start'), '%Y-%m-%d').date()
+    p1_end = datetime.strptime(request.GET.get('p1_end'), '%Y-%m-%d').date()
+    p2_start = datetime.strptime(request.GET.get('p2_start'), '%Y-%m-%d').date()
+    p2_end = datetime.strptime(request.GET.get('p2_end'), '%Y-%m-%d').date()
+    
+    comparison = ActivityReplayService.compare_periods(
+        request.user.id, p1_start, p1_end, p2_start, p2_end
+    )
+    
+    return JsonResponse({'success': True, **comparison})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_weekly_comparison(request):
+    """
+    Get week-over-week comparison.
+    
+    GET /api/v2/compare/weekly/
+    
+    Query params:
+        weeks: Number of weeks to compare (default 4)
+    """
+    from core.services.activity_replay_service import ActivityReplayService
+    
+    weeks = int(request.GET.get('weeks', 4))
+    
+    comparison = ActivityReplayService.get_weekly_comparison(request.user.id, weeks)
+    
+    return JsonResponse({'success': True, **comparison})
+
+
+@require_auth
+@require_GET
+@handle_service_errors
+def api_entity_history(request, entity_type, entity_id):
+    """
+    Get full history of changes for an entity.
+    
+    GET /api/v2/history/{entity_type}/{entity_id}/
+    """
+    from core.services.activity_replay_service import ActivityReplayService
+    
+    history = ActivityReplayService.get_historical_record(entity_type, entity_id)
+    
+    return JsonResponse({'success': True, 'history': history})
+
+
+# =============================================================================
+# V2.0 COLLABORATION ENDPOINTS
+# =============================================================================
+
+@require_http_methods(["GET"])
+@handle_service_errors
+def api_shared_tracker_view(request, token):
+    """
+    View a shared tracker (public endpoint - no auth required).
+    
+    GET /api/v2/shared/{token}/
+    
+    Query params:
+        password: If link is password protected
+    """
+    from core.services.collaboration_service import CollaborationService
+    
+    password = request.GET.get('password')
+    
+    tracker_data, error = CollaborationService.get_shared_tracker(token, password)
+    
+    if error:
+        return JsonResponse({'success': False, 'error': error}, status=403)
+    
+    return JsonResponse({'success': True, **tracker_data})
+
+
+@require_http_methods(["GET"])
+@handle_service_errors
+def api_shared_tracker_instances(request, token):
+    """
+    Get instances for a shared tracker.
+    
+    GET /api/v2/shared/{token}/instances/
+    """
+    from core.services.collaboration_service import CollaborationService
+    
+    password = request.GET.get('password')
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+    
+    start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
+    end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
+    
+    instances, error = CollaborationService.get_shared_tracker_instances(
+        token, start_date, end_date, password
+    )
+    
+    if error:
+        return JsonResponse({'success': False, 'error': error}, status=403)
+    
+    return JsonResponse({'success': True, 'instances': instances})
+
+
+@require_http_methods(["POST"])
+@handle_service_errors
+def api_shared_task_update(request, token, task_id):
+    """
+    Update a task in a shared tracker (requires edit permission).
+    
+    POST /api/v2/shared/{token}/task/{task_id}/
+    
+    Body:
+        {"status": "DONE", "password": "optional"}
+    """
+    from core.services.collaboration_service import CollaborationService
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    success, message = CollaborationService.update_shared_task(
+        token=token,
+        task_id=task_id,
+        new_status=data.get('status'),
+        password=data.get('password'),
+        editor_id=request.headers.get('X-Editor-ID')
+    )
+    
+    if not success:
+        return JsonResponse({'success': False, 'error': message}, status=403)
+    
+    return JsonResponse({'success': True, 'message': message})
+
+
+@require_http_methods(["POST"])
+@handle_service_errors
+def api_shared_note_add(request, token, instance_id):
+    """
+    Add a note to a shared tracker (requires comment or edit permission).
+    
+    POST /api/v2/shared/{token}/instance/{instance_id}/note/
+    
+    Body:
+        {"content": "note text", "author": "name", "password": "optional"}
+    """
+    from core.services.collaboration_service import CollaborationService
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+    
+    success, message = CollaborationService.add_shared_note(
+        token=token,
+        instance_id=instance_id,
+        note_content=data.get('content', ''),
+        password=data.get('password'),
+        author=data.get('author')
+    )
+    
+    if not success:
+        return JsonResponse({'success': False, 'error': message}, status=403)
+    
+    return JsonResponse({'success': True, 'message': message})
+
+
+@require_auth
+@require_POST
+@handle_service_errors
+def api_create_collaboration_invite(request, tracker_id):
+    """
+    Create a collaboration invite link.
+    
+    POST /api/v2/tracker/{tracker_id}/invite/
+    
+    Body:
+        {
+            "permission": "view", "comment", or "edit",
+            "message": "optional invite message",
+            "expires_in_days": 7
+        }
+    """
+    from core.services.collaboration_service import CollaborationService
+    
+    try:
+        data = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        data = {}
+    
+    result = CollaborationService.generate_collaboration_invite(
+        tracker_id=tracker_id,
+        inviter_id=request.user.id,
+        permission=data.get('permission', 'view'),
+        message=data.get('message'),
+        expires_in_days=data.get('expires_in_days', 7)
+    )
+    
+    if 'error' in result:
+        return JsonResponse({'success': False, 'error': result['error']}, status=404)
+    
+    return JsonResponse({'success': True, **result})
