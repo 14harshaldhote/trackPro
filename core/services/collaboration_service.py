@@ -76,11 +76,11 @@ class CollaborationService:
             'name': tracker.name,
             'description': tracker.description,
             'time_mode': tracker.time_mode,
-            'permission_level': share.permission_level,
+            'permission_level': share.permission,
             'shared_by': share.created_by.username if share.created_by else 'Unknown',
             'templates': [],
-            'can_edit': share.permission_level == CollaborationService.PERMISSION_EDIT,
-            'can_comment': share.permission_level in [
+            'can_edit': share.permission == CollaborationService.PERMISSION_EDIT,
+            'can_comment': share.permission in [
                 CollaborationService.PERMISSION_COMMENT, 
                 CollaborationService.PERMISSION_EDIT
             ]
@@ -201,7 +201,7 @@ class CollaborationService:
         # Check edit permission
         try:
             share = ShareLink.objects.get(token=token)
-            if share.permission_level != CollaborationService.PERMISSION_EDIT:
+            if share.permission != CollaborationService.PERMISSION_EDIT:
                 return False, "Edit permission required"
         except ShareLink.DoesNotExist:
             return False, "Share link not found"
@@ -269,7 +269,7 @@ class CollaborationService:
         # Check permission
         try:
             share = ShareLink.objects.get(token=token)
-            if share.permission_level == CollaborationService.PERMISSION_VIEW:
+            if share.permission == CollaborationService.PERMISSION_VIEW:
                 return False, "Comment or edit permission required"
         except ShareLink.DoesNotExist:
             return False, "Share link not found"
@@ -284,7 +284,7 @@ class CollaborationService:
             # Create or update day note
             note, created = DayNote.objects.get_or_create(
                 tracker=tracker,
-                tracking_date=instance.tracking_date,
+                date=instance.tracking_date,
                 defaults={'content': ''}
             )
             
@@ -328,7 +328,7 @@ class CollaborationService:
             return {
                 'total_uses': share.use_count,
                 'last_access': share.updated_at.isoformat() if hasattr(share, 'updated_at') else None,
-                'permission_level': share.permission_level,
+                'permission_level': share.permission,
                 'collaborators': []  # Would be populated from real-time tracking
             }
         except ShareLink.DoesNotExist:

@@ -45,15 +45,44 @@ def handle_service_errors(view_func):
             )
             
         # --- Permission Errors ---
-        except (PermissionDeniedError, PermissionDenied, DRFPermissionDenied) as e:
+        except PermissionDeniedError as e:
+            return UXResponse.error(
+                message=str(e),
+                error_code="FORBIDDEN",
+                status=403
+            )
+            
+        except (PermissionDenied, DRFPermissionDenied) as e:
             return UXResponse.error(
                 message=str(e) or "Permission denied",
                 error_code="PERMISSION_DENIED",
                 status=403
             )
             
-        # --- Validation Errors ---
-        except (TrackerValidationError, InvalidDateRangeError, InvalidStatusError, DuplicateError, json.JSONDecodeError) as e:
+        # --- Specific Validation Errors ---
+        except InvalidDateRangeError as e:
+            return UXResponse.error(
+                message=str(e),
+                error_code="INVALID_DATE_RANGE",
+                status=400
+            )
+            
+        except InvalidStatusError as e:
+            return UXResponse.error(
+                message=str(e),
+                error_code="INVALID_STATUS",
+                status=400
+            )
+            
+        except DuplicateError as e:
+            return UXResponse.error(
+                message=str(e),
+                error_code="DUPLICATE",
+                status=400
+            )
+            
+        # --- Generic Validation Errors ---
+        except (TrackerValidationError, json.JSONDecodeError) as e:
             msg = str(e)
             if isinstance(e, json.JSONDecodeError):
                 msg = "Invalid JSON body"

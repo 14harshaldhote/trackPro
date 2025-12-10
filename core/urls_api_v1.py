@@ -26,6 +26,7 @@ urlpatterns = [
     path('dashboard/streaks/', views_api.api_dashboard_streaks, name='dashboard_streaks'),
     path('dashboard/activity/', views_api.api_dashboard_activity, name='dashboard_activity'),
     path('trackers/', views_api.api_trackers_list, name='trackers_list'),
+    path('tracker/create/', views_api.api_tracker_create, name='tracker_create'),
     path('tracker/<str:tracker_id>/', views_api.api_tracker_detail, name='tracker_detail'),
     
     # =========================================================================
@@ -42,7 +43,6 @@ urlpatterns = [
     # =========================================================================
     path('tracker/<str:tracker_id>/task/add/', views_api.api_task_add, name='tracker_add_task'),
     path('tracker/<str:tracker_id>/reorder/', views_api.api_tracker_reorder, name='tracker_reorder'),
-    path('tracker/create/', views_api.api_tracker_create, name='tracker_create'),
     path('tracker/<str:tracker_id>/delete/', views_api.api_tracker_delete, name='tracker_delete'),
     path('tracker/<str:tracker_id>/update/', views_api.api_tracker_update, name='tracker_update'),
     path('tracker/<str:tracker_id>/share/', views_api.api_share_tracker, name='tracker_share'),
@@ -143,8 +143,8 @@ urlpatterns = [
     # V1.5 TAGS
     # =========================================================================
     path('tags/', views_api.api_tags, name='tags'),
-    path('tags/<str:tag_id>/', views_api.api_tag_detail, name='tag_detail'),
     path('tags/analytics/', views_api.api_tag_analytics, name='tag_analytics'),
+    path('tags/<str:tag_id>/', views_api.api_tag_detail, name='tag_detail'),
     path('template/<str:template_id>/tag/<str:tag_id>/', views_api.api_tag_template, name='tag_template'),
     path('tasks/by-tag/', views_api.api_tasks_by_tag, name='tasks_by_tag'),
     

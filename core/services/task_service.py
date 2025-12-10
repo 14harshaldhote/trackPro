@@ -152,10 +152,10 @@ class TaskService:
         if not task:
             raise TaskNotFoundError(task_id)
         
-        # Cycle status
+        # Cycle status: TODO → DONE → TODO (simplified for faster UX)
         current_status = task.get('status', 'TODO')
         status_cycle = {
-            'TODO': 'IN_PROGRESS',
+            'TODO': 'DONE',
             'IN_PROGRESS': 'DONE',
             'DONE': 'TODO',
             'MISSED': 'TODO',
@@ -515,15 +515,21 @@ class TaskService:
         1. Create TaskTemplate (so it appears in future)
         2. Create TaskInstance for current period (so it appears today)
         """
+        # Validate weight is non-negative
+        if weight < 0:
+            from core.exceptions import ValidationError as AppValidationError
+            raise AppValidationError('weight', 'Points cannot be negative')
+        
         # Validate tracker ownership
         tracker = crud.db.fetch_by_id('TrackerDefinitions', 'tracker_id', tracker_id)
         if not tracker:
+             from core.exceptions import TaskNotFoundError
              raise TaskNotFoundError(f"Tracker {tracker_id} not found")
         # ORM check for ownership (since fetch_by_id returns dict)
         if tracker.get('user_id') != user.id:
-             # Double check if fetch_by_id returns user_id differently
-             # Assuming standard dict return. If not safe, use ORM
-             pass 
+              # Double check if fetch_by_id returns user_id differently
+              # Assuming standard dict return. If not safe, use ORM
+              pass 
 
         # 1. Create Template
         template_data = {
@@ -565,3 +571,85 @@ class TaskService:
             return crud.model_to_dict(existing)
             
         return template_dict
+
+    @transaction.atomic
+    def delete_task_instance(self, task_id: str, user) -> Dict:
+        """
+        Soft delete a task instance.
+        
+        Args:
+            task_id: Task instance ID
+            user: User object
+            
+        Returns:
+            Dict with deletion info
+            
+        Raises:
+            TaskNotFoundError: If task not found
+        """
+        try:
+            task = TaskInstance.objects.select_related('tracker_instance__tracker').get(
+                task_instance_id=task_id,
+                tracker_instance__tracker__user=user
+            )
+        except TaskInstance.DoesNotExist:
+            raise TaskNotFoundError(task_id)
+        
+        tracker_id = str(task.tracker_instance.tracker.tracker_id)
+        template_id = str(task.template_id) if task.template_id else None
+        
+        # Soft delete
+        task.deleted_at = timezone.now()
+        task.save()
+        
+        # Invalidate cache
+        invalidate_tracker_cache(tracker_id)
+        
+        return {
+            'task_id': task_id,
+            'tracker_id': tracker_id,
+            'template_id': template_id,
+            'deleted': True
+        }
+    
+    def update_task_details(self, task_id: str, user, data: Dict) -> Dict:
+        """
+        Update task instance details (notes, custom fields).
+        
+        Args:
+            task_id: Task instance ID
+            user: User object
+            data: Updates (notes, etc.)
+            
+        Returns:
+            Updated task dict
+            
+        Raises:
+            TaskNotFoundError: If task not found
+        """
+        try:
+            task = TaskInstance.objects.select_related('tracker_instance__tracker').get(
+                task_instance_id=task_id,
+                tracker_instance__tracker__user=user
+            )
+        except TaskInstance.DoesNotExist:
+            raise TaskNotFoundError(task_id)
+        
+        # Update allowed fields
+        if 'notes' in data:
+            task.notes = data['notes']
+        
+        if 'status' in data:
+            task.status = data['status']
+            if data['status'] == 'DONE' and task.completed_at is None:
+                task.completed_at = timezone.now()
+            elif data['status'] != 'DONE':
+                task.completed_at = None
+        
+        task.save()
+        
+        # Invalidate cache
+        tracker_id = str(task.tracker_instance.tracker.tracker_id)
+        invalidate_tracker_cache(tracker_id)
+        
+        return crud.model_to_dict(task)

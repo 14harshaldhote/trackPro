@@ -32,15 +32,26 @@ class TagService:
             
         Returns:
             Created Tag object
+            
+        Raises:
+            ValueError: If tag with same name already exists
         """
-        tag = Tag.objects.create(
-            tag_id=str(uuid.uuid4()),
-            user_id=user_id,
-            name=name.strip(),
-            color=color or '#6366F1',  # Default indigo
-            icon=icon or '🏷️'
-        )
-        return tag
+        from django.db import IntegrityError
+        
+        try:
+            with transaction.atomic():
+                tag = Tag.objects.create(
+                    tag_id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    name=name.strip(),
+                    color=color or '#6366F1',  # Default indigo
+                    icon=icon or '🏷️'
+                )
+                return tag
+        except IntegrityError as e:
+            if 'user_id_name' in str(e).lower() or 'duplicate' in str(e).lower():
+                raise ValueError(f"Tag with name '{name}' already exists")
+            raise
     
     @staticmethod
     def get_user_tags(user_id: int) -> List[Dict]:
@@ -53,7 +64,7 @@ class TagService:
         tags = Tag.objects.filter(
             user_id=user_id
         ).annotate(
-            usage_count=Count('task_tags')
+            usage_count=Count('tagged_templates')
         ).order_by('name')
         
         return [
@@ -127,7 +138,7 @@ class TagService:
             List of template dicts
         """
         templates = TaskTemplate.objects.filter(
-            tags__tag_id=tag_id,
+            task_tags__tag__tag_id=tag_id,
             tracker__user_id=user_id,
             deleted_at__isnull=True
         ).select_related('tracker')
@@ -169,7 +180,7 @@ class TagService:
         # Filter by tags if specified
         if tag_ids:
             tasks_query = tasks_query.filter(
-                template__tags__tag_id__in=tag_ids
+                template__task_tags__tag__tag_id__in=tag_ids
             ).distinct()
         
         # Group by tag
@@ -181,21 +192,22 @@ class TagService:
             'by_tag': {}
         }
         
-        for task in tasks_query.prefetch_related('template__tags'):
+        for task in tasks_query.prefetch_related('template__task_tags__tag'):
             task_dict = {
                 'task_id': str(task.task_instance_id),
                 'description': task.template.description,
                 'status': task.status,
                 'tracker_name': task.tracker_instance.tracker.name,
                 'tags': [
-                    {'tag_id': str(t.tag_id), 'name': t.name, 'color': t.color}
-                    for t in task.template.tags.all()
+                    {'tag_id': str(tt.tag.tag_id), 'name': tt.tag.name, 'color': tt.tag.color}
+                    for tt in task.template.task_tags.all()
                 ]
             }
             result['tasks'].append(task_dict)
             
             # Group by tag
-            for tag in task.template.tags.all():
+            for tt in task.template.task_tags.all():
+                tag = tt.tag
                 tag_key = str(tag.tag_id)
                 if tag_key not in result['by_tag']:
                     result['by_tag'][tag_key] = {
@@ -234,12 +246,13 @@ class TagService:
             tracker_instance__tracker__user_id=user_id,
             tracker_instance__tracking_date__range=(start_date, end_date),
             deleted_at__isnull=True
-        ).prefetch_related('template__tags')
+        ).prefetch_related('template__task_tags__tag')
         
         tag_stats = {}
         
         for task in tasks:
-            for tag in task.template.tags.all():
+            for tt in task.template.task_tags.all():
+                tag = tt.tag
                 tag_key = str(tag.tag_id)
                 if tag_key not in tag_stats:
                     tag_stats[tag_key] = {

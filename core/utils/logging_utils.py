@@ -165,7 +165,7 @@ def log_function_call(log_args: bool = False, log_result: bool = False):
             # Log entry
             if log_args:
                 log_with_context('debug', f'Entering {func_name}', 
-                               args=str(args)[:200], kwargs=str(kwargs)[:200])
+                               func_args=str(args)[:200], func_kwargs=str(kwargs)[:200])
             
             start = time.time()
             try:

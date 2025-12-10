@@ -57,10 +57,10 @@ class EntityRelationService:
         
         # Check for existing relation
         existing = EntityRelation.objects.filter(
-            source_type=source_type,
-            source_id=source_id,
-            target_type=target_type,
-            target_id=target_id,
+            from_entity_type=source_type,
+            from_entity_id=source_id,
+            to_entity_type=target_type,
+            to_entity_id=target_id,
             relation_type=relation_type
         ).first()
         
@@ -76,12 +76,12 @@ class EntityRelationService:
                 return None
         
         relation = EntityRelation.objects.create(
-            source_type=source_type,
-            source_id=source_id,
-            target_type=target_type,
-            target_id=target_id,
+            from_entity_type=source_type,
+            from_entity_id=source_id,
+            to_entity_type=target_type,
+            to_entity_id=target_id,
             relation_type=relation_type,
-            created_by_id=user_id,
+            user_id=user_id,
             metadata=metadata or {}
         )
         
@@ -118,10 +118,10 @@ class EntityRelationService:
             
             # Get what this entity depends on
             dependencies = EntityRelation.objects.filter(
-                source_type=check_type,
-                source_id=check_id,
+                from_entity_type=check_type,
+                from_entity_id=check_id,
                 relation_type=EntityRelationService.DEPENDS_ON
-            ).values_list('target_type', 'target_id')
+            ).values_list('to_entity_type', 'to_entity_id')
             
             for dep_type, dep_id in dependencies:
                 to_check.append((dep_type, dep_id))
@@ -144,15 +144,15 @@ class EntityRelationService:
             List of dependency dicts
         """
         relations = EntityRelation.objects.filter(
-            source_type=entity_type,
-            source_id=entity_id,
+            from_entity_type=entity_type,
+            from_entity_id=entity_id,
             relation_type=EntityRelationService.DEPENDS_ON
         )
         
         return [
             {
-                'target_type': r.target_type,
-                'target_id': r.target_id,
+                'target_type': r.to_entity_type,
+                'target_id': r.to_entity_id,
                 'created_at': r.created_at.isoformat() if r.created_at else None
             }
             for r in relations
@@ -174,15 +174,15 @@ class EntityRelationService:
             List of dependent dicts
         """
         relations = EntityRelation.objects.filter(
-            target_type=entity_type,
-            target_id=entity_id,
+            to_entity_type=entity_type,
+            to_entity_id=entity_id,
             relation_type=EntityRelationService.DEPENDS_ON
         )
         
         return [
             {
-                'source_type': r.source_type,
-                'source_id': r.source_id,
+                'source_type': r.from_entity_type,
+                'source_id': r.from_entity_id,
                 'created_at': r.created_at.isoformat() if r.created_at else None
             }
             for r in relations
@@ -203,10 +203,10 @@ class EntityRelationService:
             True if deleted, False if not found
         """
         count, _ = EntityRelation.objects.filter(
-            source_type=source_type,
-            source_id=source_id,
-            target_type=target_type,
-            target_id=target_id,
+            from_entity_type=source_type,
+            from_entity_id=source_id,
+            to_entity_type=target_type,
+            to_entity_id=target_id,
             relation_type=relation_type
         ).delete()
         
@@ -233,8 +233,8 @@ class EntityRelationService:
         
         # Check template-level dependencies
         dependencies = EntityRelation.objects.filter(
-            source_type='template',
-            source_id=str(task.template_id),
+            from_entity_type='template',
+            from_entity_id=str(task.template_id),
             relation_type=EntityRelationService.DEPENDS_ON
         )
         
@@ -244,10 +244,10 @@ class EntityRelationService:
         # Check if dependencies are completed
         blockers = []
         for dep in dependencies:
-            if dep.target_type == 'template':
+            if dep.to_entity_type == 'template':
                 # Find the corresponding task instance for this template
                 blocking_tasks = TaskInstance.objects.filter(
-                    template_id=dep.target_id,
+                    template_id=dep.to_entity_id,
                     tracker_instance=task.tracker_instance,
                     deleted_at__isnull=True
                 ).exclude(status='DONE')
@@ -293,15 +293,15 @@ class EntityRelationService:
             
             # Get dependencies
             deps = EntityRelation.objects.filter(
-                source_type='template',
-                source_id=str(template.template_id),
+                from_entity_type='template',
+                from_entity_id=str(template.template_id),
                 relation_type=EntityRelationService.DEPENDS_ON
             )
             
             for dep in deps:
                 edges.append({
                     'from': str(template.template_id),
-                    'to': dep.target_id,
+                    'to': dep.to_entity_id,
                     'type': dep.relation_type
                 })
         
@@ -319,13 +319,13 @@ class EntityRelationService:
             List of all relations
         """
         as_source = EntityRelation.objects.filter(
-            source_type=entity_type,
-            source_id=entity_id
+            from_entity_type=entity_type,
+            from_entity_id=entity_id
         )
         
         as_target = EntityRelation.objects.filter(
-            target_type=entity_type,
-            target_id=entity_id
+            to_entity_type=entity_type,
+            to_entity_id=entity_id
         )
         
         result = []
@@ -334,16 +334,16 @@ class EntityRelationService:
             result.append({
                 'direction': 'outgoing',
                 'relation_type': r.relation_type,
-                'target_type': r.target_type,
-                'target_id': r.target_id
+                'target_type': r.to_entity_type,
+                'target_id': r.to_entity_id
             })
         
         for r in as_target:
             result.append({
                 'direction': 'incoming',
                 'relation_type': r.relation_type,
-                'source_type': r.source_type,
-                'source_id': r.source_id
+                'source_type': r.from_entity_type,
+                'source_id': r.from_entity_id
             })
         
         return result

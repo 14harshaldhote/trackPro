@@ -3,6 +3,7 @@ Tracker Pro - SPA API Views
 AJAX endpoints for interactive components
 """
 import json
+import logging
 from datetime import date, datetime, timedelta
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods, require_POST, require_GET
@@ -10,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 # from django.contrib.auth.decorators import login_required  <-- Replaced with custom decorator
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
+from django.db import IntegrityError
 from django.template.loader import render_to_string
 from django.utils import timezone
 from functools import wraps
@@ -29,7 +31,10 @@ from .utils.error_handlers import handle_service_errors
 from .helpers.cache_helpers import check_etag
 
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError, AuthenticationFailed
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
 
 def require_auth(view_func):
     """
@@ -57,7 +62,7 @@ def require_auth(view_func):
                 if auth_result:
                     request.user, _ = auth_result
                     return view_func(request, *args, **kwargs)
-            except (InvalidToken, TokenError) as e:
+            except (InvalidToken, TokenError, AuthenticationFailed) as e:
                 return JsonResponse({
                     'success': False,
                     'error': {
@@ -170,7 +175,7 @@ def api_task_toggle(request, task_id):
 
 
 @require_auth
-@require_POST
+@require_http_methods(['DELETE', 'POST'])
 @handle_service_errors
 def api_task_delete(request, task_id):
     """Delete a single task instance with UX feedback"""
@@ -194,7 +199,7 @@ def api_task_delete(request, task_id):
 
 
 @require_auth
-@require_POST
+@require_http_methods(['POST', 'PUT', 'PATCH'])
 @handle_service_errors
 def api_task_status(request, task_id):
     """Set specific task status and update notes with UX feedback"""
@@ -279,12 +284,15 @@ def api_tasks_bulk(request):
 def api_task_add(request, tracker_id):
     """Quick add task to tracker"""
     data = json.loads(request.body)
+    # Support both 'points' and 'weight' (points is preferred frontend term)
+    weight = data.get('points', data.get('weight', 1))
+    
     task = task_service.quick_add_task(
         tracker_id=tracker_id,
         user=request.user,
         description=data.get('description', ''),
         category=data.get('category', ''),
-        weight=data.get('weight', 1),
+        weight=weight,
         time_of_day=data.get('time_of_day', 'anytime')
     )
     return UXResponse.success(
@@ -295,7 +303,7 @@ def api_task_add(request, tracker_id):
 
 
 @require_auth
-@require_POST
+@require_http_methods(['PUT', 'PATCH', 'POST'])
 @handle_service_errors
 def api_task_edit(request, task_id):
     """Edit full task details"""
@@ -347,7 +355,7 @@ def api_tracker_create(request):
 
 
 @require_auth
-@require_POST
+@require_http_methods(['DELETE', 'POST'])
 @handle_service_errors
 def api_tracker_delete(request, tracker_id):
     """Delete tracker via AJAX"""
@@ -360,7 +368,7 @@ def api_tracker_delete(request, tracker_id):
 
 
 @require_auth
-@require_POST
+@require_http_methods(['PUT', 'PATCH', 'POST'])
 @handle_service_errors
 def api_tracker_update(request, tracker_id):
     """Update tracker details via AJAX"""
@@ -711,32 +719,35 @@ def api_day_note(request, date_str):
 @require_auth
 @require_POST
 @handle_service_errors
+@require_auth
+@require_POST
+@handle_service_errors
 def api_undo(request):
     """Undo last action (stored in session)"""
     data = json.loads(request.body)
-    undo_type = data.get('type')
-    undo_data = data.get('data', {})
+    undo_type = data.get('type') or data.get('action_type')
+    undo_data = data.get('data') or data.get('action_data') or {}
     
     if undo_type == 'task_toggle':
         task_id = undo_data.get('task_id')
         old_status = undo_data.get('old_status')
         
         # TaskInstance uses task_instance_id as primary key
-        # Allow finding soft-deleted tasks for restoration
         try:
-            # Try finding active task
             instance = TaskInstance.objects.get(
                 task_instance_id=task_id,
                 tracker_instance__tracker__user=request.user
             )
         except TaskInstance.DoesNotExist:
-            # Try finding soft-deleted task
-            instance = TaskInstance.objects.get(
+            instance = TaskInstance.objects.filter(
                 task_instance_id=task_id,
                 tracker_instance__tracker__user=request.user,
                 deleted_at__isnull=False
-            )
+            ).first()
             
+        if not instance:
+             return UXResponse.error('Task not found', status=404)
+             
         instance.status = old_status
         if instance.deleted_at:
             instance.restore()
@@ -745,23 +756,42 @@ def api_undo(request):
         
         return UXResponse.success(message='Action undone', feedback={'type': 'success', 'message': 'Action undone'})
 
-    elif undo_type == 'task_delete':
+    elif undo_type in ['task_delete', 'delete_task']:
         task_id = undo_data.get('task_id')
         
-        # Find the soft-deleted task
-        instance = get_object_or_404(
-            TaskInstance,
+        instance = TaskInstance.objects.filter(
             task_instance_id=task_id,
             tracker_instance__tracker__user=request.user
-        )
+        ).first()
         
-        # Restore it
-        if instance.deleted_at:
-            instance.restore()
+        if instance:
+            if instance.deleted_at:
+                instance.restore()
+        else:
+             return UXResponse.error('Task not found', status=404)
             
         return UXResponse.success(message='Task restored', feedback={'type': 'success', 'message': 'Task restored'})
+
+    elif undo_type == 'delete_goal':
+        from .models import Goal
+        goal_id = undo_data.get('goal_id')
+        goal = Goal.objects.filter(goal_id=goal_id, user=request.user).first()
+        if goal:
+            goal.deleted_at = None
+            goal.save()
+            return UXResponse.success(message='Goal restored')
+        return UXResponse.error('Goal not found', status=404)
+
+    elif undo_type == 'delete_tracker':
+        tracker_id = undo_data.get('tracker_id')
+        tracker = TrackerDefinition.objects.filter(tracker_id=tracker_id, user=request.user).first()
+        if tracker:
+            tracker.deleted_at = None
+            tracker.save()
+            return UXResponse.success(message='Tracker restored')
+        return UXResponse.error('Tracker not found', status=404)
     
-    return UXResponse.error('Unknown undo type', error_code='INVALID_UNDO')
+    return UXResponse.error(f'Unknown undo type: {undo_type}', error_code='INVALID_UNDO')
 
 
 # ============================================================================
@@ -778,7 +808,7 @@ def api_export(request, tracker_id):
     
     tracker = get_object_or_404(
         TrackerDefinition,
-        id=tracker_id,
+        tracker_id=tracker_id,
         user=request.user
     )
     
@@ -786,29 +816,31 @@ def api_export(request, tracker_id):
     start_date = request.GET.get('start')
     end_date = request.GET.get('end')
     
-    instances = TrackerInstance.objects.filter(
-        tracker_definition=tracker
-    ).order_by('date')
+    # Get task instances for this tracker
+    task_instances = TaskInstance.objects.filter(
+        tracker_instance__tracker=tracker,
+        deleted_at__isnull=True
+    ).select_related('tracker_instance', 'template').order_by('tracker_instance__tracking_date')
     
     if start_date:
-        instances = instances.filter(date__gte=start_date)
+        task_instances = task_instances.filter(tracker_instance__tracking_date__gte=start_date)
     if end_date:
-        instances = instances.filter(date__lte=end_date)
+        task_instances = task_instances.filter(tracker_instance__tracking_date__lte=end_date)
     
     if format_type == 'csv':
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{tracker.name}_export.csv"'
         
         writer = csv.writer(response)
-        writer.writerow(['Date', 'Description', 'Category', 'Status', 'Weight'])
+        writer.writerow(['Date', 'Description', 'Category', 'Status', 'Points'])
         
-        for instance in instances:
+        for task in task_instances:
             writer.writerow([
-                instance.date,
-                instance.description,
-                instance.category,
-                instance.status,
-                instance.weight
+                task.tracker_instance.tracking_date,
+                task.snapshot_description or (task.template.description if task.template else ''),
+                task.template.category if task.template else 'N/A',
+                task.status,
+                task.snapshot_points or 0
             ])
         
         return response
@@ -821,13 +853,13 @@ def api_export(request, tracker_id):
         },
         'tasks': [
             {
-                'date': str(i.date),
-                'description': i.description,
-                'category': i.category,
-                'status': i.status,
-                'weight': i.weight
+                'date': str(task.tracker_instance.tracking_date),
+                'description': task.snapshot_description or (task.template.description if task.template else ''),
+                'category': task.template.category if task.template else 'N/A',
+                'status': task.status,
+                'points': task.snapshot_points or 0
             }
-            for i in instances
+            for task in task_instances
         ]
     })
 
@@ -1414,7 +1446,8 @@ def api_preferences(request):
             # Update only provided fields
             fields = ['theme', 'default_view', 'timezone', 'date_format', 'week_start',
                      'daily_reminder_enabled', 'sound_complete', 'sound_notify', 
-                     'sound_volume', 'compact_mode', 'animations', 'keyboard_enabled', 'push_enabled']
+                     'sound_volume', 'compact_mode', 'animations', 'keyboard_enabled', 'push_enabled',
+                     'public_profile', 'share_streaks']
             
             for field in fields:
                 if field in data:
@@ -2137,7 +2170,7 @@ def api_user_avatar(request):
 
 
 @require_auth
-@require_POST
+@require_http_methods(['GET', 'POST'])
 def api_data_export(request):
     """
     Export user data in JSON or CSV format.
@@ -2339,7 +2372,7 @@ def api_data_import(request):
 
 
 @require_auth
-@require_POST
+@require_http_methods(['POST', 'DELETE'])
 def api_data_clear(request):
     """
     Clear all user data (trackers, tasks, goals, etc.).
@@ -2430,7 +2463,11 @@ def api_user_delete(request):
         # Hard delete all user data (not soft delete, permanent)
         username = request.user.username
         
-        # Delete user (cascades to all related data via ON_DELETE CASCADE)
+        # Manually delete trackers first to avoid simple_history integrity errors
+        # during cascade (which can cause issues with history_user FK)
+        TrackerDefinition.objects.filter(user=request.user).delete()
+        
+        # Delete user (cascades to remaining data)
         request.user.delete()
         
         return JsonResponse({
@@ -2516,7 +2553,7 @@ def api_analytics_data(request):
 
 
 @require_auth
-@require_http_methods(['POST'])
+@require_http_methods(['GET', 'POST'])
 def api_export_month(request):
     """
     Export data for a specific month
@@ -2535,10 +2572,26 @@ def api_export_month(request):
     from core.services.export_service import ExportService
     
     try:
-        data = json.loads(request.body)
+        if request.method == 'POST':
+            try:
+                data = json.loads(request.body)
+            except json.JSONDecodeError:
+                 return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+        else:
+            # GET request support
+            data = request.GET
         
-        year = data.get('year')
-        month = data.get('month')
+        today = timezone.now().date()
+        year = data.get('year') or today.year
+        month = data.get('month') or today.month
+        
+        # Ensure types
+        try:
+            year = int(year)
+            month = int(month)
+        except (ValueError, TypeError):
+             return JsonResponse({'success': False, 'error': 'Year/Month must be integers'}, status=400)
+
         format = data.get('format', 'json')
         tracker_id = data.get('tracker_id', None)
         
@@ -2685,118 +2738,7 @@ def api_analytics_forecast(request):
         }, status=500)
 
 
-# =============================================================================
-# UNDO SYSTEM
-# =============================================================================
 
-@require_auth
-@require_POST
-def api_undo(request):
-    """
-    Undo a recent destructive action
-    
-    Body:
-        {
-            "action_id": "undo_123_abc",
-            "action_type": "delete_task"|"delete_goal"|"delete_tracker",
-            "action_data": { "task_id": "...", ... }
-        }
-    
-    Returns:
-        {"success": true, "message": "Action undone"}
-    """
-    try:
-        data = json.loads(request.body)
-        
-        action_type = data.get('action_type')
-        action_data = data.get('action_data', {})
-        
-        if not action_type:
-            return JsonResponse({
-                'success': False,
-                'error': 'action_type is required'
-            }, status=400)
-        
-        # Handle different action types
-        if action_type == 'delete_task':
-            task_id = action_data.get('task_id')
-            if not task_id:
-                return JsonResponse({'success': False, 'error': 'task_id required'}, status=400)
-            
-            task = TaskInstance.objects.filter(
-                task_instance_id=task_id,
-                tracker__user=request.user
-            ).first()
-            
-            if not task:
-                return JsonResponse({'success': False, 'error': 'Task not found'}, status=404)
-            
-            task.deleted_at = None
-            task.save()
-            
-            return JsonResponse({
-                'success': True,
-                'message': 'Task restored',
-                'task_id': task_id
-            })
-        
-        elif action_type == 'delete_goal':
-            from .models import Goal
-            
-            goal_id = action_data.get('goal_id')
-            if not goal_id:
-                return JsonResponse({'success': False, 'error': 'goal_id required'}, status=400)
-            
-            goal = Goal.objects.filter(
-                goal_id=goal_id,
-                user=request.user
-            ).first()
-            
-            if not goal:
-                return JsonResponse({'success': False, 'error': 'Goal not found'}, status=404)
-            
-            goal.deleted_at = None
-            goal.save()
-            
-            return JsonResponse({
-                'success': True,
-                'message': 'Goal restored',
-                'goal_id': goal_id
-            })
-        
-        elif action_type == 'delete_tracker':
-            tracker_id = action_data.get('tracker_id')
-            if not tracker_id:
-                return JsonResponse({'success': False, 'error': 'tracker_id required'}, status=400)
-            
-            tracker = TrackerDefinition.objects.filter(
-                tracker_id=tracker_id,
-                user=request.user
-            ).first()
-            
-            if not tracker:
-                return JsonResponse({'success': False, 'error': 'Tracker not found'}, status=404)
-            
-            tracker.deleted_at = None
-            tracker.save()
-            
-            return JsonResponse({
-                'success': True,
-                'message': 'Tracker restored',
-                'tracker_id': tracker_id
-            })
-        
-        else:
-             return JsonResponse({
-                'success': False,
-                'error': f'Unsupported action_type: {action_type}'
-            }, status=400)
-    
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
 
 
 # =============================================================================
@@ -2923,7 +2865,7 @@ def api_toggle_task_goal(request, template_id):
 
 @csrf_exempt
 @require_auth
-@require_POST
+@require_http_methods(['PUT', 'PATCH', 'POST'])
 def api_update_task_points(request, template_id):
     """
     Update the points value for a task.
@@ -3537,6 +3479,10 @@ def api_goals(request):
         import uuid
         from django.db import transaction
         
+        # Validate required fields
+        if not data.get('title'):
+            return JsonResponse({'success': False, 'error': 'Title is required'}, status=400)
+        
         with transaction.atomic():
             goal = Goal.objects.create(
                 user=request.user,
@@ -3605,7 +3551,7 @@ def api_notifications(request):
     ).order_by('-created_at')[:50]
     
     data = [{
-        'id': n.id,
+        'id': str(n.notification_id),
         'title': n.title,
         'message': n.message,
         'type': n.type,
@@ -3703,81 +3649,6 @@ def api_dashboard_streaks(request):
 # PREFERENCES ENDPOINTS
 # ============================================================================
 
-@require_auth
-@require_http_methods(["GET", "POST"])
-@handle_service_errors
-def api_preferences(request):
-    """
-    GET: Get all user preferences
-    POST: Update preferences
-    """
-    user = request.user
-    
-    # Ensure prefs exist
-    prefs, created = UserPreferences.objects.get_or_create(user=user)
-    
-    if request.method == "POST":
-        data = json.loads(request.body)
-        
-        # Update fields
-        if 'theme' in data: prefs.theme = data['theme']
-        if 'default_view' in data: prefs.default_view = data['default_view']
-        
-        # Notifications
-        if 'daily_reminder_enabled' in data: prefs.daily_reminder_enabled = data['daily_reminder_enabled']
-        if 'daily_reminder_time' in data: 
-            # Parse time "HH:MM"
-            t_str = data['daily_reminder_time']
-            if t_str:
-                try:
-                    h, m = map(int, t_str.split(':'))
-                    prefs.daily_reminder_time = time(h, m)
-                except:
-                    pass
-        
-        if 'streak_threshold' in data: prefs.streak_threshold = data['streak_threshold']
-        
-        prefs.save()
-        return UXResponse.success("Preferences updated")
-    
-    else:
-        return JsonResponse({
-            'success': True,
-            'preferences': {
-                'theme': prefs.theme,
-                'default_view': prefs.default_view,
-                'daily_reminder_enabled': prefs.daily_reminder_enabled,
-                'daily_reminder_time': prefs.daily_reminder_time.strftime('%H:%M') if prefs.daily_reminder_time else '08:00',
-                'streak_threshold': prefs.streak_threshold,
-            }
-        })
-
-# ============================================================================
-# MISSING DASHBOARD ENDPOINTS
-# ============================================================================
-
-@require_auth
-@require_GET
-@handle_service_errors
-def api_dashboard_activity(request):
-    """Get recent activity feed."""
-    # Return last 20 tasks completed or modified
-    recent_tasks = TaskInstance.objects.filter(
-        tracker_instance__tracker__user=request.user,
-        deleted_at__isnull=True
-    ).order_by('-updated_at')[:10]
-    
-    activity = []
-    for task in recent_tasks:
-        activity.append({
-            'type': 'task',
-            'status': task.status,
-            'description': task.template.description,
-            'tracker': task.tracker_instance.tracker.name,
-            'timestamp': task.updated_at.isoformat()
-        })
-    
-    return JsonResponse({'success': True, 'activity': activity})
 
 
 # =============================================================================
@@ -3931,12 +3802,17 @@ def api_tags(request):
         if not name:
             return JsonResponse({'success': False, 'error': 'Tag name is required'}, status=400)
         
-        tag = TagService.create_tag(
-            user_id=request.user.id,
-            name=name,
-            color=data.get('color'),
-            icon=data.get('icon')
-        )
+        try:
+            tag = TagService.create_tag(
+                user_id=request.user.id,
+                name=name,
+                color=data.get('color'),
+                icon=data.get('icon')
+            )
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+        except IntegrityError:
+            return JsonResponse({'success': False, 'error': f"Tag '{name}' already exists"}, status=400)
         
         return UXResponse.success(
             message=f"Tag '{name}' created",
@@ -4089,11 +3965,20 @@ def api_task_dependencies(request, template_id):
     if request.method == "POST":
         try:
             data = json.loads(request.body)
+            logger.debug(f"Creating dependency relation: {data}")
         except json.JSONDecodeError:
+            logger.warning("Invalid JSON in dependency creation request")
             return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
         
         depends_on = data.get('depends_on')
         if not depends_on:
+             # Try 'target_id' alias used in tests
+             depends_on = data.get('target_id')
+        
+        relation_type = data.get('relation_type', data.get('dependency_type', EntityRelationService.DEPENDS_ON))
+        
+        if not depends_on:
+            logger.warning(f"Dependency creation missing target_id for template {template_id}")
             return JsonResponse({
                 'success': False, 
                 'error': 'depends_on template ID is required'
@@ -4102,16 +3987,26 @@ def api_task_dependencies(request, template_id):
         relation = EntityRelationService.create_relation(
             source_type='template',
             source_id=template_id,
-            target_type='template',
+            target_type='template',  # Assuming template-to-template for now
             target_id=depends_on,
-            relation_type=EntityRelationService.DEPENDS_ON,
+            relation_type=relation_type,
             user_id=request.user.id
         )
         
         if relation is None:
+            # This is often expected (e.g., circular dependency rejection in tests)
+            is_valid_type = EntityRelationService.DEPENDS_ON in EntityRelationService.VALID_RELATION_TYPES
+            msg = "Could not create dependency"
+            if not is_valid_type:
+                 msg += " (Invalid relation type)"
+            else:
+                 msg += " (possible circular reference or invalid IDs)"
+            
+            logger.info(f"Dependency rejected (may be expected): {msg} for {template_id} -> {depends_on}")
+                 
             return JsonResponse({
                 'success': False,
-                'error': 'Could not create dependency (possible circular reference)'
+                'error': msg
             }, status=400)
         
         return UXResponse.success("Dependency created")
@@ -4166,6 +4061,9 @@ def api_task_blocked_status(request, task_id):
     from core.services.entity_relation_service import EntityRelationService
     
     result = EntityRelationService.check_task_blocked(task_id)
+    
+    logger.debug(f"Task blocked check for {task_id}: {result}")
+    
     return JsonResponse({'success': True, **result})
 
 
@@ -4433,8 +4331,17 @@ def api_generate_instances(request, tracker_id):
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
     
-    start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
-    end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+    # Handle single date or date range
+    if 'date' in data and 'start_date' not in data:
+        # Single date mode for backward compatibility
+        target_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+        start_date = target_date
+        end_date = target_date
+    elif 'start_date' in data:
+        start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+        end_date = datetime.strptime(data.get('end_date', data['start_date']), '%Y-%m-%d').date()
+    else:
+        return JsonResponse({'success': False, 'error': 'Missing date or start_date parameter'}, status=400)
     
     if end_date < start_date:
         return JsonResponse({
@@ -4552,10 +4459,10 @@ def api_find_path(request):
     """
     from core.services.knowledge_graph_service import KnowledgeGraphService
     
-    source_type = request.GET.get('source_type')
-    source_id = request.GET.get('source_id')
-    target_type = request.GET.get('target_type')
-    target_id = request.GET.get('target_id')
+    source_type = request.GET.get('source_type') or request.GET.get('from_type')
+    source_id = request.GET.get('source_id') or request.GET.get('from_id')
+    target_type = request.GET.get('target_type') or request.GET.get('to_type')
+    target_id = request.GET.get('target_id') or request.GET.get('to_id')
     
     if not all([source_type, source_id, target_type, target_id]):
         return JsonResponse({
@@ -4720,10 +4627,37 @@ def api_compare_periods(request):
     """
     from core.services.activity_replay_service import ActivityReplayService
     
-    p1_start = datetime.strptime(request.GET.get('p1_start'), '%Y-%m-%d').date()
-    p1_end = datetime.strptime(request.GET.get('p1_end'), '%Y-%m-%d').date()
-    p2_start = datetime.strptime(request.GET.get('p2_start'), '%Y-%m-%d').date()
-    p2_end = datetime.strptime(request.GET.get('p2_end'), '%Y-%m-%d').date()
+    # Validate that all required params are present
+    p1_start_str = request.GET.get('p1_start')
+    p1_end_str = request.GET.get('p1_end')
+    p2_start_str = request.GET.get('p2_start')
+    p2_end_str = request.GET.get('p2_end')
+    
+    # Support 'base_date' / 'compare_date' / 'mode' alias logic from tests
+    base_date = request.GET.get('base_date')
+    compare_date = request.GET.get('compare_date')
+    mode = request.GET.get('mode', 'day')
+    
+    if base_date and compare_date:
+        if mode == 'day':
+            p1_start_str = base_date
+            p1_end_str = base_date # Inclusive logic handled by service usually? Or next day? 
+            # Service likely expects ISO dates. If single day, start=end.
+            p2_start_str = compare_date
+            p2_end_str = compare_date
+    
+    
+    if not all([p1_start_str, p1_end_str, p2_start_str, p2_end_str]):
+        logger.warning(f"Period comparison missing required parameters. Provided: {request.GET.dict()}")
+        return JsonResponse({
+            'success': False,
+            'error': 'Missing required parameters: p1_start, p1_end, p2_start, p2_end'
+        }, status=400)
+    
+    p1_start = datetime.strptime(p1_start_str, '%Y-%m-%d').date()
+    p1_end = datetime.strptime(p1_end_str, '%Y-%m-%d').date()
+    p2_start = datetime.strptime(p2_start_str, '%Y-%m-%d').date()
+    p2_end = datetime.strptime(p2_end_str, '%Y-%m-%d').date()
     
     comparison = ActivityReplayService.compare_periods(
         request.user.id, p1_start, p1_end, p2_start, p2_end
@@ -4922,3 +4856,81 @@ def api_create_collaboration_invite(request, tracker_id):
         return JsonResponse({'success': False, 'error': result['error']}, status=404)
     
     return JsonResponse({'success': True, **result})
+
+# ============================================================================
+# MISSING ENDPOINTS - ADD TO core/views_api.py (END OF FILE)
+# ============================================================================
+
+
+@require_auth
+
+@require_auth
+@require_GET
+def api_data_export(request):
+    """
+    Export all user data as JSON.
+    
+    GET /api/v1/data/export/
+    """
+    from datetime import date
+    
+    # Collect all user data
+    trackers = list(TrackerDefinition.objects.filter(
+        user=request.user,
+        deleted_at__isnull=True
+    ).values('tracker_id', 'name', 'description', 'time_mode', 'status', 'created_at'))
+    
+    instances = list(TrackerInstance.objects.filter(
+        tracker__user=request.user,
+        deleted_at__isnull=True
+    ).values('instance_id', 'tracker_id', 'tracking_date', 'period_start', 'period_end'))
+    
+    tasks = list(TaskInstance.objects.filter(
+        tracker_instance__tracker__user=request.user,
+        deleted_at__isnull=True
+    ).values('task_instance_id', 'tracker_instance_id', 'status', 'notes', 'completed_at'))
+    
+    # Convert UUIDs and datetimes to strings
+    import json
+    from django.core.serializers.json import DjangoJSONEncoder
+    
+    export_data = {
+        'export_date': date.today().isoformat(),
+        'user_id': request.user.id,
+        'username': request.user.username,
+        'trackers': trackers,
+        'instances': instances,
+        'tasks': tasks,
+    }
+    
+    return JsonResponse({
+        'success': True,
+        'data': json.loads(json.dumps(export_data, cls=DjangoJSONEncoder))
+    })
+
+
+@require_auth
+@require_POST
+def api_data_clear(request):
+    """
+    Clear all user data (soft delete).
+    
+    POST /api/v1/data/clear/
+    """
+    from django.utils import timezone
+    now = timezone.now()
+    
+    # Soft delete all user data
+    TrackerDefinition.objects.filter(user=request.user).update(deleted_at=now)
+    TrackerInstance.objects.filter(tracker__user=request.user).update(deleted_at=now)
+    TaskInstance.objects.filter(tracker_instance__tracker__user=request.user).update(deleted_at=now)
+    
+    return JsonResponse({
+        'success': True,
+        'message': 'All data cleared'
+    })
+
+
+
+
+

@@ -202,12 +202,12 @@ class HabitIntelligenceService:
                 user_id
             )
             
-            if streak_data.get('current_streak', 0) >= 7:
+            if streak_data.current_streak >= 7:
                 # Analyze what makes streaks work
                 # Get the tasks that are most consistently done during streaks
                 instances = TrackerInstance.objects.filter(
                     tracker=tracker,
-                    tracking_date__gte=date.today() - timedelta(days=streak_data['current_streak']),
+                    tracking_date__gte=date.today() - timedelta(days=streak_data.current_streak),
                     deleted_at__isnull=True
                 ).prefetch_related('tasks')
                 
@@ -237,7 +237,7 @@ class HabitIntelligenceService:
                 if anchor_tasks:
                     correlations.append({
                         'tracker_name': tracker.name,
-                        'current_streak': streak_data['current_streak'],
+                        'current_streak': streak_data.current_streak,
                         'anchor_tasks': anchor_tasks,
                         'insight': f"Your {tracker.name} streak relies on consistently doing: {', '.join(t['description'] for t in anchor_tasks[:3])}"
                     })
@@ -260,9 +260,9 @@ class HabitIntelligenceService:
         # Get notes with sentiment
         notes_with_sentiment = DayNote.objects.filter(
             tracker__user_id=user_id,
-            tracking_date__range=(start_date, end_date),
+            date__range=(start_date, end_date),
             sentiment_score__isnull=False
-        ).values('tracking_date', 'tracker_id', 'sentiment_score')
+        ).values('date', 'tracker_id', 'sentiment_score')
         
         if not notes_with_sentiment:
             return {'message': 'Not enough mood data for correlation analysis'}
@@ -270,7 +270,7 @@ class HabitIntelligenceService:
         # Create date -> sentiment mapping
         date_sentiment = {}
         for note in notes_with_sentiment:
-            key = (note['tracking_date'], note['tracker_id'])
+            key = (note['date'], note['tracker_id'])
             date_sentiment[key] = note['sentiment_score']
         
         # Get task completion for those dates

@@ -53,23 +53,23 @@ class ExportService:
     def _get_month_data(self, start_date, end_date, tracker_id=None):
         """Get aggregated data for date range"""
         tasks = TaskInstance.objects.filter(
-            tracker__user=self.user,
-            date__gte=start_date,
-            date__lte=end_date,
+            tracker_instance__tracker__user=self.user,
+            tracker_instance__tracking_date__gte=start_date,
+            tracker_instance__tracking_date__lte=end_date,
             deleted_at__isnull=True
         )
         
         if tracker_id:
-            tasks = tasks.filter(tracker__tracker__tracker_id=tracker_id)
+            tasks = tasks.filter(tracker_instance__tracker__tracker_id=tracker_id)
         
         # Aggregate by day
         daily_data = []
         current_date = start_date
         
         while current_date <= end_date:
-            day_tasks = tasks.filter(date=current_date)
+            day_tasks = tasks.filter(tracker_instance__tracking_date=current_date)
             total = day_tasks.count()
-            completed = day_tasks.filter(status='completed').count()
+            completed = day_tasks.filter(status='DONE').count()
             rate = (completed / total * 100) if total > 0 else 0
             
             daily_data.append({
@@ -84,7 +84,7 @@ class ExportService:
         
         # Overall stats
         all_tasks = tasks.count()
-        all_completed = tasks.filter(status='completed').count()
+        all_completed = tasks.filter(status='DONE').count()
         overall_rate = (all_completed / all_tasks * 100) if all_tasks > 0 else 0
         
         return {

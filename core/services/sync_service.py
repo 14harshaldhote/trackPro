@@ -148,6 +148,10 @@ class SyncService:
                 'retry': False
             }
         
+        # Auto-toggle if new_status not provided
+        if not new_status:
+            new_status = 'DONE' if task.status == 'TODO' else 'TODO'
+            
         task.status = new_status
         task.completed_at = timezone.now() if new_status == 'DONE' else None
         task.save()
@@ -202,18 +206,24 @@ class SyncService:
             'task_id': task_id,
             'server_timestamp': task.updated_at.isoformat()
         }
-    
+
     def _action_day_note(self, action_id: str, action: Dict) -> Dict:
         """Save day note"""
-        from core.models import DayNote
+        from core.models import DayNote, TrackerDefinition
         
+        tracker_id = action.get('tracker_id')
         note_date_str = action.get('date')
         content = action.get('content', '')
+        
+        tracker = TrackerDefinition.objects.get(
+            tracker_id=tracker_id,
+            user=self.user
+        )
         
         note_date = datetime.fromisoformat(note_date_str).date()
         
         note, created = DayNote.objects.update_or_create(
-            user=self.user,
+            tracker=tracker,
             date=note_date,
             defaults={'content': content}
         )

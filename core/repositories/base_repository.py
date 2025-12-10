@@ -502,8 +502,11 @@ def get_day_grid_data(tracker_id, dates_list):
         # Fetch all instances with tasks in date range (optimized)
         instances = get_tracker_instances_with_tasks(tracker_id, start_date, end_date)
         
-        # Build lookup map by period_start date
-        instances_map = {inst.period_start: inst for inst in instances}
+        # Build lookup map by period_start date string
+        instances_map = {
+            inst.period_start.isoformat() if isinstance(inst.period_start, date) else str(inst.period_start): inst 
+            for inst in instances
+        }
         
         return {
             'tracker': tracker_data,

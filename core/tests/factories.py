@@ -11,8 +11,6 @@ import uuid
 from datetime import date, timedelta
 from django.contrib.auth import get_user_model
 
-User = get_user_model()
-
 
 class UserFactory:
     """Factory for creating test users."""
@@ -29,6 +27,7 @@ class UserFactory:
         }
         defaults.update(kwargs)
         password = defaults.pop('password')
+        User = get_user_model()
         user = User.objects.create_user(**defaults)
         user.set_password(password)
         user.save()
@@ -158,9 +157,13 @@ class ShareLinkFactory:
         from core.models import ShareLink
         import secrets
         
+        # Map permission_level to permission if provided
+        if 'permission_level' in kwargs:
+            kwargs['permission'] = kwargs.pop('permission_level')
+        
         defaults = {
             'token': secrets.token_urlsafe(32),
-            'permission_level': 'view',
+            'permission': 'view',
             'is_active': True
         }
         defaults.update(kwargs)
@@ -182,7 +185,7 @@ class DayNoteFactory:
             target_date = date.today()
         
         defaults = {
-            'tracking_date': target_date,
+            'date': target_date,
             'content': 'Test note content'
         }
         defaults.update(kwargs)

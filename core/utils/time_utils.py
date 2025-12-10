@@ -150,7 +150,7 @@ def get_user_today(user_timezone: str) -> date:
     Returns:
         date: Today's date in the user's timezone
     """
-    from datetime import datetime
+    from django.utils import timezone
     try:
         from zoneinfo import ZoneInfo
     except ImportError:
@@ -158,10 +158,10 @@ def get_user_today(user_timezone: str) -> date:
     
     try:
         tz = ZoneInfo(user_timezone)
-        return datetime.now(tz).date()
+        return timezone.now().astimezone(tz).date()
     except Exception:
         # Fallback to UTC if timezone is invalid
-        return datetime.utcnow().date()
+        return timezone.now().date()
 
 
 def to_user_datetime(dt, user_timezone: str):

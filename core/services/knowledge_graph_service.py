@@ -91,7 +91,7 @@ class KnowledgeGraphService:
             templates = TaskTemplate.objects.filter(
                 tracker=tracker,
                 deleted_at__isnull=True
-            ).prefetch_related('tags')
+            ).prefetch_related('task_tags__tag')
             
             for template in templates:
                 tmpl_node_id = f"template:{template.template_id}"
@@ -118,7 +118,8 @@ class KnowledgeGraphService:
                 })
                 
                 # Add tags
-                for tag in template.tags.all():
+                for tag_rel in template.task_tags.all():
+                    tag = tag_rel.tag
                     tag_node_id = f"tag:{tag.tag_id}"
                     
                     if tag_node_id not in node_ids:
@@ -191,12 +192,12 @@ class KnowledgeGraphService:
         
         # 4. Add entity relations (dependencies)
         relations = EntityRelation.objects.filter(
-            created_by_id=user_id
+            user_id=user_id
         )
         
         for rel in relations:
-            source_node_id = f"{rel.source_type}:{rel.source_id}"
-            target_node_id = f"{rel.target_type}:{rel.target_id}"
+            source_node_id = f"{rel.from_entity_type}:{rel.from_entity_id}"
+            target_node_id = f"{rel.to_entity_type}:{rel.to_entity_id}"
             
             if source_node_id in node_ids and target_node_id in node_ids:
                 edges.append({
@@ -215,14 +216,14 @@ class KnowledgeGraphService:
             ).select_related('tracker')[:100]  # Limit for performance
             
             for note in notes:
-                note_node_id = f"note:{note.id}"
+                note_node_id = f"note:{note.note_id}"
                 
                 nodes.append({
                     'id': note_node_id,
                     'type': 'note',
-                    'label': f"Note: {note.tracking_date.isoformat()}",
+                    'label': f"Note: {note.date.isoformat()}",
                     'data': {
-                        'date': note.tracking_date.isoformat(),
+                        'date': note.date.isoformat(),
                         'sentiment': note.sentiment_score,
                         'preview': note.content[:50] if note.content else ''
                     },
@@ -284,33 +285,33 @@ class KnowledgeGraphService:
             
             # Get outgoing relations
             outgoing = EntityRelation.objects.filter(
-                source_type=e_type,
-                source_id=e_id
+                from_entity_type=e_type,
+                from_entity_id=e_id
             )
             
             for rel in outgoing:
-                target_key = f"{rel.target_type}:{rel.target_id}"
+                target_key = f"{rel.to_entity_type}:{rel.to_entity_id}"
                 edges.append({
                     'source': node_key,
                     'target': target_key,
                     'type': rel.relation_type
                 })
-                explore(rel.target_type, rel.target_id, current_depth + 1)
+                explore(rel.to_entity_type, rel.to_entity_id, current_depth + 1)
             
             # Get incoming relations
             incoming = EntityRelation.objects.filter(
-                target_type=e_type,
-                target_id=e_id
+                to_entity_type=e_type,
+                to_entity_id=e_id
             )
             
             for rel in incoming:
-                source_key = f"{rel.source_type}:{rel.source_id}"
+                source_key = f"{rel.from_entity_type}:{rel.from_entity_id}"
                 edges.append({
                     'source': source_key,
                     'target': node_key,
                     'type': rel.relation_type
                 })
-                explore(rel.source_type, rel.source_id, current_depth + 1)
+                explore(rel.from_entity_type, rel.from_entity_id, current_depth + 1)
         
         explore(entity_type, entity_id, 0)
         
@@ -356,16 +357,16 @@ class KnowledgeGraphService:
             
             # Get all relations from current node
             relations = list(EntityRelation.objects.filter(
-                Q(source_type=c_type, source_id=c_id) |
-                Q(target_type=c_type, target_id=c_id)
+                Q(from_entity_type=c_type, from_entity_id=c_id) |
+                Q(to_entity_type=c_type, to_entity_id=c_id)
             ))
             
             for rel in relations:
-                if rel.source_type == c_type and rel.source_id == c_id:
-                    next_node = f"{rel.target_type}:{rel.target_id}"
+                if rel.from_entity_type == c_type and rel.from_entity_id == c_id:
+                    next_node = f"{rel.to_entity_type}:{rel.to_entity_id}"
                     direction = 'forward'
                 else:
-                    next_node = f"{rel.source_type}:{rel.source_id}"
+                    next_node = f"{rel.from_entity_type}:{rel.from_entity_id}"
                     direction = 'backward'
                 
                 if next_node in visited:

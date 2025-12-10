@@ -204,13 +204,12 @@ class CacheInvalidator:
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # Only invalidate if no exception occurred
-        if exc_type is None:
-            if self.tracker_id:
-                invalidate_tracker_cache(self.tracker_id)
+        # Invalidate regardless of exception
+        if self.tracker_id:
+            invalidate_tracker_cache(self.tracker_id)
             
-            if self.invalidate_dashboard:
-                invalidate_dashboard_cache()
+        if self.invalidate_dashboard:
+            invalidate_dashboard_cache()
 
 
 # ============================================================================

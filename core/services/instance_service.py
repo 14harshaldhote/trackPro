@@ -22,19 +22,14 @@ class InstanceService:
     """
     
     @staticmethod
-    def create_daily_instance(tracker: TrackerDefinition, target_date: date) -> TrackerInstance:
+    def create_daily_instance(tracker: TrackerDefinition, target_date: date) -> Tuple[TrackerInstance, bool]:
         """
         Create a single day instance with all task instances.
         
-        Args:
-            tracker: The tracker definition
-            target_date: The specific date for the instance
-            
         Returns:
-            TrackerInstance with populated TaskInstances
+            (instance, created)
         """
         with transaction.atomic():
-            # Get or create to prevent duplicates
             instance, created = TrackerInstance.objects.get_or_create(
                 tracker=tracker,
                 tracking_date=target_date,
@@ -47,7 +42,6 @@ class InstanceService:
             )
             
             if created:
-                # Create task instances from active templates
                 templates = TaskTemplate.objects.filter(
                     tracker=tracker,
                     deleted_at__isnull=True,
@@ -61,7 +55,6 @@ class InstanceService:
                         tracker_instance=instance,
                         template=template,
                         status='TODO',
-                        # Snapshot fields - explicit population for bulk_create
                         snapshot_description=template.description,
                         snapshot_points=template.points if hasattr(template, 'points') else 0,
                         snapshot_weight=template.weight
@@ -70,31 +63,21 @@ class InstanceService:
                 if task_instances:
                     TaskInstance.objects.bulk_create(task_instances)
             
-            return instance
+            return instance, created
 
     @staticmethod
     def create_weekly_instance(
         tracker: TrackerDefinition,
         target_date: date,
         week_start: int = 0
-    ) -> TrackerInstance:
-        """
-        Create a weekly instance.
-        
-        Args:
-            tracker: The tracker definition (time_mode='weekly')
-            target_date: Any date within the target week
-            week_start: User's preferred week start (0=Mon, 6=Sun)
-            
-        Returns:
-            TrackerInstance for the week
-        """
+    ) -> Tuple[TrackerInstance, bool]:
+        """Create a weekly instance."""
         period_start, period_end = time_utils.get_week_boundaries(target_date, week_start)
         
         with transaction.atomic():
             instance, created = TrackerInstance.objects.get_or_create(
                 tracker=tracker,
-                tracking_date=period_start,  # Anchor to week start
+                tracking_date=period_start,
                 defaults={
                     'instance_id': str(uuid.uuid4()),
                     'period_start': period_start,
@@ -116,7 +99,6 @@ class InstanceService:
                         tracker_instance=instance,
                         template=template,
                         status='TODO',
-                        # Snapshot fields for weekly
                         snapshot_description=template.description,
                         snapshot_points=template.points if hasattr(template, 'points') else 0,
                         snapshot_weight=template.weight
@@ -125,10 +107,10 @@ class InstanceService:
                 if task_instances:
                     TaskInstance.objects.bulk_create(task_instances)
             
-            return instance
+            return instance, created
 
     @staticmethod
-    def create_monthly_instance(tracker: TrackerDefinition, target_date: date) -> TrackerInstance:
+    def create_monthly_instance(tracker: TrackerDefinition, target_date: date) -> Tuple[TrackerInstance, bool]:
         """Create a monthly tracker instance."""
         period_start = target_date.replace(day=1)
         _, last_day = monthrange(target_date.year, target_date.month)
@@ -159,7 +141,6 @@ class InstanceService:
                         tracker_instance=instance,
                         template=template,
                         status='TODO',
-                        # Snapshot fields for monthly
                         snapshot_description=template.description,
                         snapshot_points=template.points if hasattr(template, 'points') else 0,
                         snapshot_weight=template.weight
@@ -168,7 +149,7 @@ class InstanceService:
                 if task_instances:
                     TaskInstance.objects.bulk_create(task_instances)
             
-            return instance
+            return instance, created
 
     @staticmethod
     def create_challenge(
@@ -177,22 +158,18 @@ class InstanceService:
         duration_days: int,
         goal_title: str = None
     ) -> List[TrackerInstance]:
-        """
-        Create a multi-day challenge with optional goal tracking.
-        """
+        """Create a multi-day challenge with optional goal tracking."""
         from core.models import Goal, GoalTaskMapping
         
         instances = []
         end_date = start_date + timedelta(days=duration_days - 1)
         
         with transaction.atomic():
-            # Create daily instances for the challenge
             for day_offset in range(duration_days):
                 current_date = start_date + timedelta(days=day_offset)
-                instance = InstanceService.create_daily_instance(tracker, current_date)
+                instance, _ = InstanceService.create_daily_instance(tracker, current_date)
                 instances.append(instance)
             
-            # Optionally create a goal for the challenge
             if goal_title:
                 goal = Goal.objects.create(
                     user=tracker.user,
@@ -204,7 +181,6 @@ class InstanceService:
                     goal_type='achievement'
                 )
                 
-                # Link all templates to the goal
                 templates = tracker.templates.filter(deleted_at__isnull=True)
                 for template in templates:
                     GoalTaskMapping.objects.create(
@@ -222,12 +198,7 @@ class InstanceService:
         allow_backdate: bool = True,
         allow_future: bool = True
     ) -> Tuple[TrackerInstance, bool, List[str]]:
-        """
-        Create instance with validation.
-        
-        Returns:
-            Tuple of (instance, created, warnings)
-        """
+        """Create instance with validation."""
         warnings = []
         today = date.today()
         
@@ -242,32 +213,16 @@ class InstanceService:
         if target_date < today:
             warnings.append("Backdated entry - will not affect current streak")
         
-        # Dispatch based on time_mode
+        created = False
         if tracker.time_mode == 'weekly':
-            # Default week start to Monday (0) if not specified in user prefs
-            # Here we assume 0 or need to fetch from prefs. 
-            # Ideally passed in or fetched from tracker.user.preferences
             week_start = 0 
             if hasattr(tracker.user, 'preferences'):
                 week_start = tracker.user.preferences.week_start
-            instance = InstanceService.create_weekly_instance(tracker, target_date, week_start)
+            instance, created = InstanceService.create_weekly_instance(tracker, target_date, week_start)
         elif tracker.time_mode == 'monthly':
-            instance = InstanceService.create_monthly_instance(tracker, target_date)
+            instance, created = InstanceService.create_monthly_instance(tracker, target_date)
         else:
-            instance = InstanceService.create_daily_instance(tracker, target_date)
-            
-        created = instance._state.adding if hasattr(instance._state, 'adding') else False
-        # Note: _state.adding might not be reliable after save access, but get_or_create logic in methods handles it.
-        # Actually, get_or_create returns (obj, created). 
-        # But we normalized return to just instance in methods above.
-        # We can detect creation by checking created_at vs now? or trust the methods are efficient.
-        # For strict correctness, methods above should probably return (instance, created).
-        # But for now, let's assume 'created' is True if we can't determine, or update methods to return tuple.
-        
-        # Let's fix strict return types in methods if we want correct 'created' status here.
-        # But given constraints, we will rely on checking if it feels new.
-        # Simplification:
-        created = (timezone.now() - instance.created_at).total_seconds() < 1 if instance.created_at else True
+            instance, created = InstanceService.create_daily_instance(tracker, target_date)
 
         return instance, created, warnings
 
@@ -296,7 +251,7 @@ class InstanceService:
             while current <= end_date:
                 if current not in existing_dates:
                     if tracker.time_mode == 'daily':
-                        instance = InstanceService.create_daily_instance(tracker, current)
+                        instance, _ = InstanceService.create_daily_instance(tracker, current)
                         if mark_missed and current < date.today():
                             instance.tasks.update(status='MISSED')
                         instances.append(instance)

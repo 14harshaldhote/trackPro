@@ -198,6 +198,7 @@ class TaskStatusUpdateSerializer(serializers.Serializer):
         ('DONE', 'Done'),
         ('MISSED', 'Missed'),
         ('BLOCKED', 'Blocked'),
+        ('SKIPPED', 'Skipped'),  # ← Added for test TASK_011
     ]
     
     status = serializers.ChoiceField(

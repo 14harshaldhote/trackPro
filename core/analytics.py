@@ -727,8 +727,8 @@ def analyze_time_series(tracker_id: str, metric: str = 'completion_rate', foreca
         'metric': metric,
         'trend': {
             'slope': trend_result['slope'],
-            'direction': 'improving' if trend_result['direction'] > 0 else 'declining',
-            'r_squared': 0.0 # Not computed in simplified version
+            'direction': 'improving' if trend_result['slope'] > 0 else 'declining',
+            'r_squared': trend_result.get('r_squared', 0.0)  # Not computed in simplified version
         },
         'forecast': {
             'forecast': forecast_projection,
@@ -888,6 +888,9 @@ def simple_forecast(tracker_id: str, metric: str = 'completion_rate', days: int 
     forecast_values = forecast_result.get('forecast', [])
     conf_lower = forecast_result.get('confidence_lower', [])
     conf_upper = forecast_result.get('confidence_upper', [])
+    
+    # Get last date from historical data
+    last_date = historical_dates[-1] if historical_dates else date.today()
     
     # Create forecast dates - validate last_date is not NaT
     # last_date is already a date object or string from above

@@ -29,32 +29,14 @@ class BaseAPITestCase(TestCase):
             email='test@example.com',
             password='testpass123'
         )
-        # Authenticate the client
-        self._authenticate()
-    
-    def _authenticate(self):
-        """Authenticate the test client."""
-        # Try JWT authentication
-        response = self.client.post('/api/v1/auth/login/', {
-            'email': 'test@example.com',
-            'password': 'testpass123'
-        }, format='json')
-        
-        if response.status_code == 200:
-            data = response.json()
-            token = data.get('access') or data.get('token')
-            if token:
-                self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
-                self.token = token
-                return
-        
-        # Fallback to force authentication
-        self.client.force_authenticate(user=self.user)
+        # Use Django's force_login which sets session-based auth
+        # This makes request.user.is_authenticated return True
+        self.client.force_login(self.user)
         self.token = None
     
     def tearDown(self):
         """Clean up after test."""
-        self.client.credentials()  # Clear credentials
+        self.client.logout()
     
     # =========================================================================
     # ASSERTION HELPERS
@@ -174,6 +156,13 @@ class BaseAPITestCase(TestCase):
         """Create a test task instance."""
         from core.tests.factories import TaskInstanceFactory
         return TaskInstanceFactory.create(instance, template, **kwargs)
+    
+    def create_task(self, instance, template=None, **kwargs):
+        """Alias for create_task_instance for convenience."""
+        if template is None:
+            # Create a default template for the tracker
+            template = self.create_template(instance.tracker)
+        return self.create_task_instance(instance, template, **kwargs)
 
 
 class BaseTransactionTestCase(TransactionTestCase):
@@ -194,7 +183,7 @@ class BaseTransactionTestCase(TransactionTestCase):
             email='test@example.com',
             password='testpass123'
         )
-        self.client.force_authenticate(user=self.user)
+        self.client.force_login(self.user)
 
 
 class UnauthenticatedTestCase(TestCase):

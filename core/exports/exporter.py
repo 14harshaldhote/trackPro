@@ -258,21 +258,40 @@ def export_data(tracker_id: str, format: str = 'csv') -> str:
         })
     
     # Export in requested format
+    # Create dataset using tablib
+    import tablib
+    dataset = tablib.Dataset()
+    dataset.headers = ['Date', 'Total Tasks', 'Completed', 'Completion Rate']
+    
+    for row in daily_rates:
+        dataset.append([
+            str(row['date']),
+            row['total'],
+            row['completed'],
+            row['rate']
+        ])
+    
+    filename = f"tracker_{tracker_id}_daily_rates"
+    
     if format == 'csv':
-        return export_to_csv(export_list_of_dicts, filename=f"tracker_{tracker_id}_daily_rates")
+        response = HttpResponse(dataset.export('csv'), content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}.csv"'
+        return response
     elif format == 'xlsx':
-        return export_to_excel(export_list_of_dicts, filename=f"tracker_{tracker_id}_daily_rates")
+        response = HttpResponse(dataset.export('xlsx'), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="{filename}.xlsx"'
+        return response
     elif format == 'json':
         # For JSON, return as string in HttpResponse
         json_output = json.dumps(export_list_of_dicts, indent=4)
         response = HttpResponse(json_output, content_type='application/json')
-        response['Content-Disposition'] = f'attachment; filename="tracker_{tracker_id}_daily_rates.json"'
+        response['Content-Disposition'] = f'attachment; filename="{filename}.json"'
         return response
     elif format == 'yaml':
         # For YAML, return as string in HttpResponse
         yaml_output = yaml.dump(export_list_of_dicts, sort_keys=False)
         response = HttpResponse(yaml_output, content_type='application/x-yaml')
-        response['Content-Disposition'] = f'attachment; filename="tracker_{tracker_id}_daily_rates.yaml"'
+        response['Content-Disposition'] = f'attachment; filename="{filename}.yaml"'
         return response
     else:
         raise ValueError(f"Unsupported format: {format}")

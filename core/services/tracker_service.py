@@ -38,7 +38,14 @@ class TrackerService:
             
         validated_data = serializer.validated_data
         
-        name = validated_data['name']
+        name = validated_data['name'].strip()
+        # Additional validation for empty names
+        if not name:
+            raise AppValidationError('name', 'Tracker name cannot be empty')
+        # Truncate very long names
+        if len(name) > 200:
+            name = name[:200]
+        
         description = validated_data.get('description', '')
         time_mode = validated_data.get('time_mode', 'daily')
         
@@ -121,13 +128,20 @@ class TrackerService:
             user: User object
         """
         try:
-            tracker = TrackerDefinition.objects.get(tracker_id=tracker_id, user=user)
+            tracker = TrackerDefinition.objects.get(
+                tracker_id=tracker_id, 
+                user=user,
+                deleted_at__isnull=True  # Only get non-deleted trackers
+            )
         except TrackerDefinition.DoesNotExist:
             raise TrackerNotFoundError(tracker_id)
             
         name = tracker.name
         # SoftDeleteModel method
         tracker.soft_delete()
+        # Also update status to archived for consistency
+        tracker.status = 'archived'
+        tracker.save()
         invalidate_tracker_cache(tracker_id)
         
         return {'tracker_id': tracker_id, 'name': name}
@@ -288,9 +302,7 @@ class TrackerService:
                 name=clone_name,
                 description=source.description,
                 time_mode=source.time_mode,
-                status='active',
-                icon=source.icon if hasattr(source, 'icon') else None,
-                color=source.color if hasattr(source, 'color') else None
+                status='active'
             )
             
             # Clone templates

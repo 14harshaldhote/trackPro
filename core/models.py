@@ -616,6 +616,20 @@ class ShareLink(models.Model):
     def __str__(self):
         return f"Share: {self.tracker.name} ({self.permission})"
     
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate token if not set."""
+        if not self.token:
+            import secrets
+            # Generate a URL-safe token
+            # Keep trying until we get a unique one (handle collision)
+            max_attempts = 10
+            for _ in range(max_attempts):
+                self.token = secrets.token_urlsafe(32)
+                # Check if this token already exists
+                if not ShareLink.objects.filter(token=self.token).exists():
+                    break
+        super().save(*args, **kwargs)
+    
     @property
     def is_expired(self):
         """Check if the share link has expired."""

@@ -1,0 +1,13 @@
+pytest
+pytest-timeout
+pytest-xdist
+pytest-mock
+faker
+freezegun
+locust
+memory-profiler
+django-silk
+jsonschema
+openapi-core
+bandit
+safety

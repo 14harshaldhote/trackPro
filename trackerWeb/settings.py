@@ -113,35 +113,47 @@ WSGI_APPLICATION = 'trackerWeb.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Database configuration - uses DATABASE_URL for Railway/Vercel
-# 1. Check for LOCAL/PUBLIC URL first (for local dev with Railway)
-if config('DATABASE_URL_LOCAL', default=None):
-    DATABASES = {
-        'default': dj_database_url.parse(
-            config('DATABASE_URL_LOCAL'),
-            conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=True, # Public proxy requires SSL
-        )
+# # Database configuration - uses DATABASE_URL for Railway/Vercel
+# # 1. Check for LOCAL/PUBLIC URL first (for local dev with Railway)
+# if config('DATABASE_URL_LOCAL', default=None):
+#     DATABASES = {
+#         'default': dj_database_url.parse(
+#             config('DATABASE_URL_LOCAL'),
+#             conn_max_age=600,
+#             conn_health_checks=True,
+#             ssl_require=True, # Public proxy requires SSL
+#         )
+#     }
+# # 2. Fallback to INTERNAL URL (for Railway deployment)
+# elif config('DATABASE_URL', default=None):
+#     DATABASES = {
+#         'default': dj_database_url.parse(
+#             config('DATABASE_URL'),
+#             conn_max_age=600,
+#             conn_health_checks=True,
+#             ssl_require=False, # Internal network doesn't require forced SSL
+#         )
+#     }
+# else:
+#     # Fallback to SQLite for build/local development without database
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.sqlite3',
+#             'NAME': BASE_DIR / 'db.sqlite3',
+#         }
+#     }
+
+# Local MySQL database for testing
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'tracker',
+        'USER': 'root',
+        'PASSWORD': '12345678',
+        'HOST': 'localhost',
+        'PORT': '3306',
     }
-# 2. Fallback to INTERNAL URL (for Railway deployment)
-elif config('DATABASE_URL', default=None):
-    DATABASES = {
-        'default': dj_database_url.parse(
-            config('DATABASE_URL'),
-            conn_max_age=600,
-            conn_health_checks=True,
-            ssl_require=False, # Internal network doesn't require forced SSL
-        )
-    }
-else:
-    # Fallback to SQLite for build/local development without database
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
 
 
 

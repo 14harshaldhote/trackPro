@@ -1,0 +1,42 @@
+[run]
+source = core
+omit =
+    */migrations/*
+    */tests/*
+    */test_*.py
+    */__pycache__/*
+    */venv/*
+    */virtualenv/*
+    */.venv/*
+    */staticfiles/*
+    */media/*
+    core/generate_synthetic_data.py
+    core/exports/training_data_exporter.py
+    core/templates.py
+    core/management/*
+
+[report]
+# Target coverage percentage
+fail_under = 80
+
+# Show missing lines
+show_missing = True
+
+# Exclude lines from coverage
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    def __str__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+
+# Ignore too many branches
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml

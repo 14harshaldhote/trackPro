@@ -47,14 +47,14 @@ class ShareService:
         if expires_in_days:
             expires_at = timezone.now() + timezone.timedelta(days=expires_in_days)
         
-        password_hash = None
+        password_hash = ''
         if password:
             password_hash = hashlib.sha256(password.encode()).hexdigest()
         
         share_link = ShareLink.objects.create(
             tracker=tracker,
             created_by_id=user_id,
-            permission_level=permission_level,
+            permission=permission_level,
             expires_at=expires_at,
             max_uses=max_uses,
             password_hash=password_hash
@@ -215,7 +215,7 @@ class ShareService:
                 'token': str(share.token),
                 'tracker_id': str(share.tracker_id),
                 'tracker_name': share.tracker.name,
-                'permission_level': share.permission_level,
+                'permission_level': share.permission,
                 'use_count': share.use_count,
                 'max_uses': share.max_uses,
                 'is_active': share.is_active,

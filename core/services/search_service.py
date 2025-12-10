@@ -155,7 +155,7 @@ class SearchService:
         recent = SearchHistory.objects.filter(
             user=user
         ).values('query').annotate(
-            count=Count('id'),
+            count=Count('search_id'),
             last_searched=Count('created_at')
         ).order_by('-last_searched')[:limit]
         
@@ -191,7 +191,7 @@ class SearchService:
             query = query.filter(user=user)
         
         popular = query.values('query').annotate(
-            search_count=Count('id'),
+            search_count=Count('search_id'),
             avg_results=Count('result_count')
         ).filter(
             search_count__gte=2  # Must be searched at least twice
@@ -314,7 +314,7 @@ class SearchService:
         unique_queries = history.values('query').distinct().count()
         
         top_queries = history.values('query').annotate(
-            count=Count('id')
+            count=Count('search_id')
         ).order_by('-count')[:5]
         
         from django.db.models import Avg

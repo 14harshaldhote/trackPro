@@ -109,11 +109,11 @@ class ActivityReplayService:
                 'type': 'note_added',
                 'timestamp': note.updated_at.isoformat(),
                 'entity_type': 'note',
-                'entity_id': str(note.id),
-                'description': f"Note added to '{note.tracker.name}' for {note.tracking_date}",
+                'entity_id': str(note.note_id),
+                'description': f"Note added to '{note.tracker.name}' for {note.date}",
                 'data': {
                     'tracker_name': note.tracker.name,
-                    'date': note.tracking_date.isoformat(),
+                    'date': note.date.isoformat(),
                     'preview': note.content[:100] if note.content else ''
                 }
             })
@@ -207,7 +207,7 @@ class ActivityReplayService:
         # Get notes for this date
         notes = DayNote.objects.filter(
             tracker__user_id=user_id,
-            tracking_date=target_date
+            date=target_date
         ).select_related('tracker')
         
         for note in notes:
